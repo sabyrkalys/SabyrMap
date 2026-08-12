@@ -9,7 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = 'c07edf723a81'
@@ -19,8 +19,26 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    pass
+    op.create_table(
+        'resources',
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('org_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('owner_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('resource_type', postgresql.ENUM('waypoint', 'track', name='resource_type'), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
+        sa.ForeignKeyConstraint(['org_id'], ['organizations.id']),
+        sa.ForeignKeyConstraint(['owner_id'], ['users.id']),
+        sa.PrimaryKeyConstraint('id'),
+    )
+
+    op.create_index('ix_resources_org_id', 'resources', ['org_id'])
+    op.create_index('ix_resources_owner_id', 'resources', ['owner_id'])
+    op.create_index('ix_resources_org_type', 'resources', ['org_id', 'resource_type'])
 
 
 def downgrade() -> None:
-    pass
+    op.drop_index('ix_resources_org_type', table_name='resources')
+    op.drop_index('ix_resources_owner_id', table_name='resources')
+    op.drop_index('ix_resources_org_id', table_name='resources')
+    op.drop_table('resources')
