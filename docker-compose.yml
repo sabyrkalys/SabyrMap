@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgis/postgis:15-3.4
+    environment:
+      POSTGRES_USER: alpinequest
+      POSTGRES_PASSWORD: alpinequest
+      POSTGRES_DB: alpinequest
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alpinequest"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: ./api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://alpinequest:alpinequest@db:5432/alpinequest
+      JWT_SECRET_KEY: dev-secret-change-me
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+
+volumes:
+  postgres_data:
