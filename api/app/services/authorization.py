@@ -8,6 +8,8 @@ from app.models.user import User
 
 
 def can_view_resource(db: Session, user: User, resource: Resource) -> bool:
+    if user.deleted_at is not None:
+        return False
     if resource.deleted_at is not None:
         return False
     if resource.org_id != user.org_id:

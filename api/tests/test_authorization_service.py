@@ -88,6 +88,31 @@ def test_deleted_resource_is_never_visible(db_session):
     assert can_view_resource(db_session, member, resource) is False
 
 
+def test_user_scope_share_to_someone_else_does_not_grant_access(db_session):
+    org, (creator, target, bystander) = _setup(db_session, roles=(Role.MEMBER, Role.MEMBER, Role.MEMBER))
+    resource = Resource(org_id=org.id, owner_id=creator.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+    db_session.add(ResourceShare(
+        resource_id=resource.id, shared_with_user_id=target.id,
+        scope=ShareScope.USER, permission=Permission.VIEW, created_by=creator.id,
+    ))
+    db_session.flush()
+
+    assert can_view_resource(db_session, bystander, resource) is False
+
+
+def test_soft_deleted_user_cannot_view_own_resource(db_session):
+    org, (member,) = _setup(db_session, roles=(Role.OWNER,))
+    member.deleted_at = datetime.now(timezone.utc)
+    db_session.flush()
+    resource = Resource(org_id=org.id, owner_id=member.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+
+    assert can_view_resource(db_session, member, resource) is False
+
+
 def test_resource_in_other_org_never_visible(db_session):
     org1, (member1,) = _setup(db_session, roles=(Role.OWNER,))
     org2 = Organization(name="Other Org", plan="free")
