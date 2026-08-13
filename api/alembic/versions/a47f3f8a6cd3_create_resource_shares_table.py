@@ -17,11 +17,13 @@ down_revision: Union[str, None] = 'f0a2386014e2'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+share_scope_enum = postgresql.ENUM("user", "organization", name="share_scope")
+permission_enum = postgresql.ENUM("view", "edit", name="permission")
+
 
 def upgrade() -> None:
-    # Create enums - use if not exists via raw SQL to handle both fresh and existing databases
-    op.execute("CREATE TYPE share_scope AS ENUM ('user', 'organization')")
-    op.execute("CREATE TYPE permission AS ENUM ('view', 'edit')")
+    share_scope_enum.create(op.get_bind(), checkfirst=True)
+    permission_enum.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
         "resource_shares",
@@ -49,5 +51,5 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("resource_shares")
-    op.execute("DROP TYPE IF EXISTS permission")
-    op.execute("DROP TYPE IF EXISTS share_scope")
+    permission_enum.drop(op.get_bind(), checkfirst=True)
+    share_scope_enum.drop(op.get_bind(), checkfirst=True)
