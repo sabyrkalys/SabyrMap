@@ -10,6 +10,7 @@ def test_create_organization(db_session):
     assert org.name == "Acme Corp"
     assert org.plan == "free"
     assert org.limits_json == {}
+
     assert org.created_at is not None
 
 
