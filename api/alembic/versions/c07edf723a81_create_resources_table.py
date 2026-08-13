@@ -17,14 +17,18 @@ down_revision: Union[str, None] = 'c3926462607a'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
+resource_type_enum = postgresql.ENUM('waypoint', 'track', name='resource_type')
+
 
 def upgrade() -> None:
+    resource_type_enum.create(op.get_bind(), checkfirst=True)
+
     op.create_table(
         'resources',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('org_id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('owner_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('resource_type', postgresql.ENUM('waypoint', 'track', name='resource_type'), nullable=False),
+        sa.Column('resource_type', postgresql.ENUM('waypoint', 'track', name='resource_type', create_type=False), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(['org_id'], ['organizations.id']),
@@ -42,3 +46,4 @@ def downgrade() -> None:
     op.drop_index('ix_resources_owner_id', table_name='resources')
     op.drop_index('ix_resources_org_id', table_name='resources')
     op.drop_table('resources')
+    resource_type_enum.drop(op.get_bind(), checkfirst=True)
