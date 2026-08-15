@@ -1,0 +1,417 @@
+<title>Снимок базы данных AlpineQuest</title>
+<style>
+  :root{
+    --bg:#F6F7F5;
+    --surface:#FFFFFF;
+    --surface-2:#EEF1EE;
+    --line:#DBE1DC;
+    --text:#1C2624;
+    --muted:#5B6B65;
+    --faint:#8A968F;
+    --accent:#2E6E7E;
+    --accent-soft:#DCEBEE;
+    --accent-strong:#1F4E5A;
+    --amber:#8A6A2A;
+    --amber-soft:#F3EAD3;
+    --shadow: 0 1px 2px rgba(28,38,36,0.06), 0 8px 24px -12px rgba(28,38,36,0.12);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#12181A;
+      --surface:#182223;
+      --surface-2:#1E2A2B;
+      --line:#2B3839;
+      --text:#E8EEEC;
+      --muted:#9FB0AB;
+      --faint:#71827D;
+      --accent:#6FBAC9;
+      --accent-soft:#20393E;
+      --accent-strong:#9AD2DD;
+      --amber:#D9B871;
+      --amber-soft:#3A3120;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px -16px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12181A;
+    --surface:#182223;
+    --surface-2:#1E2A2B;
+    --line:#2B3839;
+    --text:#E8EEEC;
+    --muted:#9FB0AB;
+    --faint:#71827D;
+    --accent:#6FBAC9;
+    --accent-soft:#20393E;
+    --accent-strong:#9AD2DD;
+    --amber:#D9B871;
+    --amber-soft:#3A3120;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px -16px rgba(0,0,0,0.6);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:1080px;
+    margin:0 auto;
+    padding:56px 32px 96px;
+  }
+
+  header{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    margin-bottom:40px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:28px;
+  }
+  .eyebrow{
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+    font-size:12px;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+    color:var(--accent);
+  }
+  h1{
+    font-size:38px;
+    line-height:1.15;
+    margin:0;
+    font-weight:600;
+    text-wrap:balance;
+  }
+  .sub{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    color:var(--muted);
+    font-size:15px;
+    max-width:62ch;
+    line-height:1.55;
+  }
+  .meta-row{
+    display:flex;
+    gap:24px;
+    flex-wrap:wrap;
+    margin-top:6px;
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+    font-size:12.5px;
+    color:var(--faint);
+  }
+  .meta-row b{ color:var(--text); font-weight:600; }
+
+  /* schema map */
+  .schema{
+    display:flex;
+    align-items:center;
+    gap:0;
+    flex-wrap:wrap;
+    margin:36px 0 48px;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  .node{
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:12px 16px;
+    box-shadow:var(--shadow);
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    min-width:118px;
+  }
+  .node .n-title{ font-weight:700; font-size:14px; }
+  .node .n-count{ font-size:12px; color:var(--muted); font-family:ui-monospace, monospace; font-variant-numeric:tabular-nums; }
+  .arrow{
+    color:var(--faint);
+    font-size:18px;
+    padding:0 10px;
+    align-self:center;
+  }
+  .branch{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  section.table-block{
+    margin-bottom:44px;
+  }
+  .table-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    gap:16px;
+    margin-bottom:12px;
+  }
+  .table-head h2{
+    font-size:19px;
+    margin:0;
+    font-weight:700;
+    letter-spacing:.01em;
+  }
+  .table-head .rowcount{
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+    font-size:12px;
+    color:var(--faint);
+    white-space:nowrap;
+  }
+  .table-note{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    margin:-4px 0 14px;
+    max-width:70ch;
+    line-height:1.5;
+  }
+
+  .table-scroll{
+    overflow-x:auto;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:var(--shadow);
+  }
+  table{
+    border-collapse:collapse;
+    width:100%;
+    min-width:560px;
+    font-family: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
+    font-size:13px;
+  }
+  thead th{
+    text-align:left;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:600;
+    padding:12px 16px;
+    background:var(--surface-2);
+    border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody td{
+    padding:11px 16px;
+    border-bottom:1px solid var(--line);
+    color:var(--text);
+    white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+  }
+  tbody tr:last-child td{ border-bottom:none; }
+  td.id, td.uuid{ color:var(--faint); }
+  td.empty-msg{
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    color:var(--faint);
+    font-style:italic;
+    white-space:normal;
+  }
+
+  .pill{
+    display:inline-block;
+    padding:3px 9px;
+    border-radius:999px;
+    font-size:11.5px;
+    font-weight:600;
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  .pill-owner{ background:var(--accent-soft); color:var(--accent-strong); }
+  .pill-view{ background:var(--surface-2); color:var(--muted); border:1px solid var(--line); }
+  .pill-org{ background:var(--amber-soft); color:var(--amber); }
+  .pill-type{ background:var(--surface-2); color:var(--text); border:1px solid var(--line); }
+
+  footer{
+    margin-top:56px;
+    padding-top:20px;
+    border-top:1px solid var(--line);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size:12.5px;
+    color:var(--faint);
+    line-height:1.6;
+  }
+
+  @media (max-width:640px){
+    h1{ font-size:28px; }
+    .wrap{ padding:36px 18px 72px; }
+    .schema{ flex-direction:column; align-items:stretch; }
+    .arrow{ transform:rotate(90deg); align-self:flex-start; margin-left:20px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <span class="eyebrow">AlpineQuest SaaS &middot; локальная база данных</span>
+    <h1>Снимок схемы и тестовых данных</h1>
+    <p class="sub">Актуальное содержимое базы PostGIS на момент сессии — один демо-тенант, один владелец, два гео-ресурса и одна запись шаринга, показаны в порядке движения данных: организация → пользователь → ресурс → геометрия / шаринг.</p>
+    <div class="meta-row">
+      <span><b>СУБД</b> postgis/postgis:15-3.4</span>
+      <span><b>хост</b> localhost:5433</span>
+      <span><b>таблиц</b> 6</span>
+      <span><b>заполнено строк</b> 6</span>
+    </div>
+  </header>
+
+  <div class="schema">
+    <div class="node"><span class="n-title">organizations</span><span class="n-count">1 строка</span></div>
+    <span class="arrow">&#8594;</span>
+    <div class="node"><span class="n-title">users</span><span class="n-count">1 строка</span></div>
+    <span class="arrow">&#8594;</span>
+    <div class="node"><span class="n-title">resources</span><span class="n-count">2 строки</span></div>
+    <span class="arrow">&#8594;</span>
+    <div class="branch">
+      <div class="node"><span class="n-title">waypoints</span><span class="n-count">1 строка</span></div>
+      <div class="node"><span class="n-title">tracks</span><span class="n-count">1 строка</span></div>
+      <div class="node"><span class="n-title">resource_shares</span><span class="n-count">1 строка</span></div>
+    </div>
+  </div>
+
+  <section class="table-block">
+    <div class="table-head">
+      <h2>organizations</h2>
+      <span class="rowcount">1 строка</span>
+    </div>
+    <p class="table-note">Каждый пользователь и ресурс принадлежит ровно одной организации.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>id</th><th>name</th><th>plan</th><th>limits_json</th><th>created_at</th><th>deleted_at</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="uuid">f597f31d&hellip;fad125</td>
+            <td>test@alpinequest.dev</td>
+            <td><span class="pill pill-owner">персональный</span></td>
+            <td>{}</td>
+            <td>2026-08-15 14:25:05</td>
+            <td>&mdash;</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="table-block">
+    <div class="table-head">
+      <h2>users</h2>
+      <span class="rowcount">1 строка</span>
+    </div>
+    <p class="table-note">один вызов создаёт и организацию, и её первого владельца.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>id</th><th>org_id</th><th>email</th><th>password_hash</th><th>role</th><th>created_at</th><th>deleted_at</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="uuid">f03d359a&hellip;71b6edda</td>
+            <td class="uuid">f597f31d&hellip;fad125</td>
+            <td>test@alpinequest.dev</td>
+            <td>not-a-real-hash</td>
+            <td><span class="pill pill-owner">владелец</span></td>
+            <td>2026-08-15 14:25:05</td>
+            <td>&mdash;</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="table-block">
+    <div class="table-head">
+      <h2>resources</h2>
+      <span class="rowcount">2 строки</span>
+    </div>
+    <p class="table-note">Общая родительская запись для каждого гео-объекта. <code>waypoints</code> и <code>tracks</code> расширяют её 1:1, используя тот же первичный ключ.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>id</th><th>org_id</th><th>owner_id</th><th>resource_type</th><th>created_at</th><th>deleted_at</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="uuid">0aa5b7ca&hellip;778d0aa</td>
+            <td class="uuid">f597f31d&hellip;fad125</td>
+            <td class="uuid">f03d359a&hellip;71b6edda</td>
+            <td><span class="pill pill-type">путевая точка</span></td>
+            <td>2026-08-15 14:52:22</td>
+            <td>&mdash;</td>
+          </tr>
+          <tr>
+            <td class="uuid">92420ef5&hellip;e2cf5eaa1d</td>
+            <td class="uuid">f597f31d&hellip;fad125</td>
+            <td class="uuid">f03d359a&hellip;71b6edda</td>
+            <td><span class="pill pill-type">трек</span></td>
+            <td>2026-08-15 14:53:13</td>
+            <td>&mdash;</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="table-block">
+    <div class="table-head">
+      <h2>waypoints</h2>
+      <span class="rowcount">1 строка</span>
+    </div>
+    <p class="table-note">Расширяет первую строку <code>resources</code> выше названием и геометрией PostGIS <code>POINT</code>.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>id</th><th>name</th><th>geom (ST_AsText)</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="uuid">0aa5b7ca&hellip;778d0aa</td>
+            <td>Trailhead</td>
+            <td>POINT(7.6 45.9)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="table-block">
+    <div class="table-head">
+      <h2>tracks</h2>
+      <span class="rowcount">1 строка</span>
+    </div>
+    <p class="table-note">Расширяет вторую строку <code>resources</code> выше названием и геометрией PostGIS <code>LINESTRING</code>.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>id</th><th>name</th><th>geom (ST_AsText)</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="uuid">92420ef5&hellip;e2cf5eaa1d</td>
+            <td>Ridge Loop</td>
+            <td>LINESTRING(7.6 45.9, 7.7 46, 7.8 46.05)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="table-block">
+    <div class="table-head">
+      <h2>resource_shares</h2>
+      <span class="rowcount">1 строка</span>
+    </div>
+    <p class="table-note">Даёт доступ к ресурсу помимо владельца — либо одному пользователю, либо, как здесь, всей организации.</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>id</th><th>resource_id</th><th>shared_with_user_id</th><th>scope</th><th>permission</th><th>created_by</th><th>created_at</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="uuid">bf1cb00f&hellip;e37bfd5</td>
+            <td class="uuid">0aa5b7ca&hellip;778d0aa</td>
+            <td class="empty-msg">null</td>
+            <td><span class="pill pill-org">организация</span></td>
+            <td><span class="pill pill-view">просмотр</span></td>
+            <td class="uuid">f03d359a&hellip;71b6edda</td>
+            <td>2026-08-15 14:56:09</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+  </footer>
+
+</div>
