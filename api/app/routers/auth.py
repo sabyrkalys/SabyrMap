@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import RegisterRequest, TokenResponse
-from app.services.auth import create_access_token, hash_password
+from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.services.auth import create_access_token, hash_password, verify_password
 from app.services.organizations import create_personal_organization_and_owner
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -26,5 +26,22 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     user = create_personal_organization_and_owner(
         db, email=payload.email, password_hash=hash_password(payload.password)
     )
+    token = create_access_token(user.id)
+    return TokenResponse(access_token=token)
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = (
+        db.query(User)
+        .filter(User.email == payload.email, User.deleted_at.is_(None))
+        .first()
+    )
+    if user is None or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)
