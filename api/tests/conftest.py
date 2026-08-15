@@ -3,6 +3,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import email_validator
 import psycopg2
 import pytest
 from fastapi.testclient import TestClient
@@ -12,6 +13,12 @@ from sqlalchemy.orm import sessionmaker
 from app.config import settings
 from app.database import Base
 from app.main import app
+
+# Tests use *.test addresses (RFC 2606 reserved TLD) as fixtures. email-validator
+# treats "test" as a special-use domain and rejects it by default; disable that
+# check for the test suite only so RegisterRequest/LoginRequest still validate
+# these addresses without weakening production email validation.
+email_validator.SPECIAL_USE_DOMAIN_NAMES = []
 
 TEST_DB_NAME = "alpinequest_test"
 
