@@ -127,3 +127,59 @@ def test_me_rejects_missing_token(client):
 def test_me_rejects_invalid_token(client):
     response = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
     assert response.status_code == 401
+
+
+def test_register_rejects_password_over_72_bytes(client):
+    response = client.post(
+        "/auth/register",
+        json={"email": "long-pass@example.test", "password": "x" * 73},
+    )
+    assert response.status_code == 422
+
+
+def test_login_rejects_password_over_72_bytes(client):
+    response = client.post(
+        "/auth/login",
+        json={"email": "long-pass-login@example.test", "password": "x" * 73},
+    )
+    assert response.status_code == 422
+
+
+def test_register_email_is_case_insensitive_duplicate(client):
+    client.post(
+        "/auth/register",
+        json={"email": "CaseTest@example.test", "password": "s3cret-pass"},
+    )
+
+    response = client.post(
+        "/auth/register",
+        json={"email": "casetest@example.test", "password": "another-pass"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_login_email_is_case_insensitive(client):
+    client.post(
+        "/auth/register",
+        json={"email": "MixedCase@example.test", "password": "s3cret-pass"},
+    )
+
+    response = client.post(
+        "/auth/login",
+        json={"email": "mixedcase@example.test", "password": "s3cret-pass"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_register_stores_lowercased_email(client, db_session):
+    from app.models.user import User
+
+    client.post(
+        "/auth/register",
+        json={"email": "LowerMe@example.test", "password": "s3cret-pass"},
+    )
+
+    user = db_session.query(User).filter_by(email="lowerme@example.test").one_or_none()
+    assert user is not None
