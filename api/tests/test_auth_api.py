@@ -100,3 +100,30 @@ def test_login_rejects_soft_deleted_user(client, db_session):
     )
 
     assert response.status_code == 401
+
+
+def test_me_returns_current_user(client):
+    register_response = client.post(
+        "/auth/register",
+        json={"email": "me-user@example.test", "password": "s3cret-pass"},
+    )
+    token = register_response.json()["access_token"]
+
+    response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["email"] == "me-user@example.test"
+    assert body["role"] == "owner"
+    assert "org_id" in body
+
+
+def test_me_rejects_missing_token(client):
+    response = client.get("/auth/me")
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Could not validate credentials"}
+
+
+def test_me_rejects_invalid_token(client):
+    response = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
+    assert response.status_code == 401

@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from app.services.auth import create_access_token, hash_password, verify_password
 from app.services.organizations import create_personal_organization_and_owner
 
@@ -45,3 +46,13 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     token = create_access_token(user.id)
     return TokenResponse(access_token=token)
+
+
+@router.get("/me", response_model=UserResponse)
+def me(current_user: User = Depends(get_current_user)):
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        role=current_user.role.value,
+        org_id=current_user.org_id,
+    )
