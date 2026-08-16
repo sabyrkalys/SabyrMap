@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
-from app.models.enums import ShareScope
+from app.models.enums import Permission as OrmPermission, ShareScope as OrmShareScope
 from app.models.resource import Resource
 from app.models.resource_share import ResourceShare
 from app.models.user import User
-from app.schemas.shares import ShareCreateRequest, ShareListResponse, ShareResponse
+from app.schemas.shares import Permission, ShareCreateRequest, ShareListResponse, ShareResponse, ShareScope
 from app.services.authorization import can_edit_resource
 
 router = APIRouter(prefix="/resources", tags=["shares"])
@@ -38,8 +38,8 @@ def _to_response(share: ResourceShare) -> ShareResponse:
     return ShareResponse(
         id=share.id,
         resource_id=share.resource_id,
-        scope=share.scope,
-        permission=share.permission,
+        scope=ShareScope(share.scope.value),
+        permission=Permission(share.permission.value),
         shared_with_user_id=share.shared_with_user_id,
         created_by=share.created_by,
         created_at=share.created_at,
@@ -82,14 +82,14 @@ def create_share(
             db.query(ResourceShare)
             .filter(
                 ResourceShare.resource_id == resource.id,
-                ResourceShare.scope == ShareScope.ORGANIZATION,
+                ResourceShare.scope == OrmShareScope.ORGANIZATION,
             )
             .first()
         )
 
     if existing is not None:
-        existing.scope = payload.scope
-        existing.permission = payload.permission
+        existing.scope = OrmShareScope(payload.scope.value)
+        existing.permission = OrmPermission(payload.permission.value)
         db.flush()
         response.status_code = status.HTTP_200_OK
         return _to_response(existing)
@@ -97,8 +97,8 @@ def create_share(
     share = ResourceShare(
         resource_id=resource.id,
         shared_with_user_id=payload.shared_with_user_id,
-        scope=payload.scope,
-        permission=payload.permission,
+        scope=OrmShareScope(payload.scope.value),
+        permission=OrmPermission(payload.permission.value),
         created_by=current_user.id,
     )
     db.add(share)

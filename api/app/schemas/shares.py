@@ -1,9 +1,18 @@
+import enum
 import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, model_validator
 
-from app.models.enums import Permission, ShareScope
+
+class ShareScope(str, enum.Enum):
+    USER = "user"
+    ORGANIZATION = "organization"
+
+
+class Permission(str, enum.Enum):
+    VIEW = "view"
+    EDIT = "edit"
 
 
 class ShareCreateRequest(BaseModel):
