@@ -157,3 +157,68 @@ def test_create_share_on_nonexistent_resource_404(client):
         headers=headers,
     )
     assert response.status_code == 404
+
+
+def test_create_share_without_target_when_scope_is_user_returns_422(client):
+    headers = _register(client, "share-owner-9@example.test")
+    waypoint_id = _create_waypoint(client, headers)
+
+    response = client.post(
+        f"/resources/{waypoint_id}/shares",
+        json={"scope": "user", "permission": "edit"},
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
+def test_resharing_same_user_updates_permission(client, db_session):
+    owner_headers = _register(client, "share-owner-10@example.test")
+    waypoint_id = _create_waypoint(client, owner_headers)
+
+    owner = db_session.query(User).filter_by(email="share-owner-10@example.test").one()
+    target = _add_org_member(db_session, owner.org_id, "share-target-10@example.test")
+
+    first_response = client.post(
+        f"/resources/{waypoint_id}/shares",
+        json={"scope": "user", "permission": "view", "shared_with_user_id": str(target.id)},
+        headers=owner_headers,
+    )
+    assert first_response.status_code == 201
+
+    second_response = client.post(
+        f"/resources/{waypoint_id}/shares",
+        json={"scope": "user", "permission": "edit", "shared_with_user_id": str(target.id)},
+        headers=owner_headers,
+    )
+    assert second_response.status_code == 200
+    assert second_response.json()["permission"] == "edit"
+
+    list_response = client.get(f"/resources/{waypoint_id}/shares", headers=owner_headers)
+    matching = [
+        item for item in list_response.json()["items"] if item["shared_with_user_id"] == str(target.id)
+    ]
+    assert len(matching) == 1
+    assert matching[0]["permission"] == "edit"
+
+
+def test_view_shared_user_can_actually_view_the_resource(client, db_session):
+    owner_headers = _register(client, "share-owner-11@example.test")
+    waypoint_id = _create_waypoint(client, owner_headers)
+
+    owner = db_session.query(User).filter_by(email="share-owner-11@example.test").one()
+    viewer = _add_org_member(db_session, owner.org_id, "share-viewer-11@example.test")
+
+    grant_response = client.post(
+        f"/resources/{waypoint_id}/shares",
+        json={"scope": "user", "permission": "view", "shared_with_user_id": str(viewer.id)},
+        headers=owner_headers,
+    )
+    assert grant_response.status_code == 201
+
+    viewer_headers = _auth_headers_for(viewer)
+    get_response = client.get(f"/waypoints/{waypoint_id}", headers=viewer_headers)
+    assert get_response.status_code == 200
+
+    list_response = client.get("/waypoints", headers=viewer_headers)
+    assert list_response.status_code == 200
+    assert any(item["id"] == waypoint_id for item in list_response.json()["items"])

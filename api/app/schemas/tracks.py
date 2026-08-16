@@ -1,18 +1,18 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.geometry import GeoJSONLineString
 
 
 class TrackCreateRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     geom: GeoJSONLineString
 
 
 class TrackUpdateRequest(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1)
     geom: GeoJSONLineString | None = None
 
 

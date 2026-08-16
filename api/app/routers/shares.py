@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -45,10 +45,11 @@ def _to_response(share: ResourceShare) -> ShareResponse:
     )
 
 
-@router.post("/{resource_id}/shares", response_model=ShareResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{resource_id}/shares", response_model=ShareResponse)
 def create_share(
     resource_id: uuid.UUID,
     payload: ShareCreateRequest,
+    response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -67,6 +68,21 @@ def create_share(
                 detail="shared_with_user_id must belong to the resource's organization",
             )
 
+        existing = (
+            db.query(ResourceShare)
+            .filter(
+                ResourceShare.resource_id == resource.id,
+                ResourceShare.shared_with_user_id == payload.shared_with_user_id,
+            )
+            .first()
+        )
+        if existing is not None:
+            existing.scope = payload.scope
+            existing.permission = payload.permission
+            db.flush()
+            response.status_code = status.HTTP_200_OK
+            return _to_response(existing)
+
     share = ResourceShare(
         resource_id=resource.id,
         shared_with_user_id=payload.shared_with_user_id,
@@ -76,6 +92,7 @@ def create_share(
     )
     db.add(share)
     db.flush()
+    response.status_code = status.HTTP_201_CREATED
     return _to_response(share)
 
 

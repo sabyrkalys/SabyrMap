@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, model_validator
 
 from app.models.enums import Permission, ShareScope
 
@@ -11,15 +11,13 @@ class ShareCreateRequest(BaseModel):
     permission: Permission
     shared_with_user_id: uuid.UUID | None = None
 
-    @field_validator("shared_with_user_id")
-    @classmethod
-    def _validate_target(cls, v: uuid.UUID | None, info) -> uuid.UUID | None:
-        scope = info.data.get("scope")
-        if scope == ShareScope.USER and v is None:
+    @model_validator(mode="after")
+    def _validate_target(self) -> "ShareCreateRequest":
+        if self.scope == ShareScope.USER and self.shared_with_user_id is None:
             raise ValueError("shared_with_user_id is required when scope is 'user'")
-        if scope == ShareScope.ORGANIZATION and v is not None:
+        if self.scope == ShareScope.ORGANIZATION and self.shared_with_user_id is not None:
             raise ValueError("shared_with_user_id must be omitted when scope is 'organization'")
-        return v
+        return self
 
 
 class ShareResponse(BaseModel):

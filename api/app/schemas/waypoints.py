@@ -1,18 +1,18 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.geometry import GeoJSONPoint
 
 
 class WaypointCreateRequest(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     geom: GeoJSONPoint
 
 
 class WaypointUpdateRequest(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1)
     geom: GeoJSONPoint | None = None
 
 

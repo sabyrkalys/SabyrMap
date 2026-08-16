@@ -57,6 +57,16 @@ def test_get_waypoint_forbidden_for_other_org(client):
     assert response.status_code == 403
 
 
+def test_create_waypoint_rejects_empty_name(client):
+    headers = _register(client, "waypoint-empty-name@example.test")
+    response = client.post(
+        "/waypoints",
+        json={"name": "", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
 def test_create_waypoint_rejects_wrong_geometry_type(client):
     headers = _register(client, "waypoint-badgeom@example.test")
     response = client.post(

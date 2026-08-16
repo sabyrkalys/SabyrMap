@@ -67,7 +67,11 @@ def list_tracks(
 ):
     resources = (
         db.query(Resource)
-        .filter(Resource.resource_type == ResourceType.TRACK, Resource.deleted_at.is_(None))
+        .filter(
+            Resource.resource_type == ResourceType.TRACK,
+            Resource.deleted_at.is_(None),
+            Resource.org_id == current_user.org_id,
+        )
         .order_by(Resource.created_at)
         .all()
     )

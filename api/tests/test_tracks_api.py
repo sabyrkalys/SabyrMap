@@ -53,6 +53,16 @@ def test_get_track_forbidden_for_other_org(client):
     assert response.status_code == 403
 
 
+def test_create_track_rejects_empty_name(client):
+    headers = _register(client, "track-empty-name@example.test")
+    response = client.post(
+        "/tracks",
+        json={"name": "", "geom": _LINE_B},
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
 def test_create_track_rejects_wrong_geometry_type(client):
     headers = _register(client, "track-badgeom@example.test")
     response = client.post(

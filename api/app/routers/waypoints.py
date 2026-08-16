@@ -67,7 +67,11 @@ def list_waypoints(
 ):
     resources = (
         db.query(Resource)
-        .filter(Resource.resource_type == ResourceType.WAYPOINT, Resource.deleted_at.is_(None))
+        .filter(
+            Resource.resource_type == ResourceType.WAYPOINT,
+            Resource.deleted_at.is_(None),
+            Resource.org_id == current_user.org_id,
+        )
         .order_by(Resource.created_at)
         .all()
     )
