@@ -201,6 +201,31 @@ def test_resharing_same_user_updates_permission(client, db_session):
     assert matching[0]["permission"] == "edit"
 
 
+def test_resharing_organization_scope_updates_permission_without_duplicate(client, db_session):
+    owner_headers = _register(client, "share-owner-12@example.test")
+    waypoint_id = _create_waypoint(client, owner_headers)
+
+    first_response = client.post(
+        f"/resources/{waypoint_id}/shares",
+        json={"scope": "organization", "permission": "view"},
+        headers=owner_headers,
+    )
+    assert first_response.status_code == 201
+
+    second_response = client.post(
+        f"/resources/{waypoint_id}/shares",
+        json={"scope": "organization", "permission": "edit"},
+        headers=owner_headers,
+    )
+    assert second_response.status_code == 200
+    assert second_response.json()["permission"] == "edit"
+
+    list_response = client.get(f"/resources/{waypoint_id}/shares", headers=owner_headers)
+    org_shares = [item for item in list_response.json()["items"] if item["scope"] == "organization"]
+    assert len(org_shares) == 1
+    assert org_shares[0]["permission"] == "edit"
+
+
 def test_view_shared_user_can_actually_view_the_resource(client, db_session):
     owner_headers = _register(client, "share-owner-11@example.test")
     waypoint_id = _create_waypoint(client, owner_headers)

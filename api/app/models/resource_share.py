@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -16,6 +16,12 @@ class ResourceShare(Base):
         Index("ix_resource_shares_resource_id", "resource_id"),
         Index("ix_resource_shares_user_id", "shared_with_user_id"),
         UniqueConstraint("resource_id", "shared_with_user_id", name="uq_resource_shares_resource_user"),
+        Index(
+            "uq_resource_shares_resource_org",
+            "resource_id",
+            unique=True,
+            postgresql_where=text("scope = 'organization'"),
+        ),
         CheckConstraint(
             "(scope = 'user' AND shared_with_user_id IS NOT NULL) OR "
             "(scope = 'organization' AND shared_with_user_id IS NULL)",

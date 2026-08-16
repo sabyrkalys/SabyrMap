@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.models.enums import ShareScope
 from app.models.resource import Resource
 from app.models.resource_share import ResourceShare
 from app.models.user import User
@@ -76,12 +77,22 @@ def create_share(
             )
             .first()
         )
-        if existing is not None:
-            existing.scope = payload.scope
-            existing.permission = payload.permission
-            db.flush()
-            response.status_code = status.HTTP_200_OK
-            return _to_response(existing)
+    else:
+        existing = (
+            db.query(ResourceShare)
+            .filter(
+                ResourceShare.resource_id == resource.id,
+                ResourceShare.scope == ShareScope.ORGANIZATION,
+            )
+            .first()
+        )
+
+    if existing is not None:
+        existing.scope = payload.scope
+        existing.permission = payload.permission
+        db.flush()
+        response.status_code = status.HTTP_200_OK
+        return _to_response(existing)
 
     share = ResourceShare(
         resource_id=resource.id,

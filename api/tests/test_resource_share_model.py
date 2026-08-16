@@ -88,3 +88,20 @@ def test_duplicate_share_to_same_user_rejected(db_session):
     ))
     with pytest.raises(IntegrityError):
         db_session.flush()
+
+
+def test_duplicate_organization_scope_share_rejected(db_session):
+    org, owner, resource = _org_owner_resource(db_session, email="owner9@acme.test")
+
+    db_session.add(ResourceShare(
+        resource_id=resource.id, shared_with_user_id=None,
+        scope=ShareScope.ORGANIZATION, permission=Permission.VIEW, created_by=owner.id,
+    ))
+    db_session.flush()
+
+    db_session.add(ResourceShare(
+        resource_id=resource.id, shared_with_user_id=None,
+        scope=ShareScope.ORGANIZATION, permission=Permission.EDIT, created_by=owner.id,
+    ))
+    with pytest.raises(IntegrityError):
+        db_session.flush()
