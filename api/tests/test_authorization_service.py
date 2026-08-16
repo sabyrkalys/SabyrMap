@@ -5,7 +5,7 @@ from app.models.organization import Organization
 from app.models.resource import Resource
 from app.models.resource_share import ResourceShare
 from app.models.user import User
-from app.services.authorization import can_view_resource
+from app.services.authorization import can_edit_resource, can_view_resource
 
 
 def _setup(db_session, roles=("member",)):
@@ -126,3 +126,86 @@ def test_resource_in_other_org_never_visible(db_session):
     db_session.flush()
 
     assert can_view_resource(db_session, member1, resource) is False
+
+
+def test_owner_can_edit_own_resource(db_session):
+    org, (owner,) = _setup(db_session, roles=(Role.MEMBER,))
+    resource = Resource(org_id=org.id, owner_id=owner.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+
+    assert can_edit_resource(db_session, owner, resource) is True
+
+
+def test_org_admin_cannot_edit_others_resource_without_share(db_session):
+    org, (creator, admin) = _setup(db_session, roles=(Role.MEMBER, Role.ADMIN))
+    resource = Resource(org_id=org.id, owner_id=creator.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+
+    assert can_edit_resource(db_session, admin, resource) is False
+
+
+def test_user_scope_edit_share_grants_edit(db_session):
+    org, (creator, editor) = _setup(db_session, roles=(Role.MEMBER, Role.MEMBER))
+    resource = Resource(org_id=org.id, owner_id=creator.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+    db_session.add(ResourceShare(
+        resource_id=resource.id, shared_with_user_id=editor.id,
+        scope=ShareScope.USER, permission=Permission.EDIT, created_by=creator.id,
+    ))
+    db_session.flush()
+
+    assert can_edit_resource(db_session, editor, resource) is True
+
+
+def test_organization_scope_edit_share_grants_edit_to_any_member(db_session):
+    org, (creator, other_member) = _setup(db_session, roles=(Role.MEMBER, Role.MEMBER))
+    resource = Resource(org_id=org.id, owner_id=creator.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+    db_session.add(ResourceShare(
+        resource_id=resource.id, shared_with_user_id=None,
+        scope=ShareScope.ORGANIZATION, permission=Permission.EDIT, created_by=creator.id,
+    ))
+    db_session.flush()
+
+    assert can_edit_resource(db_session, other_member, resource) is True
+
+
+def test_view_only_share_does_not_grant_edit(db_session):
+    org, (creator, viewer) = _setup(db_session, roles=(Role.MEMBER, Role.MEMBER))
+    resource = Resource(org_id=org.id, owner_id=creator.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+    db_session.add(ResourceShare(
+        resource_id=resource.id, shared_with_user_id=viewer.id,
+        scope=ShareScope.USER, permission=Permission.VIEW, created_by=creator.id,
+    ))
+    db_session.flush()
+
+    assert can_edit_resource(db_session, viewer, resource) is False
+
+
+def test_deleted_resource_cannot_be_edited(db_session):
+    org, (owner,) = _setup(db_session, roles=(Role.OWNER,))
+    resource = Resource(
+        org_id=org.id, owner_id=owner.id, resource_type=ResourceType.WAYPOINT,
+        deleted_at=datetime.now(timezone.utc),
+    )
+    db_session.add(resource)
+    db_session.flush()
+
+    assert can_edit_resource(db_session, owner, resource) is False
+
+
+def test_soft_deleted_user_cannot_edit(db_session):
+    org, (owner,) = _setup(db_session, roles=(Role.OWNER,))
+    owner.deleted_at = datetime.now(timezone.utc)
+    db_session.flush()
+    resource = Resource(org_id=org.id, owner_id=owner.id, resource_type=ResourceType.WAYPOINT)
+    db_session.add(resource)
+    db_session.flush()
+
+    assert can_edit_resource(db_session, owner, resource) is False
