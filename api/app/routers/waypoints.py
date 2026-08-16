@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
@@ -10,8 +11,8 @@ from app.models.resource import Resource
 from app.models.user import User
 from app.models.waypoint import Waypoint
 from app.schemas.geometry import geojson_to_point, point_to_geojson
-from app.schemas.waypoints import WaypointCreateRequest, WaypointListResponse, WaypointResponse
-from app.services.authorization import can_view_resource
+from app.schemas.waypoints import WaypointCreateRequest, WaypointListResponse, WaypointResponse, WaypointUpdateRequest
+from app.services.authorization import can_edit_resource, can_view_resource
 from app.services.resources import create_waypoint
 
 router = APIRouter(prefix="/waypoints", tags=["waypoints"])
@@ -86,3 +87,37 @@ def get_waypoint(
     if not can_view_resource(db, current_user, resource):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to view this waypoint")
     return _to_response(resource, waypoint)
+
+
+@router.patch("/{waypoint_id}", response_model=WaypointResponse)
+def update_waypoint(
+    waypoint_id: uuid.UUID,
+    payload: WaypointUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resource, waypoint = _get_resource_and_waypoint(db, waypoint_id)
+    if not can_edit_resource(db, current_user, resource):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to edit this waypoint")
+
+    if payload.name is not None:
+        waypoint.name = payload.name
+    if payload.geom is not None:
+        waypoint.geom = geojson_to_point(payload.geom)
+    db.flush()
+    return _to_response(resource, waypoint)
+
+
+@router.delete("/{waypoint_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_waypoint(
+    waypoint_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    resource, waypoint = _get_resource_and_waypoint(db, waypoint_id)
+    if not can_edit_resource(db, current_user, resource):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed to delete this waypoint")
+
+    resource.deleted_at = datetime.now(timezone.utc)
+    db.flush()
+    return None

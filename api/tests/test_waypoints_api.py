@@ -83,3 +83,66 @@ def test_list_waypoints_pagination(client):
     assert len(body["items"]) == 2
     assert body["limit"] == 2
     assert body["offset"] == 1
+
+
+def test_update_waypoint_name_only(client):
+    headers = _register(client, "waypoint-update@example.test")
+    create_response = client.post(
+        "/waypoints",
+        json={"name": "Old", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        headers=headers,
+    )
+    waypoint_id = create_response.json()["id"]
+
+    response = client.patch(f"/waypoints/{waypoint_id}", json={"name": "New"}, headers=headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "New"
+    assert body["geom"] == {"type": "Point", "coordinates": [1.0, 1.0]}
+
+
+def test_update_waypoint_forbidden_without_edit_access(client):
+    owner_headers = _register(client, "waypoint-edit-owner@example.test")
+    create_response = client.post(
+        "/waypoints",
+        json={"name": "Mine", "geom": {"type": "Point", "coordinates": [2.0, 2.0]}},
+        headers=owner_headers,
+    )
+    waypoint_id = create_response.json()["id"]
+
+    other_headers = _register(client, "waypoint-edit-other@example.test")
+    response = client.patch(f"/waypoints/{waypoint_id}", json={"name": "Hacked"}, headers=other_headers)
+    assert response.status_code == 403
+
+
+def test_delete_waypoint_soft_deletes(client):
+    headers = _register(client, "waypoint-delete@example.test")
+    create_response = client.post(
+        "/waypoints",
+        json={"name": "Gone", "geom": {"type": "Point", "coordinates": [5.0, 5.0]}},
+        headers=headers,
+    )
+    waypoint_id = create_response.json()["id"]
+
+    delete_response = client.delete(f"/waypoints/{waypoint_id}", headers=headers)
+    assert delete_response.status_code == 204
+
+    get_response = client.get(f"/waypoints/{waypoint_id}", headers=headers)
+    assert get_response.status_code == 404
+
+    list_response = client.get("/waypoints", headers=headers)
+    assert all(item["id"] != waypoint_id for item in list_response.json()["items"])
+
+
+def test_delete_waypoint_forbidden_without_edit_access(client):
+    owner_headers = _register(client, "waypoint-del-owner@example.test")
+    create_response = client.post(
+        "/waypoints",
+        json={"name": "Protected", "geom": {"type": "Point", "coordinates": [6.0, 6.0]}},
+        headers=owner_headers,
+    )
+    waypoint_id = create_response.json()["id"]
+
+    other_headers = _register(client, "waypoint-del-other@example.test")
+    response = client.delete(f"/waypoints/{waypoint_id}", headers=other_headers)
+    assert response.status_code == 403
