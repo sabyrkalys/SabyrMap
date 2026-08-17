@@ -1122,6 +1122,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('login_email_field')), 'a@b.test');
     await tester.enterText(find.byKey(const Key('login_password_field')), 'wrong');
+    await tester.pump();
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();
 
@@ -1136,6 +1137,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('login_email_field')), 'a@b.test');
     await tester.enterText(find.byKey(const Key('login_password_field')), 'secret123');
+    await tester.pump();
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();
 
@@ -1346,6 +1348,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('register_email_field')), 'a@b.test');
     await tester.enterText(find.byKey(const Key('register_password_field')), 'secret123');
+    await tester.pump();
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();
 
@@ -1360,6 +1363,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('register_email_field')), 'a@b.test');
     await tester.enterText(find.byKey(const Key('register_password_field')), 'secret123');
+    await tester.pump();
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();
 
