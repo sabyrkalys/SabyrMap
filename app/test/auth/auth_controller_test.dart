@@ -55,7 +55,7 @@ void main() {
     test('clears the token and becomes AuthUnauthenticated when the stored token is invalid', () async {
       final storage = FakeTokenStorage();
       await storage.write('bad-token');
-      final repo = FakeAuthRepository(meResult: const AuthException('Could not validate credentials'));
+      final repo = FakeAuthRepository(meResult: const AuthException('Could not validate credentials', isAuthFailure: true));
       final container = _buildContainer(repo: repo, storage: storage);
       addTearDown(container.dispose);
 
@@ -63,6 +63,19 @@ void main() {
 
       expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
       expect(await storage.read(), isNull);
+    });
+
+    test('keeps the stored token when the me() failure is a network error, not a 401', () async {
+      final storage = FakeTokenStorage();
+      await storage.write('some-token');
+      final repo = FakeAuthRepository(meResult: const AuthException('Could not connect'));
+      final container = _buildContainer(repo: repo, storage: storage);
+      addTearDown(container.dispose);
+
+      await container.read(authControllerProvider.notifier).bootstrap();
+
+      expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
+      expect(await storage.read(), 'some-token');
     });
   });
 
@@ -132,5 +145,34 @@ void main() {
 
     expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
     expect(await storage.read(), isNull);
+  });
+
+  group('clearError', () {
+    test('clears an existing error message', () async {
+      final repo = FakeAuthRepository(loginResult: const AuthException('Invalid email or password'));
+      final container = _buildContainer(repo: repo, storage: FakeTokenStorage());
+      addTearDown(container.dispose);
+      await container.read(authControllerProvider.notifier).login('a@b.test', 'wrong');
+      expect((container.read(authControllerProvider) as AuthUnauthenticated).errorMessage, isNotNull);
+
+      container.read(authControllerProvider.notifier).clearError();
+
+      expect((container.read(authControllerProvider) as AuthUnauthenticated).errorMessage, isNull);
+    });
+
+    test('does nothing when not in an unauthenticated state', () async {
+      final storage = FakeTokenStorage();
+      await storage.write('tok-1');
+      const user = AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1');
+      final repo = FakeAuthRepository(meResult: user);
+      final container = _buildContainer(repo: repo, storage: storage);
+      addTearDown(container.dispose);
+      await container.read(authControllerProvider.notifier).bootstrap();
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+
+      container.read(authControllerProvider.notifier).clearError();
+
+      expect(container.read(authControllerProvider), isA<AuthAuthenticated>());
+    });
   });
 }

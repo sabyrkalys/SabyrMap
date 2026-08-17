@@ -13,9 +13,10 @@ class AuthUser {
 }
 
 class AuthException implements Exception {
-  const AuthException(this.message);
+  const AuthException(this.message, {this.isAuthFailure = false});
 
   final String message;
+  final bool isAuthFailure;
 
   @override
   String toString() => 'AuthException: $message';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/auth/auth_controller.dart';
 import 'package:app/auth/auth_models.dart';
 import 'package:app/auth/register_screen.dart';
@@ -56,10 +58,35 @@ void main() {
     expect(find.byType(RegisterScreen), findsOneWidget);
   });
 
-  testWidgets('navigates to /map on successful registration', (tester) async {
+  testWidgets('pops back to the previous screen on successful registration', (tester) async {
     const user = AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1');
     final repo = FakeAuthRepository(registerResult: 'tok-1', meResult: user);
-    await tester.pumpWidget(_wrap(repo: repo, storage: FakeTokenStorage()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          authRepositoryProvider.overrideWithValue(repo),
+          tokenStorageProvider.overrideWithValue(FakeTokenStorage()),
+        ],
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                  ),
+                  child: const Text('open register'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open register'));
+    await tester.pumpAndSettle();
+    expect(find.byType(RegisterScreen), findsOneWidget);
 
     await tester.enterText(find.byKey(const Key('register_email_field')), 'a@b.test');
     await tester.enterText(find.byKey(const Key('register_password_field')), 'secret123');
@@ -67,6 +94,27 @@ void main() {
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();
 
-    expect(find.text('map screen'), findsOneWidget);
+    expect(find.byType(RegisterScreen), findsNothing);
+    expect(find.text('open register'), findsOneWidget);
+  });
+
+  testWidgets('submit button is disabled and shows a spinner while loading', (tester) async {
+    final gate = Completer<void>();
+    const user = AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1');
+    final repo = FakeAuthRepository(registerResult: 'tok-1', meResult: user, registerGate: gate);
+    await tester.pumpWidget(_wrap(repo: repo, storage: FakeTokenStorage()));
+
+    await tester.enterText(find.byKey(const Key('register_email_field')), 'a@b.test');
+    await tester.enterText(find.byKey(const Key('register_password_field')), 'secret123');
+    await tester.pump();
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pump();
+
+    final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    expect(button.onPressed, isNull);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    gate.complete();
+    await tester.pumpAndSettle();
   });
 }

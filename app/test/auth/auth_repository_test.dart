@@ -44,6 +44,19 @@ void main() {
 
       await expectLater(repo.register('bad', ''), throwsA(isA<AuthException>()));
     });
+
+    test('throws AuthException("Something went wrong, please try again") on 500', () async {
+      final client = ApiClient(
+        baseUrl: 'http://example.test',
+        httpClient: MockClient((request) async => http.Response('{"detail":"internal error"}', 500)),
+      );
+      final repo = HttpAuthRepository(client);
+
+      await expectLater(
+        repo.register('a@b.test', 'secret123'),
+        throwsA(isA<AuthException>().having((e) => e.message, 'message', 'Something went wrong, please try again')),
+      );
+    });
   });
 
   group('login', () {
@@ -72,6 +85,19 @@ void main() {
       await expectLater(
         repo.login('a@b.test', 'wrong'),
         throwsA(isA<AuthException>().having((e) => e.message, 'message', 'Invalid email or password')),
+      );
+    });
+
+    test('throws AuthException("Something went wrong, please try again") on 500', () async {
+      final client = ApiClient(
+        baseUrl: 'http://example.test',
+        httpClient: MockClient((request) async => http.Response('{"detail":"internal error"}', 500)),
+      );
+      final repo = HttpAuthRepository(client);
+
+      await expectLater(
+        repo.login('a@b.test', 'secret123'),
+        throwsA(isA<AuthException>().having((e) => e.message, 'message', 'Something went wrong, please try again')),
       );
     });
   });
@@ -106,7 +132,10 @@ void main() {
       );
       final repo = HttpAuthRepository(client);
 
-      await expectLater(repo.me('bad-token'), throwsA(isA<AuthException>()));
+      await expectLater(
+        repo.me('bad-token'),
+        throwsA(isA<AuthException>().having((e) => e.isAuthFailure, 'isAuthFailure', true)),
+      );
     });
   });
 

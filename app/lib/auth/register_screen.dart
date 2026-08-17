@@ -25,10 +25,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(authControllerProvider.notifier).clearError();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (next is AuthAuthenticated) {
-        Navigator.of(context).pushReplacementNamed('/map');
+      if (next is AuthAuthenticated && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
       }
     });
 

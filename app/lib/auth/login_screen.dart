@@ -25,13 +25,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _emailController.text.isNotEmpty && _passwordController.text.isNotEmpty;
 
   @override
-  Widget build(BuildContext context) {
-    ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (next is AuthAuthenticated) {
-        Navigator.of(context).pushReplacementNamed('/map');
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(authControllerProvider.notifier).clearError();
       }
     });
+  }
 
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(authControllerProvider);
     final isLoading = state is AuthAuthenticating;
     final errorMessage = state is AuthUnauthenticated ? state.errorMessage : null;

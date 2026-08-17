@@ -4,4 +4,10 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Cleartext HTTP is only needed for the dev default API_BASE_URL
+         (http://10.0.2.2:8000, the Android-emulator alias for host localhost).
+         Scoped to debug builds only so release builds never get blanket
+         cleartext trust. -->
+    <application android:usesCleartextTraffic="true">
+    </application>
 </manifest>

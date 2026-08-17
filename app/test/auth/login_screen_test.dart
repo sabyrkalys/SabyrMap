@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/auth/auth_controller.dart';
 import 'package:app/auth/auth_models.dart';
 import 'package:app/auth/login_screen.dart';
@@ -63,18 +65,24 @@ void main() {
     expect(find.byType(LoginScreen), findsOneWidget);
   });
 
-  testWidgets('navigates to /map on successful login', (tester) async {
+  testWidgets('submit button is disabled and shows a spinner while loading', (tester) async {
+    final gate = Completer<void>();
     const user = AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1');
-    final repo = FakeAuthRepository(loginResult: 'tok-1', meResult: user);
+    final repo = FakeAuthRepository(loginResult: 'tok-1', meResult: user, loginGate: gate);
     await tester.pumpWidget(_wrap(repo: repo, storage: FakeTokenStorage()));
 
     await tester.enterText(find.byKey(const Key('login_email_field')), 'a@b.test');
     await tester.enterText(find.byKey(const Key('login_password_field')), 'secret123');
     await tester.pump();
     await tester.tap(find.byType(ElevatedButton));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
-    expect(find.text('map screen'), findsOneWidget);
+    final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    expect(button.onPressed, isNull);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    gate.complete();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('tapping "Create account" navigates to /register', (tester) async {

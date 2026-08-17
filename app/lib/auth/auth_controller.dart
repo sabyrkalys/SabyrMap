@@ -57,8 +57,10 @@ class AuthController extends Notifier<AuthState> {
     try {
       final user = await _repository.me(token);
       state = AuthAuthenticated(user);
-    } on AuthException {
-      await _storage.delete();
+    } on AuthException catch (e) {
+      if (e.isAuthFailure) {
+        await _storage.delete();
+      }
       state = const AuthUnauthenticated();
     }
   }
@@ -86,5 +88,11 @@ class AuthController extends Notifier<AuthState> {
   Future<void> logout() async {
     await _storage.delete();
     state = const AuthUnauthenticated();
+  }
+
+  void clearError() {
+    if (state is AuthUnauthenticated) {
+      state = const AuthUnauthenticated();
+    }
   }
 }

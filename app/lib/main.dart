@@ -19,9 +19,7 @@ class AlpineQuestApp extends StatelessWidget {
       title: 'AlpineQuest',
       home: const AuthGate(),
       routes: {
-        '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
-        '/map': (context) => const MapScreen(),
       },
     );
   }

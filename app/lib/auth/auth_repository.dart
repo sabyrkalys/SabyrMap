@@ -19,6 +19,7 @@ class HttpAuthRepository implements AuthRepository {
   Future<String> register(String email, String password) {
     return _postForToken('/auth/register', email, password, messageForStatus: (status) {
       if (status == 409) return 'Email already registered';
+      if (status >= 500) return 'Something went wrong, please try again';
       return 'Please check your email and password';
     });
   }
@@ -27,6 +28,7 @@ class HttpAuthRepository implements AuthRepository {
   Future<String> login(String email, String password) {
     return _postForToken('/auth/login', email, password, messageForStatus: (status) {
       if (status == 401) return 'Invalid email or password';
+      if (status >= 500) return 'Something went wrong, please try again';
       return 'Please check your email and password';
     });
   }
@@ -64,7 +66,7 @@ class HttpAuthRepository implements AuthRepository {
           orgId: json['org_id'] as String,
         );
       }
-      throw const AuthException('Could not validate credentials');
+      throw const AuthException('Could not validate credentials', isAuthFailure: true);
     } on AuthException {
       rethrow;
     } catch (_) {
