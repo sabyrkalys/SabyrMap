@@ -24,7 +24,7 @@ services:
       DATABASE_URL: postgresql://alpinequest:alpinequest@db:5432/alpinequest
       JWT_SECRET_KEY: dev-secret-change-me
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - ./api:/app
 
