@@ -11,6 +11,21 @@ import '../waypoints/waypoint_models.dart';
 import '../waypoints/waypoint_types.dart';
 import '../waypoints/waypoints_controller.dart';
 
+/// Pure mapping from a waypoint (plus the current user id, to distinguish
+/// own vs. shared waypoints) to the [CircleOptions] used to render it.
+/// Extracted as a top-level function so it can be unit-tested without a
+/// real [MapLibreMapController]/platform view.
+CircleOptions circleOptionsForWaypoint(Waypoint waypoint, String currentUserId) {
+  final isOwn = waypoint.ownerId == currentUserId;
+  return CircleOptions(
+    geometry: LatLng(waypoint.lat, waypoint.lng),
+    circleRadius: 8,
+    circleColor: waypointTypeColors[waypoint.type] ?? waypointTypeColors[defaultWaypointType]!,
+    circleStrokeColor: isOwn ? '#FFFFFF' : '#000000',
+    circleStrokeWidth: isOwn ? 1 : 2,
+  );
+}
+
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
@@ -22,10 +37,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   MapLibreMapController? _controller;
   final Map<String, Circle> _circlesByWaypointId = {};
 
+  // Serializes _syncCircles runs: at most one runs at a time, and a state
+  // change that arrives while a run is in flight is coalesced into a single
+  // trailing re-run (rather than racing concurrently against the in-flight
+  // one, which could orphan or duplicate circles).
+  bool _isSyncing = false;
+  List<Waypoint>? _pendingWaypoints;
+
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => ref.read(waypointsControllerProvider.notifier).loadWaypoints());
+    Future.microtask(() {
+      if (!mounted) return;
+      ref.read(waypointsControllerProvider.notifier).loadWaypoints();
+    });
   }
 
   void _onMapCreated(MapLibreMapController controller) {
@@ -34,12 +59,50 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onStyleLoaded() {
-    _syncCircles(ref.read(waypointsControllerProvider));
+    // Every style (re)load disposes and re-creates maplibre_gl's annotation
+    // managers, which wipes their internal id tracking. Drop our own
+    // tracking too so the next sync re-adds every circle from scratch
+    // instead of trying to update ids the new manager doesn't know about.
+    _circlesByWaypointId.clear();
+    _requestSync(ref.read(waypointsControllerProvider));
+  }
+
+  /// Entry point for requesting a circle sync. Coalesces concurrent
+  /// requests so only one [_syncCircles] run is ever in flight.
+  void _requestSync(List<Waypoint> waypoints) {
+    if (_isSyncing) {
+      _pendingWaypoints = waypoints;
+      return;
+    }
+    _runSync(waypoints);
+  }
+
+  Future<void> _runSync(List<Waypoint> waypoints) async {
+    _isSyncing = true;
+    try {
+      await _syncCircles(waypoints);
+    } catch (_) {
+      // Swallow sync failures (e.g. the circle manager wasn't ready yet, or
+      // a style reload raced with an in-flight call): the next waypoints
+      // state change or style-loaded event will retry from a clean slate.
+    } finally {
+      _isSyncing = false;
+    }
+    final pending = _pendingWaypoints;
+    if (pending != null) {
+      _pendingWaypoints = null;
+      _requestSync(pending);
+    }
   }
 
   Future<void> _syncCircles(List<Waypoint> waypoints) async {
     final controller = _controller;
-    if (controller == null) return;
+    // The circle manager is only initialized after onStyleLoadedCallback
+    // fires; addCircle/updateCircle/removeCircle throw before then. A sync
+    // can otherwise be requested (via the waypoints ref.listen callback,
+    // once loadWaypoints() resolves) in the window after onMapCreated but
+    // before the style has finished loading, so guard on both.
+    if (controller == null || controller.circleManager == null) return;
     final currentUserId = _currentUserId();
 
     final currentIds = waypoints.map((w) => w.id).toSet();
@@ -50,26 +113,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
 
     for (final waypoint in waypoints) {
-      final options = _circleOptionsFor(waypoint, currentUserId);
+      final options = circleOptionsForWaypoint(waypoint, currentUserId);
       final existing = _circlesByWaypointId[waypoint.id];
       if (existing == null) {
         _circlesByWaypointId[waypoint.id] = await controller.addCircle(options, {'waypointId': waypoint.id});
       } else {
         await controller.updateCircle(existing, options);
-        _circlesByWaypointId[waypoint.id] = Circle(existing.id, options, {'waypointId': waypoint.id});
       }
     }
-  }
-
-  CircleOptions _circleOptionsFor(Waypoint waypoint, String currentUserId) {
-    final isOwn = waypoint.ownerId == currentUserId;
-    return CircleOptions(
-      geometry: LatLng(waypoint.lat, waypoint.lng),
-      circleRadius: 8,
-      circleColor: waypointTypeColors[waypoint.type] ?? waypointTypeColors[defaultWaypointType]!,
-      circleStrokeColor: isOwn ? '#FFFFFF' : '#000000',
-      circleStrokeWidth: isOwn ? 1 : 2,
-    );
   }
 
   String _currentUserId() {
@@ -186,7 +237,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     ref.listen<List<Waypoint>>(waypointsControllerProvider, (previous, next) {
-      _syncCircles(next);
+      _requestSync(next);
     });
 
     return Scaffold(
