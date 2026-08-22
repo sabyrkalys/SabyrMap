@@ -13,6 +13,25 @@ from app.models.user import User
 from app.services.authorization import can_edit_resource, can_view_resource
 
 
+def get_resource_and_entity(
+    db: Session, model: Type[Any], entity_id: uuid.UUID, entity_label: str
+) -> tuple[Resource, Any]:
+    """Get a Resource and its associated entity by ID, raising HTTPException(404) if not found.
+
+    Queries the Resource table and the entity model table, returning both if both exist
+    and the resource has not been soft-deleted.
+    """
+    resource = (
+        db.query(Resource)
+        .filter(Resource.id == entity_id, Resource.deleted_at.is_(None))
+        .first()
+    )
+    entity = db.get(model, entity_id) if resource is not None else None
+    if resource is None or entity is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{entity_label} not found")
+    return resource, entity
+
+
 def build_resource_router(
     *,
     prefix: str,
@@ -50,15 +69,7 @@ def build_resource_router(
         )
 
     def _get_resource_and_entity(db: Session, entity_id: uuid.UUID) -> tuple[Resource, Any]:
-        resource = (
-            db.query(Resource)
-            .filter(Resource.id == entity_id, Resource.deleted_at.is_(None))
-            .first()
-        )
-        entity = db.get(model, entity_id) if resource is not None else None
-        if resource is None or entity is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"{entity_label} not found")
-        return resource, entity
+        return get_resource_and_entity(db, model, entity_id, entity_label)
 
     @router.post("", response_model=response_schema, status_code=status.HTTP_201_CREATED)
     def create(
