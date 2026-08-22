@@ -24,6 +24,21 @@ class ApiClient {
     );
   }
 
+  Future<http.Response> patch(String path, {Map<String, dynamic>? body, String? token}) {
+    return _httpClient.patch(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers(token),
+      body: jsonEncode(body ?? const {}),
+    );
+  }
+
+  Future<http.Response> delete(String path, {String? token}) {
+    return _httpClient.delete(
+      Uri.parse('$baseUrl$path'),
+      headers: _headers(token),
+    );
+  }
+
   Map<String, String> _headers(String? token) {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (token != null) {
