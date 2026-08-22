@@ -34,7 +34,7 @@ class HttpWaypointsRepository implements WaypointsRepository {
 
   @override
   Future<List<Waypoint>> list(String token) async {
-    final response = await _client.get('/waypoints', token: token);
+    final response = await _client.get('/waypoints?limit=200', token: token);
     if (response.statusCode != 200) {
       throw const WaypointException('Could not load waypoints');
     }

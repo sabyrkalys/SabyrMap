@@ -29,6 +29,7 @@ void main() {
         baseUrl: 'http://example.test',
         httpClient: MockClient((request) async {
           expect(request.url.path, '/waypoints');
+          expect(request.url.queryParameters['limit'], '200');
           expect(request.method, 'GET');
           return http.Response(
             jsonEncode({'items': [_waypointJson], 'limit': 50, 'offset': 0}),
