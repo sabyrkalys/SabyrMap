@@ -47,7 +47,7 @@ is enforced client-side only, so adding new types later doesn't require a migrat
 ### Schemas (`app/schemas/waypoints.py`)
 
 - `WaypointCreateRequest`: add `type: str = Field(min_length=1)`, `note: str | None = Field(default=None, max_length=500)`.
-- `WaypointUpdateRequest`: add `type: str | None = Field(default=None, min_length=1)`, `note: str | None = Field(default=None, max_length=500)` (note explicitly settable to `None`/empty to clear it — same partial-PATCH semantics as `name`/`geom`).
+- `WaypointUpdateRequest`: add `type: str | None = Field(default=None, min_length=1)`, `note: str | None = Field(default=None, max_length=500)` (same partial-PATCH semantics as `name`/`geom` — omitting the field, or sending `null`, leaves it unchanged; sending an empty string `""` clears it).
 - `WaypointResponse`: add `type: str`, `note: str | None`, and **`can_edit: bool`** — computed server-side via the existing `can_edit_resource(db, current_user, resource)`, so the client never re-implements permission logic.
 
 ### Router

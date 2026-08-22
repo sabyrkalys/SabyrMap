@@ -17,7 +17,7 @@ def test_create_waypoint_creates_resource_and_waypoint_rows(db_session):
 
     waypoint = create_waypoint(
         db_session, org_id=org.id, owner_id=owner.id, name="Summit",
-        geom=from_shape(Point(7.6, 45.9), srid=4326),
+        geom=from_shape(Point(7.6, 45.9), srid=4326), type="generic",
     )
 
     resource = db_session.get(Resource, waypoint.id)
