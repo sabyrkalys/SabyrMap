@@ -1955,7 +1955,7 @@ void main() {
 - [ ] **Step 2: Run the existing tests to verify they still pass (with the override in place)**
 
 Run: `flutter test test/map/map_screen_test.dart` (from `app/`)
-Expected: FAIL at this point — `waypointsRepositoryProvider` import resolves fine (Task 8 already merged), but `MapScreen` doesn't yet call `loadWaypoints()`, so this specific step should already PASS since the override is harmless when unused. Confirm: PASS. (If it fails, do not proceed until this baseline is green.)
+Expected: PASS. At this point `MapScreen` hasn't been rewritten yet (that's Step 3), so the added `waypointsRepositoryProvider` override is simply unused — the test file just needs to compile and pass as before. If it fails, do not proceed until this baseline is green.
 
 - [ ] **Step 3: Implement — rewrite `MapScreen`**
 
