@@ -43,6 +43,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   MapLibreMapController? _controller;
   final Map<String, Circle> _circlesByWaypointId = {};
   final Map<String, Line> _linesByTrackId = {};
+  // Caches a cheap "did this actually change" key per circle/line id so
+  // _syncCircles/_syncLines only issue an updateCircle/updateLine platform
+  // call when the rendered options for that particular id would differ from
+  // what's already applied, instead of re-pushing every waypoint/track on
+  // every sync run (which otherwise happens on every single recorded GPS
+  // point, since the recording stream routes through the same sync gate).
+  final Map<String, String> _appliedCircleKeys = {};
+  final Map<String, String> _appliedLineKeys = {};
   bool _tracksVisible = false;
   // Tracks whether loadTracks() has run this session. Using this instead of
   // `tracksControllerProvider`'s emptiness avoids skipping the initial load
@@ -60,13 +68,48 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _isSyncing = false;
   bool _syncPending = false;
 
+  // Captured in initState rather than read directly inside dispose(): by the
+  // time State.dispose() runs, the widget's element is already deactivated
+  // and using `ref` throws ("Using ref when a widget is about to or has
+  // been unmounted is unsafe"). The notifier instance itself is stable for
+  // the lifetime of the (root-scope, non-autoDispose) provider, so grabbing
+  // it once up front and calling stop() on it later is safe.
+  late final TrackRecordingController _recordingController;
+
   @override
   void initState() {
     super.initState();
+    _recordingController = ref.read(trackRecordingControllerProvider.notifier);
     Future.microtask(() {
       if (!mounted) return;
       ref.read(waypointsControllerProvider.notifier).loadWaypoints();
     });
+  }
+
+  @override
+  void dispose() {
+    // trackRecordingControllerProvider is a root-scope, non-autoDispose
+    // provider: it survives MapScreen being swapped out (e.g. on logout),
+    // so without this the geolocator stream would keep appending points in
+    // the background and a subsequent user could pick up and save the
+    // previous user's still-in-progress recording. stop() is synchronous
+    // and a no-op when already idle.
+    //
+    // Riverpod forbids modifying provider state synchronously from within a
+    // widget's dispose() (the element tree is locked while unmounting), so
+    // the call is deferred to a microtask, which runs immediately after
+    // this frame finishes finalizing. If the whole provider container is
+    // also being torn down around the same time (e.g. app shutdown, test
+    // teardown), the notifier's Ref may already be disposed by the time the
+    // microtask runs; that's fine since there's no container left in which
+    // a leaked recording could resurface, so the resulting exception is
+    // swallowed.
+    Future.microtask(() {
+      try {
+        _recordingController.stop();
+      } catch (_) {}
+    });
+    super.dispose();
   }
 
   void _onMapCreated(MapLibreMapController controller) {
@@ -81,6 +124,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // instead of trying to update ids the new manager doesn't know about.
     _circlesByWaypointId.clear();
     _linesByTrackId.clear();
+    _appliedCircleKeys.clear();
+    _appliedLineKeys.clear();
     _requestSync();
   }
 
@@ -131,23 +176,35 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // Reconcile against the manager's live set first so a stale entry is
     // dropped (and re-added fresh) rather than "updated" into limbo.
     final liveCircleIds = controller.circles.map((c) => c.id).toSet();
-    _circlesByWaypointId.removeWhere((_, circle) => !liveCircleIds.contains(circle.id));
+    _circlesByWaypointId.removeWhere((id, circle) {
+      final stale = !liveCircleIds.contains(circle.id);
+      if (stale) _appliedCircleKeys.remove(id);
+      return stale;
+    });
     final currentUserId = _currentUserId();
 
     final currentIds = waypoints.map((w) => w.id).toSet();
     for (final id in _circlesByWaypointId.keys.toList()) {
       if (!currentIds.contains(id)) {
         await controller.removeCircle(_circlesByWaypointId.remove(id)!);
+        _appliedCircleKeys.remove(id);
       }
     }
 
     for (final waypoint in waypoints) {
-      final options = circleOptionsForWaypoint(waypoint, currentUserId);
+      // circleOptionsForWaypoint is a pure function of (waypoint.type,
+      // isOwn) — nothing else it reads ever varies for a given waypoint id
+      // — so this key cheaply captures "would the rendered options change".
+      final isOwn = waypoint.ownerId == currentUserId;
+      final key = '${waypoint.type}|$isOwn';
       final existing = _circlesByWaypointId[waypoint.id];
       if (existing == null) {
+        final options = circleOptionsForWaypoint(waypoint, currentUserId);
         _circlesByWaypointId[waypoint.id] = await controller.addCircle(options, {'waypointId': waypoint.id});
-      } else {
-        await controller.updateCircle(existing, options);
+        _appliedCircleKeys[waypoint.id] = key;
+      } else if (_appliedCircleKeys[waypoint.id] != key) {
+        await controller.updateCircle(existing, circleOptionsForWaypoint(waypoint, currentUserId));
+        _appliedCircleKeys[waypoint.id] = key;
       }
     }
   }
@@ -163,7 +220,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // manager and onStyleLoadedCallback clearing our tracking is more
     // likely to be hit mid-flight.
     final liveLineIds = controller.lines.map((l) => l.id).toSet();
-    _linesByTrackId.removeWhere((_, line) => !liveLineIds.contains(line.id));
+    _linesByTrackId.removeWhere((id, line) {
+      final stale = !liveLineIds.contains(line.id);
+      if (stale) _appliedLineKeys.remove(id);
+      return stale;
+    });
 
     final tracks = _tracksVisible ? ref.read(tracksControllerProvider) : const <Track>[];
     final currentIds = tracks.map((t) => t.id).toSet();
@@ -171,42 +232,74 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (id == _recordingLineKey) continue;
       if (!currentIds.contains(id)) {
         await controller.removeLine(_linesByTrackId.remove(id)!);
+        _appliedLineKeys.remove(id);
       }
     }
 
     for (final track in tracks) {
-      final options = LineOptions(
-        geometry: [for (final p in track.points) LatLng(p.lat, p.lng)],
-        lineColor: '#1976D2',
-        lineWidth: 3,
-      );
+      // Cheap proxy for "did the geometry change": point count plus the
+      // last point's coordinates. Exact correctness matters less than
+      // avoiding the worst case of re-pushing every unrelated track's full
+      // geometry on every recording-stream tick.
+      final key = _geometryKey(track.points.map((p) => (p.lat, p.lng)).toList());
       final existing = _linesByTrackId[track.id];
       if (existing == null) {
+        final options = LineOptions(
+          geometry: [for (final p in track.points) LatLng(p.lat, p.lng)],
+          lineColor: '#1976D2',
+          lineWidth: 3,
+        );
         _linesByTrackId[track.id] = await controller.addLine(options);
-      } else {
+        _appliedLineKeys[track.id] = key;
+      } else if (_appliedLineKeys[track.id] != key) {
+        final options = LineOptions(
+          geometry: [for (final p in track.points) LatLng(p.lat, p.lng)],
+          lineColor: '#1976D2',
+          lineWidth: 3,
+        );
         await controller.updateLine(existing, options);
+        _appliedLineKeys[track.id] = key;
       }
     }
 
     final recordingState = ref.read(trackRecordingControllerProvider);
     if (recordingState is TrackRecordingActive && recordingState.points.length >= 2) {
-      final options = LineOptions(
-        geometry: [for (final p in recordingState.points) LatLng(p.lat, p.lng)],
-        lineColor: '#E53935',
-        lineWidth: 4,
-      );
+      final key = _geometryKey(recordingState.points.map((p) => (p.lat, p.lng)).toList());
       final existing = _linesByTrackId[_recordingLineKey];
       if (existing == null) {
+        final options = LineOptions(
+          geometry: [for (final p in recordingState.points) LatLng(p.lat, p.lng)],
+          lineColor: '#E53935',
+          lineWidth: 4,
+        );
         _linesByTrackId[_recordingLineKey] = await controller.addLine(options);
-      } else {
+        _appliedLineKeys[_recordingLineKey] = key;
+      } else if (_appliedLineKeys[_recordingLineKey] != key) {
+        final options = LineOptions(
+          geometry: [for (final p in recordingState.points) LatLng(p.lat, p.lng)],
+          lineColor: '#E53935',
+          lineWidth: 4,
+        );
         await controller.updateLine(existing, options);
+        _appliedLineKeys[_recordingLineKey] = key;
       }
     } else {
       final existing = _linesByTrackId.remove(_recordingLineKey);
+      _appliedLineKeys.remove(_recordingLineKey);
       if (existing != null) {
         await controller.removeLine(existing);
       }
     }
+  }
+
+  /// Cheap proxy key for "did this line's geometry change": point count
+  /// plus the last point's coordinates. Not a full geometry comparison, but
+  /// sufficient to skip redundant updateLine calls for tracks/recordings
+  /// whose points haven't changed since the last sync.
+  String _geometryKey(List<(double, double)> points) {
+    if (points.isEmpty) return '0';
+    final last = points.last;
+    return '${points.length}|${last.$1}|${last.$2}';
   }
 
   String _currentUserId() {
