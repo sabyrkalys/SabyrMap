@@ -41,7 +41,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final errorMessage = state is AuthUnauthenticated ? state.errorMessage : null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Log in')),
+      appBar: AppBar(title: const Text('Вход')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -57,7 +57,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             TextField(
               key: const Key('login_password_field'),
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: const InputDecoration(labelText: 'Пароль'),
               obscureText: true,
               onChanged: (_) => setState(() {}),
             ),
@@ -83,12 +83,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Log in'),
+                  : const Text('Войти'),
             ),
             TextButton(
               key: const Key('login_create_account_button'),
               onPressed: () => Navigator.of(context).pushNamed('/register'),
-              child: const Text('Create account'),
+              child: const Text('Создать аккаунт'),
             ),
           ],
         ),

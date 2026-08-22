@@ -56,12 +56,12 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(isEditing ? 'Edit waypoint' : 'New waypoint', style: Theme.of(context).textTheme.titleLarge),
+          Text(isEditing ? 'Редактировать метку' : 'Новая метка', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 12),
           TextField(
             key: const Key('waypoint_name_field'),
             controller: _nameController,
-            decoration: const InputDecoration(labelText: 'Name'),
+            decoration: const InputDecoration(labelText: 'Название'),
             onChanged: (_) => setState(() {}),
           ),
           const SizedBox(height: 12),
@@ -71,7 +71,7 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
               for (final type in waypointTypes)
                 ChoiceChip(
                   key: Key('waypoint_type_chip_$type'),
-                  label: Text(type),
+                  label: Text(waypointTypeLabels[type] ?? type),
                   selected: _selectedType == type,
                   onSelected: (_) => setState(() => _selectedType = type),
                 ),
@@ -82,7 +82,7 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
             key: const Key('waypoint_note_field'),
             controller: _noteController,
             maxLength: 500,
-            decoration: const InputDecoration(labelText: 'Note (optional)'),
+            decoration: const InputDecoration(labelText: 'Заметка (необязательно)'),
           ),
           const SizedBox(height: 12),
           FilledButton(
@@ -96,7 +96,7 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
                         note: _noteController.text.trim(),
                       ),
                     ),
-            child: Text(isEditing ? 'Save' : 'Create'),
+            child: Text(isEditing ? 'Сохранить' : 'Создать'),
           ),
         ],
       ),

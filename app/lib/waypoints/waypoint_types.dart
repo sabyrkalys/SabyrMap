@@ -9,3 +9,11 @@ const Map<String, String> waypointTypeColors = {
   'danger': '#E53935',
   'point': '#43A047',
 };
+
+const Map<String, String> waypointTypeLabels = {
+  'generic': 'обычная',
+  'camp': 'стоянка',
+  'water': 'вода',
+  'danger': 'опасность',
+  'point': 'точка',
+};

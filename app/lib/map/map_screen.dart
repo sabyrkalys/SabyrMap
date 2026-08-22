@@ -165,7 +165,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           children: [
             Text(waypoint.name, style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            Text(waypoint.type),
+            Text(waypointTypeLabels[waypoint.type] ?? waypoint.type),
             if (waypoint.note != null && waypoint.note!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(waypoint.note!),
@@ -177,12 +177,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   TextButton(
                     key: const Key('waypoint_edit_button'),
                     onPressed: () => Navigator.of(context).pop('edit'),
-                    child: const Text('Edit'),
+                    child: const Text('Изменить'),
                   ),
                   TextButton(
                     key: const Key('waypoint_delete_button'),
                     onPressed: () => Navigator.of(context).pop('delete'),
-                    child: const Text('Delete'),
+                    child: const Text('Удалить'),
                   ),
                 ],
               ),
@@ -219,10 +219,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete waypoint?'),
+        title: const Text('Удалить метку?'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Delete')),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Удалить')),
         ],
       ),
     );
@@ -242,7 +242,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Map'),
+        title: const Text('Карта'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),

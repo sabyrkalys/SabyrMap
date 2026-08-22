@@ -47,7 +47,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final errorMessage = state is AuthUnauthenticated ? state.errorMessage : null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create account')),
+      appBar: AppBar(title: const Text('Создать аккаунт')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -63,7 +63,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             TextField(
               key: const Key('register_password_field'),
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
+              decoration: const InputDecoration(labelText: 'Пароль'),
               obscureText: true,
               onChanged: (_) => setState(() {}),
             ),
@@ -89,7 +89,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Create account'),
+                  : const Text('Создать аккаунт'),
             ),
           ],
         ),

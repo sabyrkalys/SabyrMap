@@ -24,7 +24,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Log in'), findsWidgets);
+    expect(find.text('Вход'), findsWidgets);
 
     await tester.enterText(find.byKey(const Key('login_email_field')), 'a@b.test');
     await tester.enterText(find.byKey(const Key('login_password_field')), 'secret123');
@@ -33,12 +33,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.logout), findsOneWidget);
-    expect(find.text('Log in'), findsNothing);
+    expect(find.text('Вход'), findsNothing);
 
     await tester.tap(find.byIcon(Icons.logout));
     await tester.pumpAndSettle();
 
-    expect(find.text('Log in'), findsWidgets);
+    expect(find.text('Вход'), findsWidgets);
     expect(find.byIcon(Icons.logout), findsNothing);
 
     // log back in a second time, proving AuthGate is still the live navigation authority
