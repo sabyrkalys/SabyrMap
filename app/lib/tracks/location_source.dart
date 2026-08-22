@@ -13,6 +13,12 @@ abstract class LocationSource {
   /// device has moved at least [distanceFilterMeters] from the last
   /// reported position.
   Stream<TrackPoint> positionStream({required int distanceFilterMeters});
+
+  /// A one-shot read of the device's current position, for centering the
+  /// map on open (not a live feed). Returns null if permission isn't
+  /// granted or location services are unavailable, rather than throwing --
+  /// callers should treat "no position" as a normal, silent outcome.
+  Future<TrackPoint?> getCurrentPosition();
 }
 
 class GeolocatorLocationSource implements LocationSource {
@@ -34,5 +40,13 @@ class GeolocatorLocationSource implements LocationSource {
     return Geolocator.getPositionStream(
       locationSettings: LocationSettings(distanceFilter: distanceFilterMeters),
     ).map((position) => TrackPoint(lat: position.latitude, lng: position.longitude));
+  }
+
+  @override
+  Future<TrackPoint?> getCurrentPosition() async {
+    final granted = await ensurePermission();
+    if (!granted) return null;
+    final position = await Geolocator.getCurrentPosition();
+    return TrackPoint(lat: position.latitude, lng: position.longitude);
   }
 }

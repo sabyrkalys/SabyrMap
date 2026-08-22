@@ -51,6 +51,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // point, since the recording stream routes through the same sync gate).
   final Map<String, String> _appliedCircleKeys = {};
   final Map<String, String> _appliedLineKeys = {};
+
+  // One-shot "my location" state: fetched once on screen open, not a live
+  // feed. _hasCenteredCamera guards animateCamera so a later style reload
+  // (which re-runs _onStyleLoaded) never re-centers the map out from under
+  // the user after they've since panned away.
+  TrackPoint? _myLocation;
+  Circle? _myLocationCircle;
+  bool _hasCenteredCamera = false;
+
   bool _tracksVisible = false;
   // Tracks whether loadTracks() has run this session. Using this instead of
   // `tracksControllerProvider`'s emptiness avoids skipping the initial load
@@ -84,6 +93,33 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (!mounted) return;
       ref.read(waypointsControllerProvider.notifier).loadWaypoints();
     });
+    _loadMyLocation();
+  }
+
+  // Fetches the device's current position once, for centering the map and
+  // showing a "my location" dot. GPS being unavailable or permission being
+  // denied is a normal, silent outcome here (the map just stays as-is) --
+  // any exception from the platform channel (e.g. no location plugin
+  // registered, as in widget tests) is swallowed for the same reason.
+  Future<void> _loadMyLocation() async {
+    try {
+      final position = await ref.read(locationSourceProvider).getCurrentPosition();
+      if (!mounted || position == null) return;
+      _myLocation = position;
+      _maybeCenterCamera();
+      _requestSync();
+    } catch (_) {
+      // No GPS available -- leave the map exactly as it is.
+    }
+  }
+
+  void _maybeCenterCamera() {
+    if (_hasCenteredCamera) return;
+    final controller = _controller;
+    final location = _myLocation;
+    if (controller == null || location == null) return;
+    _hasCenteredCamera = true;
+    controller.animateCamera(CameraUpdate.newLatLngZoom(LatLng(location.lat, location.lng), 15));
   }
 
   @override
@@ -126,6 +162,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _linesByTrackId.clear();
     _appliedCircleKeys.clear();
     _appliedLineKeys.clear();
+    _myLocationCircle = null;
+    _maybeCenterCamera();
     _requestSync();
   }
 
@@ -146,6 +184,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     try {
       await _syncCircles(ref.read(waypointsControllerProvider));
       await _syncLines();
+      await _syncMyLocationCircle();
     } catch (_) {
       // Swallow sync failures (e.g. a manager wasn't ready yet, or a style
       // reload raced with an in-flight call): the next state change or
@@ -290,6 +329,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         await controller.removeLine(existing);
       }
     }
+  }
+
+  /// Renders the one-shot "my location" dot. Unlike waypoint/track circles
+  /// this never needs an updateCircle call -- _myLocation is fetched once
+  /// and never changes for the lifetime of the screen -- so once added, the
+  /// only thing that can invalidate it is a style reload (handled by
+  /// clearing _myLocationCircle in _onStyleLoaded so it's re-added fresh).
+  Future<void> _syncMyLocationCircle() async {
+    final controller = _controller;
+    if (controller == null || controller.circleManager == null) return;
+    if (_myLocationCircle != null) return;
+    final location = _myLocation;
+    if (location == null) return;
+    _myLocationCircle = await controller.addCircle(
+      CircleOptions(
+        geometry: LatLng(location.lat, location.lng),
+        circleRadius: 7,
+        circleColor: '#2196F3',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 2,
+      ),
+    );
   }
 
   /// Cheap proxy key for "did this line's geometry change": point count

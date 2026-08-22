@@ -366,4 +366,65 @@ void main() {
 
     expect(find.text('Could not create track'), findsOneWidget);
   });
+
+  testWidgets('builds without throwing when the location source has no position available', (tester) async {
+    final storage = FakeTokenStorage();
+    await storage.write('tok-1');
+    final authRepo = FakeAuthRepository(
+      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
+    );
+    final locationSource = FakeLocationSource(permissionGranted: false);
+    final container = ProviderContainer(
+      overrides: [
+        ..._baseOverrides(authRepo: authRepo, storage: storage),
+        locationSourceProvider.overrideWithValue(locationSource),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.notifier).bootstrap();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MapScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(MapScreen), findsOneWidget);
+  });
+
+  testWidgets('builds without throwing when the location source resolves a position', (tester) async {
+    final storage = FakeTokenStorage();
+    await storage.write('tok-1');
+    final authRepo = FakeAuthRepository(
+      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
+    );
+    // MapLibreMap has no real platform view under flutter test, so
+    // onMapCreated/onStyleLoadedCallback never fire and the camera-centering
+    // / "my location" circle code path (which requires a live controller)
+    // is never reached here -- that behavior is covered by manual device
+    // verification, same precedent as long-press waypoint creation. This
+    // test guards the wiring: fetching a resolved position must not throw
+    // or leave the screen in a broken state.
+    final locationSource = FakeLocationSource(currentPosition: const TrackPoint(lat: 45.9, lng: 7.6));
+    final container = ProviderContainer(
+      overrides: [
+        ..._baseOverrides(authRepo: authRepo, storage: storage),
+        locationSourceProvider.overrideWithValue(locationSource),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.notifier).bootstrap();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MapScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(MapScreen), findsOneWidget);
+  });
 }

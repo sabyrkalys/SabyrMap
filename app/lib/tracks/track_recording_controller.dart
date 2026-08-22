@@ -50,7 +50,7 @@ class TrackRecordingController extends Notifier<TrackRecordingState> {
       return;
     }
     state = TrackRecordingActive(points: const [], startedAt: DateTime.now());
-    _subscription = _location.positionStream(distanceFilterMeters: 10).listen((point) {
+    _subscription = _location.positionStream(distanceFilterMeters: 5).listen((point) {
       final current = state;
       if (current is! TrackRecordingActive) return;
       state = TrackRecordingActive(points: [...current.points, point], startedAt: current.startedAt);

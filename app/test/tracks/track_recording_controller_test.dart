@@ -16,7 +16,7 @@ void main() {
   });
 
   group('start', () {
-    test('transitions to active and requests a 10-meter distance filter', () async {
+    test('transitions to active and requests a 5-meter distance filter', () async {
       final source = FakeLocationSource();
       final container = ProviderContainer(overrides: [locationSourceProvider.overrideWithValue(source)]);
       addTearDown(container.dispose);
@@ -25,7 +25,7 @@ void main() {
       await container.read(trackRecordingControllerProvider.notifier).start();
 
       expect(container.read(trackRecordingControllerProvider), isA<TrackRecordingActive>());
-      expect(source.lastDistanceFilterMeters, 10);
+      expect(source.lastDistanceFilterMeters, 5);
     });
 
     test('accumulates points as the location source emits them', () async {
