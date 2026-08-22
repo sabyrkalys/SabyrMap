@@ -1,6 +1,8 @@
 import 'package:app/auth/auth_controller.dart';
 import 'package:app/auth/auth_models.dart';
 import 'package:app/map/map_screen.dart';
+import 'package:app/tracks/track_models.dart';
+import 'package:app/tracks/track_recording_controller.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoint_types.dart';
@@ -10,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../auth/fakes.dart';
+import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
 import '../waypoints/fakes.dart';
 
@@ -239,7 +242,18 @@ void main() {
     final authRepo = FakeAuthRepository(
       meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
     );
-    final tracksRepo = FakeTracksRepository();
+    final tracksRepo = FakeTracksRepository(
+      initial: [
+        Track(
+          id: 't1',
+          orgId: 'o1',
+          ownerId: 'u1',
+          name: 'Old track',
+          points: const [TrackPoint(lat: 1.0, lng: 2.0), TrackPoint(lat: 1.1, lng: 2.1)],
+          createdAt: DateTime.utc(2026, 8, 20),
+        ),
+      ],
+    );
     final container = ProviderContainer(
       overrides: _baseOverrides(authRepo: authRepo, storage: storage, tracksRepo: tracksRepo),
     );
@@ -260,8 +274,96 @@ void main() {
     await tester.tap(find.byKey(const Key('tracks_visibility_switch')));
     await tester.pumpAndSettle();
 
-    // loadTracks() ran (the fake repo starts empty, so state stays empty,
-    // but this confirms the toggle triggered the load path without error).
-    expect(container.read(tracksControllerProvider), isEmpty);
+    // loadTracks() actually ran and populated state from the (seeded, not
+    // empty) fake repository -- this is a meaningful assertion, unlike
+    // relying on the fake repo staying empty.
+    expect(container.read(tracksControllerProvider), hasLength(1));
+    expect(container.read(tracksControllerProvider).single.name, 'Old track');
+  });
+
+  testWidgets('stopping a too-short recording shows a message and does not open the save form', (tester) async {
+    final storage = FakeTokenStorage();
+    await storage.write('tok-1');
+    final authRepo = FakeAuthRepository(
+      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
+    );
+    final locationSource = FakeLocationSource();
+    final container = ProviderContainer(
+      overrides: [
+        ..._baseOverrides(authRepo: authRepo, storage: storage),
+        locationSourceProvider.overrideWithValue(locationSource),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.notifier).bootstrap();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MapScreen()),
+      ),
+    );
+    await tester.pump();
+
+    // Start recording.
+    await tester.tap(find.byKey(const Key('track_record_toggle')));
+    await tester.pumpAndSettle();
+
+    // Emit a single point -- not enough to save a valid track (needs >= 2).
+    locationSource.emit(const TrackPoint(lat: 1.0, lng: 2.0));
+    await tester.pump();
+
+    // Stop recording.
+    await tester.tap(find.byKey(const Key('track_record_toggle')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Трек слишком короткий, чтобы сохранить'), findsOneWidget);
+    expect(find.byKey(const Key('track_name_field')), findsNothing);
+  });
+
+  testWidgets('a TrackException on save shows a SnackBar with the error message', (tester) async {
+    final storage = FakeTokenStorage();
+    await storage.write('tok-1');
+    final authRepo = FakeAuthRepository(
+      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
+    );
+    final locationSource = FakeLocationSource();
+    final tracksRepo = FakeTracksRepository()..createResult = const TrackException('Could not create track');
+    final container = ProviderContainer(
+      overrides: [
+        ..._baseOverrides(authRepo: authRepo, storage: storage, tracksRepo: tracksRepo),
+        locationSourceProvider.overrideWithValue(locationSource),
+      ],
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.notifier).bootstrap();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MapScreen()),
+      ),
+    );
+    await tester.pump();
+
+    // Start recording and emit enough points for a valid track.
+    await tester.tap(find.byKey(const Key('track_record_toggle')));
+    await tester.pumpAndSettle();
+    locationSource.emit(const TrackPoint(lat: 1.0, lng: 2.0));
+    await tester.pump();
+    locationSource.emit(const TrackPoint(lat: 1.1, lng: 2.1));
+    await tester.pump();
+
+    // Stop recording -- this opens the save-name sheet.
+    await tester.tap(find.byKey(const Key('track_record_toggle')));
+    await tester.pumpAndSettle();
+
+    // Submit the save form.
+    await tester.enterText(find.byKey(const Key('track_name_field')), 'My track');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('track_save_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not create track'), findsOneWidget);
   });
 }

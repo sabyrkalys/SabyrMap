@@ -44,6 +44,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final Map<String, Circle> _circlesByWaypointId = {};
   final Map<String, Line> _linesByTrackId = {};
   bool _tracksVisible = false;
+  // Tracks whether loadTracks() has run this session. Using this instead of
+  // `tracksControllerProvider`'s emptiness avoids skipping the initial load
+  // after the user has recorded-and-saved a track (which appends directly
+  // into that state via TracksController.saveTrack, making it non-empty
+  // even though the server's other previously-saved tracks were never
+  // fetched).
+  bool _tracksLoaded = false;
 
   // Serializes _syncCircles/_syncLines runs together: at most one combined
   // sync runs at a time, and any state change that arrives while a run is
@@ -115,6 +122,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // once loadWaypoints() resolves) in the window after onMapCreated but
     // before the style has finished loading, so guard on both.
     if (controller == null || controller.circleManager == null) return;
+    // A style reload disposes and re-creates the circle manager, but
+    // onStyleLoadedCallback (which clears _circlesByWaypointId) only fires
+    // after the new manager already exists. If a sync landed in that gap,
+    // our tracking map could still hold Circle objects belonging to the
+    // disposed manager, which controller.updateCircle would then silently
+    // (in release builds) insert into the new manager instead of throwing.
+    // Reconcile against the manager's live set first so a stale entry is
+    // dropped (and re-added fresh) rather than "updated" into limbo.
+    final liveCircleIds = controller.circles.map((c) => c.id).toSet();
+    _circlesByWaypointId.removeWhere((_, circle) => !liveCircleIds.contains(circle.id));
     final currentUserId = _currentUserId();
 
     final currentIds = waypoints.map((w) => w.id).toSet();
@@ -139,6 +156,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final controller = _controller;
     // Same readiness guard as _syncCircles, for the line manager.
     if (controller == null || controller.lineManager == null) return;
+    // Same stale-manager reconciliation as _syncCircles, for lines. This is
+    // more reachable here than for circles: the recording stream can emit
+    // a new point (and thus request a sync) far more often than waypoints
+    // change, so the window between a style reload creating a new line
+    // manager and onStyleLoadedCallback clearing our tracking is more
+    // likely to be hit mid-flight.
+    final liveLineIds = controller.lines.map((l) => l.id).toSet();
+    _linesByTrackId.removeWhere((_, line) => !liveLineIds.contains(line.id));
 
     final tracks = _tracksVisible ? ref.read(tracksControllerProvider) : const <Track>[];
     final currentIds = tracks.map((t) => t.id).toSet();
@@ -330,8 +355,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   Future<void> _onTracksVisibilityChanged(bool visible) async {
     setState(() => _tracksVisible = visible);
-    if (visible && ref.read(tracksControllerProvider).isEmpty) {
+    if (visible && !_tracksLoaded) {
       await ref.read(tracksControllerProvider.notifier).loadTracks();
+      _tracksLoaded = true;
     }
     _requestSync();
   }
