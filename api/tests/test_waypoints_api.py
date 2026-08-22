@@ -7,7 +7,7 @@ def test_create_and_get_waypoint(client):
     headers = _register(client, "waypoint-create@example.test")
     create_response = client.post(
         "/waypoints",
-        json={"name": "Trailhead", "geom": {"type": "Point", "coordinates": [7.6, 45.9]}},
+        json={"name": "Trailhead", "type": "generic", "geom": {"type": "Point", "coordinates": [7.6, 45.9]}},
         headers=headers,
     )
     assert create_response.status_code == 201
@@ -24,7 +24,7 @@ def test_list_waypoints_returns_created(client):
     headers = _register(client, "waypoint-list@example.test")
     client.post(
         "/waypoints",
-        json={"name": "A", "geom": {"type": "Point", "coordinates": [1.0, 2.0]}},
+        json={"name": "A", "type": "generic", "geom": {"type": "Point", "coordinates": [1.0, 2.0]}},
         headers=headers,
     )
     response = client.get("/waypoints", headers=headers)
@@ -47,7 +47,7 @@ def test_get_waypoint_forbidden_for_other_org(client):
     owner_headers = _register(client, "waypoint-owner-a@example.test")
     create_response = client.post(
         "/waypoints",
-        json={"name": "Secret", "geom": {"type": "Point", "coordinates": [3.0, 4.0]}},
+        json={"name": "Secret", "type": "generic", "geom": {"type": "Point", "coordinates": [3.0, 4.0]}},
         headers=owner_headers,
     )
     waypoint_id = create_response.json()["id"]
@@ -61,7 +61,7 @@ def test_create_waypoint_rejects_empty_name(client):
     headers = _register(client, "waypoint-empty-name@example.test")
     response = client.post(
         "/waypoints",
-        json={"name": "", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        json={"name": "", "type": "generic", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
         headers=headers,
     )
     assert response.status_code == 422
@@ -73,6 +73,7 @@ def test_create_waypoint_rejects_wrong_geometry_type(client):
         "/waypoints",
         json={
             "name": "Bad",
+            "type": "generic",
             "geom": {"type": "LineString", "coordinates": [[1.0, 2.0], [3.0, 4.0]]},
         },
         headers=headers,
@@ -85,7 +86,7 @@ def test_list_waypoints_pagination(client):
     for i in range(3):
         client.post(
             "/waypoints",
-            json={"name": f"P{i}", "geom": {"type": "Point", "coordinates": [float(i), float(i)]}},
+            json={"name": f"P{i}", "type": "generic", "geom": {"type": "Point", "coordinates": [float(i), float(i)]}},
             headers=headers,
         )
     response = client.get("/waypoints?limit=2&offset=1", headers=headers)
@@ -99,7 +100,7 @@ def test_update_waypoint_name_only(client):
     headers = _register(client, "waypoint-update@example.test")
     create_response = client.post(
         "/waypoints",
-        json={"name": "Old", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        json={"name": "Old", "type": "generic", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
         headers=headers,
     )
     waypoint_id = create_response.json()["id"]
@@ -115,7 +116,7 @@ def test_update_waypoint_forbidden_without_edit_access(client):
     owner_headers = _register(client, "waypoint-edit-owner@example.test")
     create_response = client.post(
         "/waypoints",
-        json={"name": "Mine", "geom": {"type": "Point", "coordinates": [2.0, 2.0]}},
+        json={"name": "Mine", "type": "generic", "geom": {"type": "Point", "coordinates": [2.0, 2.0]}},
         headers=owner_headers,
     )
     waypoint_id = create_response.json()["id"]
@@ -129,7 +130,7 @@ def test_delete_waypoint_soft_deletes(client):
     headers = _register(client, "waypoint-delete@example.test")
     create_response = client.post(
         "/waypoints",
-        json={"name": "Gone", "geom": {"type": "Point", "coordinates": [5.0, 5.0]}},
+        json={"name": "Gone", "type": "generic", "geom": {"type": "Point", "coordinates": [5.0, 5.0]}},
         headers=headers,
     )
     waypoint_id = create_response.json()["id"]
@@ -148,7 +149,7 @@ def test_delete_waypoint_forbidden_without_edit_access(client):
     owner_headers = _register(client, "waypoint-del-owner@example.test")
     create_response = client.post(
         "/waypoints",
-        json={"name": "Protected", "geom": {"type": "Point", "coordinates": [6.0, 6.0]}},
+        json={"name": "Protected", "type": "generic", "geom": {"type": "Point", "coordinates": [6.0, 6.0]}},
         headers=owner_headers,
     )
     waypoint_id = create_response.json()["id"]
@@ -156,3 +157,13 @@ def test_delete_waypoint_forbidden_without_edit_access(client):
     other_headers = _register(client, "waypoint-del-other@example.test")
     response = client.delete(f"/waypoints/{waypoint_id}", headers=other_headers)
     assert response.status_code == 403
+
+
+def test_create_waypoint_rejects_empty_type(client):
+    headers = _register(client, "waypoint-empty-type@example.test")
+    response = client.post(
+        "/waypoints",
+        json={"name": "Valid", "type": "", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        headers=headers,
+    )
+    assert response.status_code == 422

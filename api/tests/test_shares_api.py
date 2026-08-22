@@ -14,7 +14,7 @@ def _register(client, email, password="s3cret-pass"):
 def _create_waypoint(client, headers, name="Shared Point"):
     response = client.post(
         "/waypoints",
-        json={"name": name, "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        json={"name": name, "type": "generic", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
         headers=headers,
     )
     return response.json()["id"]

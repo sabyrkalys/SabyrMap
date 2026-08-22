@@ -8,11 +8,13 @@ from app.models.track import Track
 from app.models.waypoint import Waypoint
 
 
-def create_waypoint(db: Session, *, org_id: uuid.UUID, owner_id: uuid.UUID, name: str, geom) -> Waypoint:
+def create_waypoint(
+    db: Session, *, org_id: uuid.UUID, owner_id: uuid.UUID, name: str, geom, type: str, note: str | None = None
+) -> Waypoint:
     resource = Resource(org_id=org_id, owner_id=owner_id, resource_type=ResourceType.WAYPOINT)
     db.add(resource)
     db.flush()
-    waypoint = Waypoint(id=resource.id, name=name, geom=geom)
+    waypoint = Waypoint(id=resource.id, name=name, geom=geom, type=type, note=note or None)
     db.add(waypoint)
     db.flush()
     return waypoint
