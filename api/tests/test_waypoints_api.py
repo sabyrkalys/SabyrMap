@@ -342,3 +342,56 @@ def test_can_edit_false_for_view_share(client, db_session):
     viewer_headers = {"Authorization": f"Bearer {create_access_token(viewer.id)}"}
     response = client.get(f"/waypoints/{waypoint_id}", headers=viewer_headers)
     assert response.json()["can_edit"] is False
+
+
+def test_update_waypoint_sets_color(client):
+    headers = _register(client, "waypoint-update-color-set@example.test")
+    create_response = client.post(
+        "/waypoints",
+        json={"name": "A", "type": "generic", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        headers=headers,
+    )
+    waypoint_id = create_response.json()["id"]
+
+    response = client.patch(f"/waypoints/{waypoint_id}", json={"color": "#00FF00"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["color"] == "#00FF00"
+
+
+def test_update_waypoint_omitting_color_leaves_it_unchanged(client):
+    headers = _register(client, "waypoint-update-color-omit@example.test")
+    create_response = client.post(
+        "/waypoints",
+        json={
+            "name": "A",
+            "type": "generic",
+            "color": "#00FF00",
+            "geom": {"type": "Point", "coordinates": [1.0, 1.0]},
+        },
+        headers=headers,
+    )
+    waypoint_id = create_response.json()["id"]
+
+    response = client.patch(f"/waypoints/{waypoint_id}", json={"name": "B"}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["color"] == "#00FF00"
+    assert response.json()["name"] == "B"
+
+
+def test_update_waypoint_null_color_clears_it(client):
+    headers = _register(client, "waypoint-update-color-clear@example.test")
+    create_response = client.post(
+        "/waypoints",
+        json={
+            "name": "A",
+            "type": "generic",
+            "color": "#00FF00",
+            "geom": {"type": "Point", "coordinates": [1.0, 1.0]},
+        },
+        headers=headers,
+    )
+    waypoint_id = create_response.json()["id"]
+
+    response = client.patch(f"/waypoints/{waypoint_id}", json={"color": None}, headers=headers)
+    assert response.status_code == 200
+    assert response.json()["color"] is None

@@ -113,6 +113,8 @@ def update_waypoint(
         entity.note = payload.note or None
     if payload.geom is not None:
         entity.geom = geojson_to_point(payload.geom)
+    if "color" in payload.model_fields_set:
+        entity.color = payload.color
     db.flush()
     return _to_response(resource, entity, current_user, db)
 
