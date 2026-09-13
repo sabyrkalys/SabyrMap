@@ -13,11 +13,11 @@ class GeoJSONPoint(BaseModel):
 
 class GeoJSONLineString(BaseModel):
     type: Literal["LineString"] = "LineString"
-    coordinates: list[tuple[float, float]]
+    coordinates: list[tuple[float, float, float]]
 
     @field_validator("coordinates")
     @classmethod
-    def _min_two_points(cls, v: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    def _min_two_points(cls, v: list[tuple[float, float, float]]) -> list[tuple[float, float, float]]:
         if len(v) < 2:
             raise ValueError("LineString requires at least 2 coordinates")
         return v
@@ -34,7 +34,7 @@ def geojson_to_point(geo: GeoJSONPoint) -> WKBElement:
 
 def linestring_to_geojson(geom: WKBElement) -> GeoJSONLineString:
     shape = to_shape(geom)
-    return GeoJSONLineString(coordinates=[(x, y) for x, y in shape.coords])
+    return GeoJSONLineString(coordinates=[(x, y, z) for x, y, z in shape.coords])
 
 
 def geojson_to_linestring(geo: GeoJSONLineString) -> WKBElement:

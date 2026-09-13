@@ -19,15 +19,22 @@ def test_point_roundtrip():
 
 
 def test_linestring_roundtrip():
-    original = GeoJSONLineString(coordinates=[(7.6, 45.9), (7.7, 46.0), (7.8, 46.05)])
+    original = GeoJSONLineString(
+        coordinates=[(7.6, 45.9, 1200.0), (7.7, 46.0, 1250.5), (7.8, 46.05, 1300.0)]
+    )
     wkb = geojson_to_linestring(original)
     result = linestring_to_geojson(wkb)
-    assert result.coordinates == [(7.6, 45.9), (7.7, 46.0), (7.8, 46.05)]
+    assert result.coordinates == [(7.6, 45.9, 1200.0), (7.7, 46.0, 1250.5), (7.8, 46.05, 1300.0)]
 
 
 def test_linestring_rejects_single_point():
     with pytest.raises(ValidationError):
-        GeoJSONLineString(coordinates=[(7.6, 45.9)])
+        GeoJSONLineString(coordinates=[(7.6, 45.9, 1200.0)])
+
+
+def test_linestring_rejects_2d_coordinates():
+    with pytest.raises(ValidationError):
+        GeoJSONLineString(coordinates=[(7.6, 45.9), (7.7, 46.0)])
 
 
 def test_point_rejects_wrong_type_literal():
