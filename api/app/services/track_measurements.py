@@ -24,9 +24,11 @@ def compute_elevation_gain_meters(coords: list[tuple[float, float, float]]) -> f
     """Sum of sustained climbs, smoothing GPS altitude noise with a 3m threshold.
 
     Tracks a baseline elevation; a delta only counts (and resets the baseline
-    upward) once it exceeds the noise threshold, so small jitter is ignored.
-    Drops never reset the baseline, so climbing back to a previous local peak
-    doesn't double-count.
+    upward) once a sustained climb exceeds the noise threshold. A sustained
+    descent (also past the threshold) re-arms the baseline downward without
+    adding to the gain, so a later re-climb past the same or a new peak is
+    correctly counted again — jitter within the threshold in either direction
+    is ignored either way.
     """
     if len(coords) < 2:
         return 0.0
@@ -36,5 +38,7 @@ def compute_elevation_gain_meters(coords: list[tuple[float, float, float]]) -> f
         delta = elevation - baseline
         if delta > _ELEVATION_NOISE_THRESHOLD_METERS:
             gain += delta
+            baseline = elevation
+        elif -delta > _ELEVATION_NOISE_THRESHOLD_METERS:
             baseline = elevation
     return gain

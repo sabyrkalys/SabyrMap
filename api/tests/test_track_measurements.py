@@ -35,3 +35,13 @@ def test_compute_elevation_gain_climb_drop_climb_past_threshold():
 
 def test_compute_elevation_gain_single_point_is_zero():
     assert compute_elevation_gain_meters([(0.0, 0.0, 100.0)]) == 0.0
+
+
+def test_compute_elevation_gain_out_and_back():
+    coords = [(0.0, 0.0, 100.0), (0.0, 0.0, 200.0), (0.0, 0.0, 100.0)]
+    assert compute_elevation_gain_meters(coords) == pytest.approx(100.0)
+
+
+def test_compute_elevation_gain_out_and_back_and_reclimb():
+    coords = [(0.0, 0.0, 100.0), (0.0, 0.0, 200.0), (0.0, 0.0, 100.0), (0.0, 0.0, 200.0)]
+    assert compute_elevation_gain_meters(coords) == pytest.approx(200.0)
