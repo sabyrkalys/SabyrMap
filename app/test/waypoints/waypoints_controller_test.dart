@@ -83,6 +83,7 @@ void main() {
             name: 'Test',
             type: 'generic',
             note: '',
+            color: null,
             lat: 1.0,
             lng: 2.0,
           );
@@ -122,6 +123,7 @@ void main() {
               name: 'Test',
               type: 'generic',
               note: '',
+              color: null,
               lat: 1.0,
               lng: 2.0,
             ),
@@ -145,11 +147,34 @@ void main() {
             name: 'Test',
             type: 'danger',
             note: 'Careful',
+            color: null,
           );
 
       final state = container.read(waypointsControllerProvider);
       expect(state.single.type, 'danger');
       expect(state.single.note, 'Careful');
+    });
+
+    test('passes color through to the repository and the resulting state', () async {
+      // Uses a color distinct from any type's default so this can't be
+      // masked by a call site that dropped the argument and happened to
+      // land on a coincidentally-matching default color.
+      final repo = FakeWaypointsRepository(initial: [_waypoint()])
+        ..updateResult = _waypoint(color: '#123456');
+      final container = _buildContainer(repo: repo);
+      addTearDown(container.dispose);
+      await container.read(waypointsControllerProvider.notifier).loadWaypoints();
+
+      await container.read(waypointsControllerProvider.notifier).updateWaypoint(
+            'w1',
+            name: 'Test',
+            type: 'generic',
+            note: '',
+            color: '#123456',
+          );
+
+      expect(repo.lastUpdateColor, '#123456');
+      expect(container.read(waypointsControllerProvider).single.color, '#123456');
     });
 
     test('rolls back to the previous waypoint and rethrows on failure', () async {
@@ -165,6 +190,7 @@ void main() {
               name: 'Test',
               type: 'danger',
               note: '',
+              color: null,
             ),
         throwsA(isA<WaypointException>()),
       );

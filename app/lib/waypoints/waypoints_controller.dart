@@ -39,7 +39,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required String note,
     required double lat,
     required double lng,
-    String? color,
+    required String? color,
   }) async {
     final token = await _storage.read();
     if (token == null) return;
@@ -74,7 +74,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required String name,
     required String type,
     required String note,
-    String? color,
+    required String? color,
   }) async {
     final token = await _storage.read();
     if (token == null) return;

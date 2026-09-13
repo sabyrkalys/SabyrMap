@@ -129,6 +129,7 @@ void main() {
           name: 'Summit',
           type: 'generic',
           note: '',
+          color: null,
           lat: 1.0,
           lng: 2.0,
         );

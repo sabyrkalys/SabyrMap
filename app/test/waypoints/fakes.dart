@@ -11,6 +11,12 @@ class FakeWaypointsRepository implements WaypointsRepository {
   Object? updateResult;
   Object? deleteResult;
 
+  /// Records the `color` argument actually passed to [update], so tests can
+  /// assert on what was truly sent through rather than only on the fake's
+  /// canned return value (which could coincidentally already carry the
+  /// right color, masking a call site that dropped the argument).
+  String? lastUpdateColor;
+
   @override
   Future<List<Waypoint>> list(String token) async => List.of(items);
 
@@ -37,6 +43,7 @@ class FakeWaypointsRepository implements WaypointsRepository {
     required String note,
     required String? color,
   }) async {
+    lastUpdateColor = color;
     if (updateResult is WaypointException) throw updateResult as WaypointException;
     return updateResult as Waypoint;
   }

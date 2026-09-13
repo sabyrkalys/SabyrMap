@@ -231,8 +231,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     for (final waypoint in waypoints) {
       // circleOptionsForWaypoint is a pure function of (waypoint.type,
-      // isOwn) — nothing else it reads ever varies for a given waypoint id
-      // — so this key cheaply captures "would the rendered options change".
+      // isOwn, waypoint.color) — nothing else it reads ever varies for a
+      // given waypoint id — so this key cheaply captures "would the
+      // rendered options change".
       final isOwn = waypoint.ownerId == currentUserId;
       final key = '${waypoint.type}|$isOwn|${waypoint.color ?? ''}';
       final existing = _circlesByWaypointId[waypoint.id];
@@ -458,6 +459,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             name: result.name,
             type: result.type,
             note: result.note,
+            color: result.color,
           );
     } on WaypointException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));

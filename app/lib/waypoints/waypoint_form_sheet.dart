@@ -52,7 +52,8 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
     super.dispose();
   }
 
-  String get _effectiveColorHex => _selectedColor ?? waypointTypeColors[_selectedType]!;
+  String get _effectiveColorHex =>
+      _selectedColor ?? waypointTypeColors[_selectedType] ?? waypointTypeColors[defaultWaypointType]!;
 
   Future<void> _openColorPicker() async {
     Color picked = colorFromHex(_effectiveColorHex);

@@ -98,6 +98,29 @@ void main() {
     expect(decoration.color, colorFromHex(waypointTypeColors[defaultWaypointType]!));
   });
 
+  testWidgets('falls back to the default type color for an unrecognized waypoint type', (tester) async {
+    final existing = Waypoint(
+      id: 'w1',
+      orgId: 'o1',
+      ownerId: 'u1',
+      name: 'Old name',
+      type: 'not-a-real-type',
+      note: null,
+      lat: 1.0,
+      lng: 2.0,
+      canEdit: true,
+      createdAt: DateTime.utc(2026, 8, 22),
+      color: null,
+    );
+    await tester.pumpWidget(_harness(() {}, (_) {}, existing: existing));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    final swatch = tester.widget<Container>(find.byKey(const Key('waypoint_color_swatch')));
+    final decoration = swatch.decoration as BoxDecoration;
+    expect(decoration.color, colorFromHex(waypointTypeColors[defaultWaypointType]!));
+  });
+
   testWidgets('picking a color in the dialog carries it into the form result', (tester) async {
     WaypointFormResult? result;
     await tester.pumpWidget(_harness(() {}, (r) => result = r));
