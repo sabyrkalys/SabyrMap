@@ -57,7 +57,7 @@ void main() {
   });
 
   group('create', () {
-    test('sends name and [lng, lat] coordinates and returns the created track on 201', () async {
+    test('sends name and [lng, lat, elevation] coordinates and returns the created track on 201', () async {
       Map<String, dynamic>? capturedBody;
       final client = ApiClient(
         baseUrl: 'http://example.test',
@@ -81,8 +81,8 @@ void main() {
         'geom': {
           'type': 'LineString',
           'coordinates': [
-            [7.6, 45.9],
-            [7.7, 46.0],
+            [7.6, 45.9, 0.0],
+            [7.7, 46.0, 0.0],
           ],
         },
       });

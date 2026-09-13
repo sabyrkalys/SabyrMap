@@ -7,7 +7,13 @@ import 'track_models.dart';
 abstract class TracksRepository {
   Future<List<Track>> list(String token);
 
-  Future<Track> create(String token, {required String name, required List<TrackPoint> points});
+  Future<Track> create(
+    String token, {
+    required String name,
+    required List<TrackPoint> points,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+  });
 }
 
 class HttpTracksRepository implements TracksRepository {
@@ -27,7 +33,13 @@ class HttpTracksRepository implements TracksRepository {
   }
 
   @override
-  Future<Track> create(String token, {required String name, required List<TrackPoint> points}) async {
+  Future<Track> create(
+    String token, {
+    required String name,
+    required List<TrackPoint> points,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+  }) async {
     final response = await _client.post(
       '/tracks',
       token: token,
@@ -36,9 +48,11 @@ class HttpTracksRepository implements TracksRepository {
         'geom': {
           'type': 'LineString',
           'coordinates': [
-            for (final p in points) [p.lng, p.lat],
+            for (final p in points) [p.lng, p.lat, p.elevationMeters],
           ],
         },
+        if (startedAt != null) 'started_at': startedAt.toUtc().toIso8601String(),
+        if (finishedAt != null) 'finished_at': finishedAt.toUtc().toIso8601String(),
       },
     );
     if (response.statusCode != 201) {

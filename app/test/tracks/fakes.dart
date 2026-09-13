@@ -9,11 +9,22 @@ class FakeTracksRepository implements TracksRepository {
   /// Set to a Track for success, or a TrackException instance to throw.
   Object? createResult;
 
+  DateTime? lastCreateStartedAt;
+  DateTime? lastCreateFinishedAt;
+
   @override
   Future<List<Track>> list(String token) async => List.of(items);
 
   @override
-  Future<Track> create(String token, {required String name, required List<TrackPoint> points}) async {
+  Future<Track> create(
+    String token, {
+    required String name,
+    required List<TrackPoint> points,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+  }) async {
+    lastCreateStartedAt = startedAt;
+    lastCreateFinishedAt = finishedAt;
     if (createResult is TrackException) throw createResult as TrackException;
     return createResult as Track;
   }

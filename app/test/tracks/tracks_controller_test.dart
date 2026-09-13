@@ -62,19 +62,25 @@ void main() {
   });
 
   group('saveTrack', () {
-    test('appends the created track to state on success', () async {
+    test('appends the created track to state and forwards timing to the repository', () async {
       final repo = FakeTracksRepository()..createResult = _track(id: 'server-id');
       final container = _buildContainer(repo: repo);
       addTearDown(container.dispose);
+      final startedAt = DateTime.utc(2026, 9, 13, 8);
+      final finishedAt = DateTime.utc(2026, 9, 13, 9, 30);
 
       await container.read(tracksControllerProvider.notifier).saveTrack(
             name: 'Morning walk',
             points: const [TrackPoint(lat: 1.0, lng: 2.0), TrackPoint(lat: 1.1, lng: 2.1)],
+            startedAt: startedAt,
+            finishedAt: finishedAt,
           );
 
       final state = container.read(tracksControllerProvider);
       expect(state, hasLength(1));
       expect(state.single.id, 'server-id');
+      expect(repo.lastCreateStartedAt, startedAt);
+      expect(repo.lastCreateFinishedAt, finishedAt);
     });
 
     test('leaves state unchanged and rethrows on failure', () async {

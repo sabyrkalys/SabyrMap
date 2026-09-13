@@ -35,10 +35,21 @@ class TracksController extends Notifier<List<Track>> {
   /// "immediately visible on the map" expectation before the user has even
   /// confirmed the save form, so there's nothing to roll back on failure —
   /// [TrackException] simply propagates to the caller.
-  Future<void> saveTrack({required String name, required List<TrackPoint> points}) async {
+  Future<void> saveTrack({
+    required String name,
+    required List<TrackPoint> points,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+  }) async {
     final token = await _storage.read();
     if (token == null) return;
-    final created = await _repository.create(token, name: name, points: points);
+    final created = await _repository.create(
+      token,
+      name: name,
+      points: points,
+      startedAt: startedAt,
+      finishedAt: finishedAt,
+    );
     state = [...state, created];
   }
 }
