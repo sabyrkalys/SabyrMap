@@ -19,3 +19,4 @@ class Waypoint(Base):
     geom: Mapped[str] = mapped_column(Geometry(geometry_type="POINT", srid=4326, spatial_index=False), nullable=False)
     type: Mapped[str] = mapped_column(String(50), nullable=False, server_default="generic")
     note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    color: Mapped[str | None] = mapped_column(String(7), nullable=True)
