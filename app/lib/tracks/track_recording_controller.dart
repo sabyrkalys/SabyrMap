@@ -5,6 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'location_source.dart';
 import 'track_models.dart';
 
+class TrackRecordingResult {
+  const TrackRecordingResult({required this.points, required this.startedAt, required this.finishedAt});
+
+  final List<TrackPoint> points;
+  final DateTime startedAt;
+  final DateTime finishedAt;
+}
+
 sealed class TrackRecordingState {
   const TrackRecordingState();
 }
@@ -57,11 +65,16 @@ class TrackRecordingController extends Notifier<TrackRecordingState> {
     });
   }
 
-  List<TrackPoint> stop() {
+  TrackRecordingResult? stop() {
     final current = state;
     _subscription?.cancel();
     _subscription = null;
     state = const TrackRecordingIdle();
-    return current is TrackRecordingActive ? current.points : const [];
+    if (current is! TrackRecordingActive) return null;
+    return TrackRecordingResult(
+      points: current.points,
+      startedAt: current.startedAt,
+      finishedAt: DateTime.now(),
+    );
   }
 }

@@ -76,7 +76,7 @@ void main() {
   });
 
   group('stop', () {
-    test('returns the accumulated points and transitions back to idle', () async {
+    test('returns the accumulated points and timestamps, and transitions back to idle', () async {
       final source = FakeLocationSource();
       final container = ProviderContainer(overrides: [locationSourceProvider.overrideWithValue(source)]);
       addTearDown(container.dispose);
@@ -87,9 +87,12 @@ void main() {
       source.emit(const TrackPoint(lat: 1.1, lng: 2.1));
       await Future<void>.delayed(Duration.zero);
 
-      final points = container.read(trackRecordingControllerProvider.notifier).stop();
+      final result = container.read(trackRecordingControllerProvider.notifier).stop();
 
-      expect(points, hasLength(2));
+      expect(result, isNotNull);
+      expect(result!.points, hasLength(2));
+      expect(result.finishedAt.isAfter(result.startedAt) || result.finishedAt.isAtSameMomentAs(result.startedAt),
+          isTrue);
       expect(container.read(trackRecordingControllerProvider), isA<TrackRecordingIdle>());
     });
 
@@ -107,15 +110,15 @@ void main() {
       expect(container.read(trackRecordingControllerProvider), isA<TrackRecordingIdle>());
     });
 
-    test('returns an empty list and is a no-op when already idle', () {
+    test('returns null and is a no-op when already idle', () {
       final source = FakeLocationSource();
       final container = ProviderContainer(overrides: [locationSourceProvider.overrideWithValue(source)]);
       addTearDown(container.dispose);
       addTearDown(source.dispose);
 
-      final points = container.read(trackRecordingControllerProvider.notifier).stop();
+      final result = container.read(trackRecordingControllerProvider.notifier).stop();
 
-      expect(points, isEmpty);
+      expect(result, isNull);
       expect(container.read(trackRecordingControllerProvider), isA<TrackRecordingIdle>());
     });
   });
