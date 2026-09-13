@@ -1,10 +1,13 @@
+import pytest
+
+
 def _register(client, email, password="s3cret-pass"):
     response = client.post("/auth/register", json={"email": email, "password": password})
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-_LINE_A = {"type": "LineString", "coordinates": [[7.6, 45.9], [7.7, 46.0], [7.8, 46.05]]}
-_LINE_B = {"type": "LineString", "coordinates": [[1.0, 1.0], [2.0, 2.0]]}
+_LINE_A = {"type": "LineString", "coordinates": [[7.6, 45.9, 0.0], [7.7, 46.0, 0.0], [7.8, 46.05, 0.0]]}
+_LINE_B = {"type": "LineString", "coordinates": [[1.0, 1.0, 0.0], [2.0, 2.0, 0.0]]}
 
 
 def test_create_and_get_track(client):
@@ -77,7 +80,7 @@ def test_create_track_rejects_single_point_linestring(client):
     headers = _register(client, "track-shortline@example.test")
     response = client.post(
         "/tracks",
-        json={"name": "TooShort", "geom": {"type": "LineString", "coordinates": [[1.0, 2.0]]}},
+        json={"name": "TooShort", "geom": {"type": "LineString", "coordinates": [[1.0, 2.0, 0.0]]}},
         headers=headers,
     )
     assert response.status_code == 422
@@ -88,7 +91,13 @@ def test_list_tracks_pagination(client):
     for i in range(3):
         client.post(
             "/tracks",
-            json={"name": f"T{i}", "geom": {"type": "LineString", "coordinates": [[float(i), float(i)], [float(i) + 1, float(i) + 1]]}},
+            json={
+                "name": f"T{i}",
+                "geom": {
+                    "type": "LineString",
+                    "coordinates": [[float(i), float(i), 0.0], [float(i) + 1, float(i) + 1, 0.0]],
+                },
+            },
             headers=headers,
         )
     response = client.get("/tracks?limit=2&offset=1", headers=headers)
@@ -151,3 +160,58 @@ def test_delete_track_forbidden_without_edit_access(client):
     other_headers = _register(client, "track-del-other@example.test")
     response = client.delete(f"/tracks/{track_id}", headers=other_headers)
     assert response.status_code == 403
+
+
+def test_create_track_includes_computed_measurements(client):
+    headers = _register(client, "track-measure@example.test")
+    response = client.post(
+        "/tracks",
+        json={
+            "name": "Ridge Loop",
+            "geom": {
+                "type": "LineString",
+                "coordinates": [[0.0, 0.0, 100.0], [0.0, 1.0, 110.0]],
+            },
+            "started_at": "2026-09-13T08:00:00Z",
+            "finished_at": "2026-09-13T09:30:00Z",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["length_meters"] == pytest.approx(111195, rel=1e-3)
+    assert body["duration_seconds"] == 5400
+    assert body["elevation_gain_meters"] == pytest.approx(10.0)
+
+
+def test_create_track_without_timing_has_null_duration_and_elevation(client):
+    headers = _register(client, "track-notiming@example.test")
+    response = client.post(
+        "/tracks",
+        json={"name": "Untimed", "geom": _LINE_B},
+        headers=headers,
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["duration_seconds"] is None
+    assert body["elevation_gain_meters"] is None
+    assert body["length_meters"] > 0
+
+
+def test_update_track_timing_recomputes_duration(client):
+    headers = _register(client, "track-update-timing@example.test")
+    create_response = client.post(
+        "/tracks",
+        json={"name": "Untimed", "geom": _LINE_B},
+        headers=headers,
+    )
+    track_id = create_response.json()["id"]
+    assert create_response.json()["duration_seconds"] is None
+
+    response = client.patch(
+        f"/tracks/{track_id}",
+        json={"started_at": "2026-09-13T08:00:00Z", "finished_at": "2026-09-13T08:10:00Z"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["duration_seconds"] == 600

@@ -20,11 +20,20 @@ def create_waypoint(
     return waypoint
 
 
-def create_track(db: Session, *, org_id: uuid.UUID, owner_id: uuid.UUID, name: str, geom) -> Track:
+def create_track(
+    db: Session,
+    *,
+    org_id: uuid.UUID,
+    owner_id: uuid.UUID,
+    name: str,
+    geom,
+    started_at=None,
+    finished_at=None,
+) -> Track:
     resource = Resource(org_id=org_id, owner_id=owner_id, resource_type=ResourceType.TRACK)
     db.add(resource)
     db.flush()
-    track = Track(id=resource.id, name=name, geom=geom)
+    track = Track(id=resource.id, name=name, geom=geom, started_at=started_at, finished_at=finished_at)
     db.add(track)
     db.flush()
     return track

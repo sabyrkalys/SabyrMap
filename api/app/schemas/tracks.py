@@ -9,11 +9,15 @@ from app.schemas.geometry import GeoJSONLineString
 class TrackCreateRequest(BaseModel):
     name: str = Field(min_length=1)
     geom: GeoJSONLineString
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 class TrackUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1)
     geom: GeoJSONLineString | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
 
 
 class TrackResponse(BaseModel):
@@ -23,6 +27,9 @@ class TrackResponse(BaseModel):
     name: str
     geom: GeoJSONLineString
     created_at: datetime
+    length_meters: float
+    duration_seconds: int | None
+    elevation_gain_meters: float | None
 
 
 class TrackListResponse(BaseModel):

@@ -46,6 +46,9 @@ def build_resource_router(
     list_response_schema: Type[Any],
     geom_to_wire: Callable[[Any], Any],
     wire_to_geom: Callable[[Any], Any],
+    extra_create_kwargs: Callable[[Any], dict] | None = None,
+    apply_extra_update: Callable[[Any, Any], None] | None = None,
+    extra_response_fields: Callable[[Any], dict] | None = None,
 ) -> APIRouter:
     """Build a CRUD router for a resource-backed entity (waypoint, track, ...).
 
@@ -59,14 +62,17 @@ def build_resource_router(
     entity_label = entity_name.capitalize()
 
     def _to_response(resource: Resource, entity: Any):
-        return response_schema(
-            id=entity.id,
-            org_id=resource.org_id,
-            owner_id=resource.owner_id,
-            name=entity.name,
-            geom=geom_to_wire(entity.geom),
-            created_at=resource.created_at,
-        )
+        fields = {
+            "id": entity.id,
+            "org_id": resource.org_id,
+            "owner_id": resource.owner_id,
+            "name": entity.name,
+            "geom": geom_to_wire(entity.geom),
+            "created_at": resource.created_at,
+        }
+        if extra_response_fields is not None:
+            fields.update(extra_response_fields(entity))
+        return response_schema(**fields)
 
     def _get_resource_and_entity(db: Session, entity_id: uuid.UUID) -> tuple[Resource, Any]:
         return get_resource_and_entity(db, model, entity_id, entity_label)
@@ -77,12 +83,14 @@ def build_resource_router(
         current_user: User = Depends(get_current_user),
         db: Session = Depends(get_db),
     ):
+        extra_kwargs = extra_create_kwargs(payload) if extra_create_kwargs is not None else {}
         entity = create_service(
             db,
             org_id=current_user.org_id,
             owner_id=current_user.id,
             name=payload.name,
             geom=wire_to_geom(payload.geom),
+            **extra_kwargs,
         )
         resource = db.get(Resource, entity.id)
         return _to_response(resource, entity)
@@ -139,6 +147,8 @@ def build_resource_router(
             entity.name = payload.name
         if payload.geom is not None:
             entity.geom = wire_to_geom(payload.geom)
+        if apply_extra_update is not None:
+            apply_extra_update(entity, payload)
         db.flush()
         return _to_response(resource, entity)
 
