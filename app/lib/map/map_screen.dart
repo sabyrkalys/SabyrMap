@@ -10,6 +10,7 @@ import '../tracks/track_models.dart';
 import '../tracks/track_name_form_sheet.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
+import '../tracks/tracks_list_screen.dart';
 import '../waypoints/waypoint_form_sheet.dart';
 import '../waypoints/waypoint_models.dart';
 import '../waypoints/waypoint_types.dart';
@@ -482,8 +483,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   Future<void> _onRecordToggle(TrackRecordingState recordingState) async {
     if (recordingState is TrackRecordingActive) {
-      final points = ref.read(trackRecordingControllerProvider.notifier).stop();
-      if (points.length < 2) {
+      final stopResult = ref.read(trackRecordingControllerProvider.notifier).stop();
+      if (stopResult == null || stopResult.points.length < 2) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Трек слишком короткий, чтобы сохранить')),
@@ -494,7 +495,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final result = await showTrackNameFormSheet(context, initialName: _defaultTrackName());
       if (result == null || !mounted) return;
       try {
-        await ref.read(tracksControllerProvider.notifier).saveTrack(name: result.name, points: points);
+        await ref.read(tracksControllerProvider.notifier).saveTrack(
+              name: result.name,
+              points: stopResult.points,
+              startedAt: stopResult.startedAt,
+              finishedAt: stopResult.finishedAt,
+            );
       } on TrackException catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
@@ -568,6 +574,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             key: const Key('layers_button'),
             icon: const Icon(Icons.layers),
             onPressed: _onLayersButtonPressed,
+          ),
+          IconButton(
+            key: const Key('tracks_list_button'),
+            icon: const Icon(Icons.list),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const TracksListScreen()),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.logout),
