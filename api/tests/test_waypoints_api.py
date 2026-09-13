@@ -99,6 +99,48 @@ def test_list_waypoints_pagination(client):
     assert body["offset"] == 1
 
 
+def test_create_waypoint_accepts_valid_hex_color(client):
+    headers = _register(client, "waypoint-color-valid@example.test")
+    response = client.post(
+        "/waypoints",
+        json={
+            "name": "Colorful",
+            "type": "generic",
+            "color": "#FF00AA",
+            "geom": {"type": "Point", "coordinates": [1.0, 1.0]},
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["color"] == "#FF00AA"
+
+
+def test_create_waypoint_rejects_malformed_color(client):
+    headers = _register(client, "waypoint-color-bad@example.test")
+    response = client.post(
+        "/waypoints",
+        json={
+            "name": "Bad Color",
+            "type": "generic",
+            "color": "red",
+            "geom": {"type": "Point", "coordinates": [1.0, 1.0]},
+        },
+        headers=headers,
+    )
+    assert response.status_code == 422
+
+
+def test_create_waypoint_without_color_defaults_to_none(client):
+    headers = _register(client, "waypoint-color-none@example.test")
+    response = client.post(
+        "/waypoints",
+        json={"name": "No Color", "type": "generic", "geom": {"type": "Point", "coordinates": [1.0, 1.0]}},
+        headers=headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["color"] is None
+
+
 def test_update_waypoint_name_only(client):
     headers = _register(client, "waypoint-update@example.test")
     create_response = client.post(

@@ -32,6 +32,7 @@ def _to_response(resource: Resource, entity: Waypoint, current_user: User, db: S
         name=entity.name,
         type=entity.type,
         note=entity.note,
+        color=entity.color,
         geom=point_to_geojson(entity.geom),
         can_edit=can_edit_resource(db, current_user, resource),
         created_at=resource.created_at,
@@ -52,6 +53,7 @@ def create(
         geom=geojson_to_point(payload.geom),
         type=payload.type,
         note=payload.note,
+        color=payload.color,
     )
     resource = db.get(Resource, entity.id)
     return _to_response(resource, entity, current_user, db)
