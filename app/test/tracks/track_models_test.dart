@@ -32,6 +32,58 @@ void main() {
       expect(track.points[1].lat, 46.0);
       expect(track.createdAt, DateTime.parse('2026-08-22T10:00:00Z'));
     });
+
+    test('parses elevation and measurement fields when present', () {
+      final json = {
+        'id': 't1',
+        'org_id': 'o1',
+        'owner_id': 'u1',
+        'name': 'Ridge Loop',
+        'geom': {
+          'type': 'LineString',
+          'coordinates': [
+            [7.6, 45.9, 1200.0],
+            [7.7, 46.0, 1250.5],
+          ],
+        },
+        'created_at': '2026-08-22T10:00:00Z',
+        'length_meters': 4200.5,
+        'duration_seconds': 5400,
+        'elevation_gain_meters': 320.0,
+      };
+
+      final track = Track.fromJson(json);
+
+      expect(track.points[0].elevationMeters, 1200.0);
+      expect(track.points[1].elevationMeters, 1250.5);
+      expect(track.lengthMeters, 4200.5);
+      expect(track.durationSeconds, 5400);
+      expect(track.elevationGainMeters, 320.0);
+    });
+
+    test('defaults measurement fields when absent', () {
+      final json = {
+        'id': 't1',
+        'org_id': 'o1',
+        'owner_id': 'u1',
+        'name': 'Old track',
+        'geom': {
+          'type': 'LineString',
+          'coordinates': [
+            [7.6, 45.9],
+            [7.7, 46.0],
+          ],
+        },
+        'created_at': '2026-08-20T10:00:00Z',
+      };
+
+      final track = Track.fromJson(json);
+
+      expect(track.points[0].elevationMeters, 0.0);
+      expect(track.lengthMeters, 0.0);
+      expect(track.durationSeconds, isNull);
+      expect(track.elevationGainMeters, isNull);
+    });
   });
 
   test('TrackException.toString includes the message', () {

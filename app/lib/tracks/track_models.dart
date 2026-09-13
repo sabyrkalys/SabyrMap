@@ -1,8 +1,9 @@
 class TrackPoint {
-  const TrackPoint({required this.lat, required this.lng});
+  const TrackPoint({required this.lat, required this.lng, this.elevationMeters = 0.0});
 
   final double lat;
   final double lng;
+  final double elevationMeters;
 }
 
 class Track {
@@ -13,6 +14,9 @@ class Track {
     required this.name,
     required this.points,
     required this.createdAt,
+    this.lengthMeters = 0.0,
+    this.durationSeconds,
+    this.elevationGainMeters,
   });
 
   final String id;
@@ -21,6 +25,9 @@ class Track {
   final String name;
   final List<TrackPoint> points;
   final DateTime createdAt;
+  final double lengthMeters;
+  final int? durationSeconds;
+  final double? elevationGainMeters;
 
   factory Track.fromJson(Map<String, dynamic> json) {
     final geom = json['geom'] as Map<String, dynamic>;
@@ -35,9 +42,13 @@ class Track {
           TrackPoint(
             lng: ((c as List<dynamic>)[0] as num).toDouble(),
             lat: (c[1] as num).toDouble(),
+            elevationMeters: c.length > 2 ? (c[2] as num).toDouble() : 0.0,
           ),
       ],
       createdAt: DateTime.parse(json['created_at'] as String),
+      lengthMeters: (json['length_meters'] as num?)?.toDouble() ?? 0.0,
+      durationSeconds: (json['duration_seconds'] as num?)?.toInt(),
+      elevationGainMeters: (json['elevation_gain_meters'] as num?)?.toDouble(),
     );
   }
 }
