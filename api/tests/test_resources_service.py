@@ -35,7 +35,7 @@ def test_create_track_creates_resource_and_track_rows(db_session):
     db_session.add(owner)
     db_session.flush()
 
-    line = LineString([(7.6, 45.9), (7.7, 46.0)])
+    line = LineString([(7.6, 45.9, 0.0), (7.7, 46.0, 0.0)])
     track = create_track(
         db_session, org_id=org.id, owner_id=owner.id, name="Loop",
         geom=from_shape(line, srid=4326),

@@ -21,7 +21,7 @@ def test_create_track_shares_id_with_resource(db_session):
     db_session.add(resource)
     db_session.flush()
 
-    line = LineString([(7.6, 45.9), (7.7, 46.0)])
+    line = LineString([(7.6, 45.9, 0.0), (7.7, 46.0, 0.0)])
     track = Track(id=resource.id, name="Ridge Loop", geom=from_shape(line, srid=4326))
     db_session.add(track)
     db_session.flush()
