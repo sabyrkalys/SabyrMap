@@ -7,7 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import '../auth/fakes.dart';
 import 'fakes.dart';
 
-Waypoint _waypoint({String id = 'w1', String ownerId = 'u1', String type = 'generic', String? note}) {
+Waypoint _waypoint({
+  String id = 'w1',
+  String ownerId = 'u1',
+  String type = 'generic',
+  String? note,
+  String? color,
+}) {
   return Waypoint(
     id: id,
     orgId: 'o1',
@@ -15,6 +21,7 @@ Waypoint _waypoint({String id = 'w1', String ownerId = 'u1', String type = 'gene
     name: 'Test',
     type: type,
     note: note,
+    color: color,
     lat: 1.0,
     lng: 2.0,
     canEdit: true,
@@ -83,6 +90,25 @@ void main() {
       final state = container.read(waypointsControllerProvider);
       expect(state, hasLength(1));
       expect(state.single.id, 'server-id');
+    });
+
+    test('passes color through to the repository and optimistic state', () async {
+      final repo = FakeWaypointsRepository()
+        ..createResult = _waypoint(id: 'w1', color: '#FF00AA');
+      final container = _buildContainer(repo: repo);
+      addTearDown(container.dispose);
+
+      await container.read(waypointsControllerProvider.notifier).createWaypoint(
+            ownerId: 'u1',
+            name: 'Test',
+            type: 'generic',
+            note: '',
+            color: '#FF00AA',
+            lat: 1.0,
+            lng: 2.0,
+          );
+
+      expect(container.read(waypointsControllerProvider).single.color, '#FF00AA');
     });
 
     test('rolls back the optimistic waypoint and rethrows on failure', () async {
