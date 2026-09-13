@@ -1,5 +1,7 @@
+import 'package:app/waypoints/waypoint_color.dart';
 import 'package:app/waypoints/waypoint_form_sheet.dart';
 import 'package:app/waypoints/waypoint_models.dart';
+import 'package:app/waypoints/waypoint_types.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -15,6 +17,7 @@ Waypoint _existingWaypoint() {
     lng: 2.0,
     canEdit: true,
     createdAt: DateTime.utc(2026, 8, 22),
+    color: null,
   );
 }
 
@@ -73,7 +76,8 @@ void main() {
   });
 
   testWidgets('returns null when dismissed without saving', (tester) async {
-    WaypointFormResult? result = const WaypointFormResult(name: 'sentinel', type: 'generic', note: '');
+    WaypointFormResult? result =
+        const WaypointFormResult(name: 'sentinel', type: 'generic', note: '', color: null);
     await tester.pumpWidget(_harness(() {}, (r) => result = r));
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
@@ -82,5 +86,87 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(result, isNull);
+  });
+
+  testWidgets('swatch defaults to the selected type color when no override is set', (tester) async {
+    await tester.pumpWidget(_harness(() {}, (_) {}));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    final swatch = tester.widget<Container>(find.byKey(const Key('waypoint_color_swatch')));
+    final decoration = swatch.decoration as BoxDecoration;
+    expect(decoration.color, colorFromHex(waypointTypeColors[defaultWaypointType]!));
+  });
+
+  testWidgets('picking a color in the dialog carries it into the form result', (tester) async {
+    WaypointFormResult? result;
+    await tester.pumpWidget(_harness(() {}, (r) => result = r));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('waypoint_name_field')), 'Summit');
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('waypoint_color_swatch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('waypoint_color_picker_select_button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('waypoint_save_button')));
+    await tester.pumpAndSettle();
+
+    // Tapping "Select" without changing the picker's initial selection keeps
+    // it at the effective default it was seeded with -- this asserts the
+    // round trip works, not a specific chosen hue (see Task 8 Step 3 note on
+    // why the exact seeded value is `waypointTypeColors[defaultWaypointType]`
+    // for a new waypoint).
+    expect(result!.color, waypointTypeColors[defaultWaypointType]);
+  });
+
+  testWidgets('reset to default clears a previously-picked color', (tester) async {
+    WaypointFormResult? result;
+    await tester.pumpWidget(_harness(() {}, (r) => result = r, existing: _existingWaypoint()));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('waypoint_color_swatch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('waypoint_color_picker_select_button')));
+    await tester.pumpAndSettle();
+
+    // Now open again and reset.
+    await tester.tap(find.byKey(const Key('waypoint_color_swatch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('waypoint_color_picker_reset_button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('waypoint_save_button')));
+    await tester.pumpAndSettle();
+
+    expect(result!.color, isNull);
+  });
+
+  testWidgets('changing type does not clear a previously-picked custom color', (tester) async {
+    WaypointFormResult? result;
+    await tester.pumpWidget(_harness(() {}, (r) => result = r));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('waypoint_name_field')), 'Summit');
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('waypoint_color_swatch')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('waypoint_color_picker_select_button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('waypoint_type_chip_water')));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('waypoint_save_button')));
+    await tester.pumpAndSettle();
+
+    expect(result!.type, 'water');
+    expect(result!.color, waypointTypeColors[defaultWaypointType]);
   });
 }

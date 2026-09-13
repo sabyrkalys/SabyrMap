@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart' hide colorFromHex, colorToHex;
 
+import 'waypoint_color.dart';
 import 'waypoint_models.dart';
 import 'waypoint_types.dart';
 
 class WaypointFormResult {
-  const WaypointFormResult({required this.name, required this.type, required this.note});
+  const WaypointFormResult({required this.name, required this.type, required this.note, required this.color});
 
   final String name;
   final String type;
   final String note;
+  final String? color;
 }
 
 Future<WaypointFormResult?> showWaypointFormSheet(BuildContext context, {Waypoint? existing}) {
@@ -34,12 +37,60 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
   late final TextEditingController _noteController =
       TextEditingController(text: widget.existing?.note ?? '');
   late String _selectedType = widget.existing?.type ?? defaultWaypointType;
+  String? _selectedColor;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedColor = widget.existing?.color;
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  String get _effectiveColorHex => _selectedColor ?? waypointTypeColors[_selectedType]!;
+
+  Future<void> _openColorPicker() async {
+    Color picked = colorFromHex(_effectiveColorHex);
+    final action = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: picked,
+            onColorChanged: (color) => picked = color,
+            enableAlpha: false,
+            labelTypes: const [],
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const Key('waypoint_color_picker_reset_button'),
+            onPressed: () => Navigator.of(dialogContext).pop('reset'),
+            child: const Text('Сбросить'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop('cancel'),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            key: const Key('waypoint_color_picker_select_button'),
+            onPressed: () => Navigator.of(dialogContext).pop('select'),
+            child: const Text('Выбрать'),
+          ),
+        ],
+      ),
+    );
+
+    if (action == 'select') {
+      setState(() => _selectedColor = colorToHex(picked));
+    } else if (action == 'reset') {
+      setState(() => _selectedColor = null);
+    }
   }
 
   @override
@@ -78,6 +129,26 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
             ],
           ),
           const SizedBox(height: 12),
+          Row(
+            children: [
+              const Text('Цвет'),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: _openColorPicker,
+                child: Container(
+                  key: const Key('waypoint_color_swatch'),
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colorFromHex(_effectiveColorHex),
+                    border: Border.all(color: Theme.of(context).dividerColor),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           TextField(
             key: const Key('waypoint_note_field'),
             controller: _noteController,
@@ -94,6 +165,7 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
                         name: _nameController.text.trim(),
                         type: _selectedType,
                         note: _noteController.text.trim(),
+                        color: _selectedColor,
                       ),
                     ),
             child: Text(isEditing ? 'Сохранить' : 'Создать'),
