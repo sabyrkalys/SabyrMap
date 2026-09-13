@@ -39,7 +39,13 @@ class GeolocatorLocationSource implements LocationSource {
   Stream<TrackPoint> positionStream({required int distanceFilterMeters}) {
     return Geolocator.getPositionStream(
       locationSettings: LocationSettings(distanceFilter: distanceFilterMeters),
-    ).map((position) => TrackPoint(lat: position.latitude, lng: position.longitude));
+    ).map(
+      (position) => TrackPoint(
+        lat: position.latitude,
+        lng: position.longitude,
+        elevationMeters: position.altitude,
+      ),
+    );
   }
 
   @override
@@ -47,6 +53,6 @@ class GeolocatorLocationSource implements LocationSource {
     final granted = await ensurePermission();
     if (!granted) return null;
     final position = await Geolocator.getCurrentPosition();
-    return TrackPoint(lat: position.latitude, lng: position.longitude);
+    return TrackPoint(lat: position.latitude, lng: position.longitude, elevationMeters: position.altitude);
   }
 }
