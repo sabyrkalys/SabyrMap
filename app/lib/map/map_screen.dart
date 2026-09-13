@@ -25,7 +25,7 @@ CircleOptions circleOptionsForWaypoint(Waypoint waypoint, String currentUserId) 
   return CircleOptions(
     geometry: LatLng(waypoint.lat, waypoint.lng),
     circleRadius: 8,
-    circleColor: waypointTypeColors[waypoint.type] ?? waypointTypeColors[defaultWaypointType]!,
+    circleColor: waypoint.color ?? waypointTypeColors[waypoint.type] ?? waypointTypeColors[defaultWaypointType]!,
     circleStrokeColor: isOwn ? '#FFFFFF' : '#000000',
     circleStrokeWidth: isOwn ? 1 : 2,
   );
@@ -236,7 +236,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       // isOwn) — nothing else it reads ever varies for a given waypoint id
       // — so this key cheaply captures "would the rendered options change".
       final isOwn = waypoint.ownerId == currentUserId;
-      final key = '${waypoint.type}|$isOwn';
+      final key = '${waypoint.type}|$isOwn|${waypoint.color ?? ''}';
       final existing = _circlesByWaypointId[waypoint.id];
       if (existing == null) {
         final options = circleOptionsForWaypoint(waypoint, currentUserId);

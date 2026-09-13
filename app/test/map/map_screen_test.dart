@@ -183,6 +183,26 @@ void main() {
       expect(options.circleStrokeColor, '#000000');
       expect(options.circleStrokeWidth, 2);
     });
+
+    test('a custom color overrides the type color', () {
+      final waypoint = Waypoint(
+        id: 'w1',
+        orgId: 'o1',
+        ownerId: 'u1',
+        name: 'Summit',
+        type: 'danger',
+        note: null,
+        color: '#123456',
+        lat: 1.0,
+        lng: 2.0,
+        canEdit: true,
+        createdAt: DateTime.utc(2026, 8, 22),
+      );
+
+      final options = circleOptionsForWaypoint(waypoint, 'u1');
+
+      expect(options.circleColor, '#123456');
+    });
   });
 
   testWidgets('record toggle icon switches between start and stop', (tester) async {

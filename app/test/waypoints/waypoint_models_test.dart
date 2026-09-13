@@ -53,6 +53,50 @@ void main() {
 
       expect(waypoint.note, isNull);
     });
+
+    test('fromJson parses a non-null color', () {
+      final json = {
+        'id': 'w1',
+        'org_id': 'o1',
+        'owner_id': 'u1',
+        'name': 'Trailhead',
+        'type': 'generic',
+        'note': null,
+        'color': '#FF00AA',
+        'geom': {
+          'type': 'Point',
+          'coordinates': [7.6, 45.9],
+        },
+        'can_edit': true,
+        'created_at': '2026-08-22T10:00:00Z',
+      };
+
+      final waypoint = Waypoint.fromJson(json);
+
+      expect(waypoint.color, '#FF00AA');
+    });
+
+    test('fromJson parses a null color', () {
+      final json = {
+        'id': 'w1',
+        'org_id': 'o1',
+        'owner_id': 'u1',
+        'name': 'Trailhead',
+        'type': 'generic',
+        'note': null,
+        'color': null,
+        'geom': {
+          'type': 'Point',
+          'coordinates': [7.6, 45.9],
+        },
+        'can_edit': true,
+        'created_at': '2026-08-22T10:00:00Z',
+      };
+
+      final waypoint = Waypoint.fromJson(json);
+
+      expect(waypoint.color, isNull);
+    });
   });
 
   test('WaypointException.toString includes the message', () {

@@ -6,6 +6,7 @@ class Waypoint {
     required this.name,
     required this.type,
     required this.note,
+    this.color,
     required this.lat,
     required this.lng,
     required this.canEdit,
@@ -18,6 +19,7 @@ class Waypoint {
   final String name;
   final String type;
   final String? note;
+  final String? color;
   final double lat;
   final double lng;
   final bool canEdit;
@@ -33,6 +35,7 @@ class Waypoint {
       name: json['name'] as String,
       type: json['type'] as String,
       note: json['note'] as String?,
+      color: json['color'] as String?,
       lng: (coordinates[0] as num).toDouble(),
       lat: (coordinates[1] as num).toDouble(),
       canEdit: json['can_edit'] as bool,
