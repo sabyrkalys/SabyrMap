@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -369,7 +367,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return auth is AuthAuthenticated ? auth.user.id : '';
   }
 
-  Future<void> _onMapLongClick(Point<double> point, LatLng coordinates) async {
+  Future<void> _createWaypointAtCrosshair() async {
+    final controller = _controller;
+    final cameraPosition = controller?.cameraPosition;
+    if (controller == null || cameraPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Карта ещё не готова')),
+      );
+      return;
+    }
+    final coordinates = cameraPosition.target;
     final result = await showWaypointFormSheet(context);
     if (result == null || !mounted) return;
     try {
@@ -378,6 +385,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             name: result.name,
             type: result.type,
             note: result.note,
+            color: result.color,
             lat: coordinates.latitude,
             lng: coordinates.longitude,
           );
@@ -588,12 +596,26 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
         ],
       ),
-      body: MapLibreMap(
-        styleString: AppConfig.mapStyleUrl,
-        initialCameraPosition: const CameraPosition(target: LatLng(0, 0), zoom: 1),
-        onMapCreated: _onMapCreated,
-        onStyleLoadedCallback: _onStyleLoaded,
-        onMapLongClick: _onMapLongClick,
+      body: Stack(
+        children: [
+          MapLibreMap(
+            styleString: AppConfig.mapStyleUrl,
+            initialCameraPosition: const CameraPosition(target: LatLng(0, 0), zoom: 1),
+            trackCameraPosition: true,
+            onMapCreated: _onMapCreated,
+            onStyleLoadedCallback: _onStyleLoaded,
+          ),
+          const IgnorePointer(
+            child: Center(
+              child: Icon(Icons.add, key: Key('map_crosshair'), size: 32, color: Colors.black87),
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        key: const Key('create_waypoint_button'),
+        onPressed: _createWaypointAtCrosshair,
+        child: const Icon(Icons.add_location_alt),
       ),
     );
   }

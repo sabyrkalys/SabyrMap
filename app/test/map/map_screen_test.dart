@@ -10,6 +10,7 @@ import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../auth/fakes.dart';
 import '../tracks/fake_location_source.dart';
@@ -134,6 +135,64 @@ void main() {
 
     expect(container.read(waypointsControllerProvider), hasLength(1));
     expect(container.read(waypointsControllerProvider).single.name, 'Summit');
+  });
+
+  testWidgets('shows a persistent crosshair and a create-waypoint button, with no long-press wiring', (tester) async {
+    final storage = FakeTokenStorage();
+    await storage.write('tok-1');
+    final authRepo = FakeAuthRepository(
+      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
+    );
+    final container = ProviderContainer(
+      overrides: _baseOverrides(authRepo: authRepo, storage: storage),
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.notifier).bootstrap();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MapScreen()),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byKey(const Key('map_crosshair')), findsOneWidget);
+    expect(find.byKey(const Key('create_waypoint_button')), findsOneWidget);
+
+    final map = tester.widget<MapLibreMap>(find.byType(MapLibreMap));
+    expect(map.onMapLongClick, isNull);
+  });
+
+  testWidgets('tapping create-waypoint button before the map controller is ready shows a message, no crash', (tester) async {
+    final storage = FakeTokenStorage();
+    await storage.write('tok-1');
+    final authRepo = FakeAuthRepository(
+      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
+    );
+    final container = ProviderContainer(
+      overrides: _baseOverrides(authRepo: authRepo, storage: storage),
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.notifier).bootstrap();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MapScreen()),
+      ),
+    );
+    await tester.pump();
+
+    // MapLibreMap has no real platform view under flutter test, so
+    // onMapCreated never fires and _controller stays null -- this exercises
+    // the FAB's fallback path (real crosshair-driven creation is covered by
+    // manual device verification, same precedent as the old long-press flow
+    // it replaces).
+    await tester.tap(find.byKey(const Key('create_waypoint_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Карта ещё не готова'), findsOneWidget);
   });
 
   group('circleOptionsForWaypoint', () {
