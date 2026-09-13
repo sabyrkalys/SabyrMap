@@ -20,6 +20,7 @@ class FakeWaypointsRepository implements WaypointsRepository {
     required String name,
     required String type,
     required String note,
+    required String? color,
     required double lat,
     required double lng,
   }) async {
@@ -34,6 +35,7 @@ class FakeWaypointsRepository implements WaypointsRepository {
     required String name,
     required String type,
     required String note,
+    required String? color,
   }) async {
     if (updateResult is WaypointException) throw updateResult as WaypointException;
     return updateResult as Waypoint;

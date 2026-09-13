@@ -57,7 +57,7 @@ void main() {
   });
 
   group('create', () {
-    test('sends name/type/note/geom and returns the created waypoint on 201', () async {
+    test('sends name/type/note/geom and color, returns the created waypoint on 201', () async {
       Map<String, dynamic>? capturedBody;
       final client = ApiClient(
         baseUrl: 'http://example.test',
@@ -74,6 +74,7 @@ void main() {
         name: 'Trailhead',
         type: 'generic',
         note: '',
+        color: null,
         lat: 45.9,
         lng: 7.6,
       );
@@ -83,11 +84,53 @@ void main() {
         'name': 'Trailhead',
         'type': 'generic',
         'note': '',
+        'color': null,
         'geom': {
           'type': 'Point',
           'coordinates': [7.6, 45.9],
         },
       });
+    });
+
+    test('sends a null color when none is provided', () async {
+      Map<String, dynamic>? capturedBody;
+      final client = ApiClient(
+        baseUrl: 'http://example.test',
+        httpClient: MockClient((request) async {
+          capturedBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(jsonEncode(_waypointJson), 201);
+        }),
+      );
+      final repo = HttpWaypointsRepository(client);
+
+      await repo.create('tok-1', name: 'Trailhead', type: 'generic', note: '', color: null, lat: 45.9, lng: 7.6);
+
+      expect(capturedBody!['color'], isNull);
+      expect(capturedBody!.containsKey('color'), isTrue);
+    });
+
+    test('sends a hex color when provided', () async {
+      Map<String, dynamic>? capturedBody;
+      final client = ApiClient(
+        baseUrl: 'http://example.test',
+        httpClient: MockClient((request) async {
+          capturedBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(jsonEncode(_waypointJson), 201);
+        }),
+      );
+      final repo = HttpWaypointsRepository(client);
+
+      await repo.create(
+        'tok-1',
+        name: 'Trailhead',
+        type: 'generic',
+        note: '',
+        color: '#FF00AA',
+        lat: 45.9,
+        lng: 7.6,
+      );
+
+      expect(capturedBody!['color'], '#FF00AA');
     });
 
     test('throws WaypointException on non-201', () async {
@@ -98,14 +141,30 @@ void main() {
       final repo = HttpWaypointsRepository(client);
 
       await expectLater(
-        repo.create('tok-1', name: '', type: 'generic', note: '', lat: 0, lng: 0),
+        repo.create('tok-1', name: '', type: 'generic', note: '', color: null, lat: 0, lng: 0),
         throwsA(isA<WaypointException>()),
       );
     });
   });
 
   group('update', () {
-    test('sends name/type/note and returns the updated waypoint on 200', () async {
+    test('sends color along with name/type/note', () async {
+      Map<String, dynamic>? capturedBody;
+      final client = ApiClient(
+        baseUrl: 'http://example.test',
+        httpClient: MockClient((request) async {
+          capturedBody = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(jsonEncode(_waypointJson), 200);
+        }),
+      );
+      final repo = HttpWaypointsRepository(client);
+
+      await repo.update('tok-1', 'w1', name: 'New name', type: 'danger', note: 'Careful', color: '#00FF00');
+
+      expect(capturedBody!['color'], '#00FF00');
+    });
+
+    test('sends name/type/note and color, returns the updated waypoint on 200', () async {
       Map<String, dynamic>? capturedBody;
       final client = ApiClient(
         baseUrl: 'http://example.test',
@@ -118,10 +177,10 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      final waypoint = await repo.update('tok-1', 'w1', name: 'New name', type: 'danger', note: 'Careful');
+      final waypoint = await repo.update('tok-1', 'w1', name: 'New name', type: 'danger', note: 'Careful', color: null);
 
       expect(waypoint.id, 'w1');
-      expect(capturedBody, {'name': 'New name', 'type': 'danger', 'note': 'Careful'});
+      expect(capturedBody, {'name': 'New name', 'type': 'danger', 'note': 'Careful', 'color': null});
     });
 
     test('throws WaypointException on non-200', () async {
@@ -132,7 +191,7 @@ void main() {
       final repo = HttpWaypointsRepository(client);
 
       await expectLater(
-        repo.update('tok-1', 'w1', name: 'x', type: 'generic', note: ''),
+        repo.update('tok-1', 'w1', name: 'x', type: 'generic', note: '', color: null),
         throwsA(isA<WaypointException>()),
       );
     });

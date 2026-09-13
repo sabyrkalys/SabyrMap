@@ -12,6 +12,7 @@ abstract class WaypointsRepository {
     required String name,
     required String type,
     required String note,
+    required String? color,
     required double lat,
     required double lng,
   });
@@ -22,6 +23,7 @@ abstract class WaypointsRepository {
     required String name,
     required String type,
     required String note,
+    required String? color,
   });
 
   Future<void> delete(String token, String id);
@@ -49,6 +51,7 @@ class HttpWaypointsRepository implements WaypointsRepository {
     required String name,
     required String type,
     required String note,
+    required String? color,
     required double lat,
     required double lng,
   }) async {
@@ -59,6 +62,7 @@ class HttpWaypointsRepository implements WaypointsRepository {
         'name': name,
         'type': type,
         'note': note,
+        'color': color,
         'geom': {
           'type': 'Point',
           'coordinates': [lng, lat],
@@ -78,11 +82,12 @@ class HttpWaypointsRepository implements WaypointsRepository {
     required String name,
     required String type,
     required String note,
+    required String? color,
   }) async {
     final response = await _client.patch(
       '/waypoints/$id',
       token: token,
-      body: {'name': name, 'type': type, 'note': note},
+      body: {'name': name, 'type': type, 'note': note, 'color': color},
     );
     if (response.statusCode != 200) {
       throw const WaypointException('Could not update waypoint');

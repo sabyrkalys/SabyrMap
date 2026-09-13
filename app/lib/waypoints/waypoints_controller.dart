@@ -39,6 +39,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required String note,
     required double lat,
     required double lng,
+    String? color,
   }) async {
     final token = await _storage.read();
     if (token == null) return;
@@ -53,13 +54,14 @@ class WaypointsController extends Notifier<List<Waypoint>> {
       note: note.isEmpty ? null : note,
       lat: lat,
       lng: lng,
+      color: color,
       canEdit: true,
       createdAt: DateTime.now(),
     );
     state = [...state, optimistic];
 
     try {
-      final created = await _repository.create(token, name: name, type: type, note: note, lat: lat, lng: lng);
+      final created = await _repository.create(token, name: name, type: type, note: note, color: color, lat: lat, lng: lng);
       state = [for (final w in state) if (w.id == tempId) created else w];
     } on WaypointException {
       state = [for (final w in state) if (w.id != tempId) w];
@@ -72,6 +74,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required String name,
     required String type,
     required String note,
+    String? color,
   }) async {
     final token = await _storage.read();
     if (token == null) return;
@@ -88,13 +91,14 @@ class WaypointsController extends Notifier<List<Waypoint>> {
       note: note.isEmpty ? null : note,
       lat: previous.lat,
       lng: previous.lng,
+      color: color,
       canEdit: previous.canEdit,
       createdAt: previous.createdAt,
     );
     state = [for (final w in state) if (w.id == id) optimistic else w];
 
     try {
-      final updated = await _repository.update(token, id, name: name, type: type, note: note);
+      final updated = await _repository.update(token, id, name: name, type: type, note: note, color: color);
       state = [for (final w in state) if (w.id == id) updated else w];
     } on WaypointException {
       state = [for (final w in state) if (w.id == id) previous else w];
