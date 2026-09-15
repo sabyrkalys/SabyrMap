@@ -25,22 +25,22 @@ void main() {
   group('IconLibraryScanner', () {
     test('creates the folder when missing and returns an empty list', () async {
       final fs = MemoryFileSystem();
-      final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base/mediafile/iconTypes');
+      final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base/mediafile/custom-types');
 
       final result = await scanner.scan();
 
       expect(result, isEmpty);
-      expect(fs.directory('/base/mediafile/iconTypes').existsSync(), isTrue);
+      expect(fs.directory('/base/mediafile/custom-types').existsSync(), isTrue);
     });
 
     test('lists supported files sorted by filename, ignoring unsupported ones', () async {
       final fs = MemoryFileSystem();
-      final dir = fs.directory('/base/mediafile/iconTypes')..createSync(recursive: true);
+      final dir = fs.directory('/base/mediafile/custom-types')..createSync(recursive: true);
       dir.childFile('zebra.png').createSync();
       dir.childFile('arrow.svg').createSync();
       dir.childFile('notes.txt').createSync();
       dir.childFile('camp.jpeg').createSync();
-      final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base/mediafile/iconTypes');
+      final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base/mediafile/custom-types');
 
       final result = await scanner.scan();
 

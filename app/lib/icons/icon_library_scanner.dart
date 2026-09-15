@@ -33,7 +33,7 @@ class IconLibraryScanner {
   final FileSystem _fileSystem;
   final String? baseDirectoryPath;
 
-  static const _folderSuffix = 'mediafile/iconTypes';
+  static const _folderSuffix = 'mediafile/custom-types';
 
   Future<Directory> resolveBaseDirectory() async {
     final fixed = baseDirectoryPath;
