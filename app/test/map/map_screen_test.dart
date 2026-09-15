@@ -1,5 +1,7 @@
 import 'package:app/auth/auth_controller.dart';
 import 'package:app/auth/auth_models.dart';
+import 'package:app/icons/waypoint_icon_assignments_controller.dart';
+import 'package:app/icons/waypoint_icon_store.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
@@ -13,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../auth/fakes.dart';
+import '../icons/fakes.dart';
 import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
 import '../waypoints/fakes.dart';
@@ -29,12 +32,17 @@ _baseOverrides({
   required FakeTokenStorage storage,
   FakeWaypointsRepository? waypointsRepo,
   FakeTracksRepository? tracksRepo,
+  FakeWaypointIconStore? iconStore,
 }) {
   return [
     authRepositoryProvider.overrideWithValue(authRepo),
     tokenStorageProvider.overrideWithValue(storage),
     waypointsRepositoryProvider.overrideWithValue(waypointsRepo ?? FakeWaypointsRepository()),
     tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
+    // MapScreen loads the local icon assignments on open; the real store
+    // talks to flutter_secure_storage, which has no platform channel under
+    // flutter test.
+    waypointIconStoreProvider.overrideWithValue(iconStore ?? FakeWaypointIconStore()),
   ];
 }
 
@@ -235,6 +243,46 @@ void main() {
       final options = circleOptionsForWaypoint(waypoint, 'u1');
 
       expect(options.circleColor, '#123456');
+    });
+  });
+
+  testWidgets('opening the map loads the locally-stored icon assignments', (tester) async {
+    final storage = FakeTokenStorage();
+    await storage.write('tok-1');
+    final authRepo = FakeAuthRepository(
+      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
+    );
+    final iconStore = FakeWaypointIconStore()..icons.addAll({'w1': 'camp.png'});
+    final container = ProviderContainer(
+      overrides: _baseOverrides(authRepo: authRepo, storage: storage, iconStore: iconStore),
+    );
+    addTearDown(container.dispose);
+    await container.read(authControllerProvider.notifier).bootstrap();
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: MapScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The assignments are what decide circle-vs-symbol rendering, so they
+    // must be in state by the time the first sync runs. The rendering itself
+    // needs a real MapLibreMapController (none under flutter test, so
+    // _syncSymbols returns at its readiness guard) and is covered by manual
+    // device verification, same precedent as the other map render paths.
+    expect(container.read(waypointIconAssignmentsControllerProvider), {'w1': 'camp.png'});
+    expect(find.byType(MapScreen), findsOneWidget);
+  });
+
+  group('renderModeForWaypoint', () {
+    test('no assigned icon -> circle', () {
+      expect(renderModeForWaypoint(null), WaypointRenderMode.circle);
+    });
+
+    test('an assigned icon -> symbol', () {
+      expect(renderModeForWaypoint('camp.png'), WaypointRenderMode.symbol);
     });
   });
 

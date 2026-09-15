@@ -4,6 +4,9 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../auth/auth_controller.dart';
 import '../config.dart';
+import '../icons/icon_image_cache.dart';
+import '../icons/icon_library_scanner.dart';
+import '../icons/waypoint_icon_assignments_controller.dart';
 import 'geo_utils.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_name_form_sheet.dart';
@@ -31,6 +34,15 @@ CircleOptions circleOptionsForWaypoint(Waypoint waypoint, String currentUserId) 
   );
 }
 
+enum WaypointRenderMode { circle, symbol }
+
+/// Pure routing decision: a waypoint with a locally-assigned icon renders as
+/// an image Symbol; everything else keeps the existing colored Circle.
+/// Extracted as a top-level function for the same reason
+/// [circleOptionsForWaypoint] is -- unit-testable without a platform view.
+WaypointRenderMode renderModeForWaypoint(String? assignedIconFileName) =>
+    assignedIconFileName == null ? WaypointRenderMode.circle : WaypointRenderMode.symbol;
+
 const String _recordingLineKey = '__recording__';
 
 class MapScreen extends ConsumerStatefulWidget {
@@ -52,6 +64,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // point, since the recording stream routes through the same sync gate).
   final Map<String, String> _appliedCircleKeys = {};
   final Map<String, String> _appliedLineKeys = {};
+
+  // The Symbol counterpart of the circle tracking above, for waypoints that
+  // have a locally-assigned icon file (see renderModeForWaypoint). Same
+  // invariants: one entry per waypoint id, plus an applied-key cache so a
+  // sync only issues an updateSymbol platform call when the rendered image
+  // for that id would actually differ.
+  final Map<String, Symbol> _symbolsByWaypointId = {};
+  final Map<String, String> _appliedSymbolKeys = {};
+  late final IconImageCache _iconImageCache = IconImageCache(
+    addImage: (name, bytes) async {
+      final controller = _controller;
+      if (controller == null) return;
+      await controller.addImage(name, bytes);
+    },
+  );
+  final IconLibraryScanner _iconLibraryScanner = IconLibraryScanner();
+  // Cached so _syncSymbols (which can run many times per second while a
+  // track is recording, same as _syncCircles) doesn't rescan the device
+  // folder on every tick. A file name that isn't in the map triggers exactly
+  // one rescan (the user may have dropped a new file in while the app was
+  // running); if it's still missing afterwards it's recorded in
+  // _unresolvableIconFileNames so a file that was deleted from the device
+  // doesn't cause a folder listing on every subsequent sync.
+  final Map<String, IconFile> _iconFilesByFileName = {};
+  final Set<String> _unresolvableIconFileNames = {};
+  bool _iconFilesLoaded = false;
 
   // One-shot "my location" state: fetched once on screen open, not a live
   // feed. _hasCenteredCamera guards animateCamera so a later style reload
@@ -98,6 +136,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     Future.microtask(() {
       if (!mounted) return;
       ref.read(waypointsControllerProvider.notifier).loadWaypoints();
+    });
+    // Icon assignments live entirely on the device (flutter_secure_storage),
+    // so unlike loadWaypoints() this never reaches the backend. A failure to
+    // read them back is a soft failure -- every waypoint simply keeps
+    // rendering as a plain circle -- and is swallowed for the same reason
+    // waypoint_actions.dart swallows icon-store write failures, rather than
+    // surfacing as an unhandled async error.
+    Future.microtask(() async {
+      if (!mounted) return;
+      try {
+        await ref.read(waypointIconAssignmentsControllerProvider.notifier).load();
+      } catch (_) {}
     });
     _loadMyLocation();
   }
@@ -157,6 +207,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onMapCreated(MapLibreMapController controller) {
     _controller = controller;
     controller.onCircleTapped.add(_onCircleTapped);
+    controller.onSymbolTapped.add(_onSymbolTapped);
   }
 
   void _onCameraIdle() {
@@ -174,15 +225,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _linesByTrackId.clear();
     _appliedCircleKeys.clear();
     _appliedLineKeys.clear();
+    // Symbols are managed by a manager that's re-created exactly like the
+    // circle/line ones, and the images they reference are registered against
+    // the style itself -- neither survives a reload, so drop both the symbol
+    // tracking and the registered-image bookkeeping.
+    _symbolsByWaypointId.clear();
+    _appliedSymbolKeys.clear();
+    _iconImageCache.clear();
     _myLocationCircle = null;
     _maybeCenterCamera();
     _requestSync();
   }
 
-  /// Entry point for requesting a combined circle+line sync. Coalesces
-  /// concurrent requests so only one sync run is ever in flight; both
-  /// [_syncCircles] and [_syncLines] read fresh state via `ref.read` when
-  /// they actually run, rather than being handed a snapshot up front.
+  /// Entry point for requesting a combined circle+symbol+line sync. Coalesces
+  /// concurrent requests so only one sync run is ever in flight; [_runSync]
+  /// reads fresh state via `ref.read` when it actually runs, rather than
+  /// being handed a snapshot up front.
   void _requestSync() {
     if (_isSyncing) {
       _syncPending = true;
@@ -194,7 +252,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Future<void> _runSync() async {
     _isSyncing = true;
     try {
-      await _syncCircles(ref.read(waypointsControllerProvider));
+      // Read once and hand the same snapshot to both renderers, so a
+      // waypoint can't be classified as circle-mode by one and symbol-mode
+      // by the other within a single sync pass (which would render it twice).
+      final iconAssignments = ref.read(waypointIconAssignmentsControllerProvider);
+      final waypoints = ref.read(waypointsControllerProvider);
+      await _syncCircles(waypoints, iconAssignments);
+      await _syncSymbols(waypoints, iconAssignments);
       await _syncLines();
       await _syncMyLocationCircle();
     } catch (_) {
@@ -210,7 +274,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  Future<void> _syncCircles(List<Waypoint> waypoints) async {
+  Future<void> _syncCircles(List<Waypoint> waypoints, Map<String, String> iconAssignments) async {
     final controller = _controller;
     // The circle manager is only initialized after onStyleLoadedCallback
     // fires; addCircle/updateCircle/removeCircle throw before then. A sync
@@ -234,7 +298,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     });
     final currentUserId = _currentUserId();
 
-    final currentIds = waypoints.map((w) => w.id).toSet();
+    // Waypoints with a locally-assigned icon are rendered by _syncSymbols
+    // instead, so they're excluded here. Because the exclusion happens before
+    // currentIds is computed, a waypoint that just gained an icon falls into
+    // the removal branch below (dropping its now-obsolete circle) and gets
+    // added as a Symbol on the same pass -- and vice versa when an icon is
+    // cleared -- so it is never rendered as both at once.
+    final circleModeWaypoints =
+        waypoints.where((w) => renderModeForWaypoint(iconAssignments[w.id]) == WaypointRenderMode.circle).toList();
+    final currentIds = circleModeWaypoints.map((w) => w.id).toSet();
     for (final id in _circlesByWaypointId.keys.toList()) {
       if (!currentIds.contains(id)) {
         await controller.removeCircle(_circlesByWaypointId.remove(id)!);
@@ -242,7 +314,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       }
     }
 
-    for (final waypoint in waypoints) {
+    for (final waypoint in circleModeWaypoints) {
       // circleOptionsForWaypoint is a pure function of (waypoint.type,
       // isOwn, waypoint.color) — nothing else it reads ever varies for a
       // given waypoint id — so this key cheaply captures "would the
@@ -259,6 +331,87 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _appliedCircleKeys[waypoint.id] = key;
       }
     }
+  }
+
+  /// The Symbol counterpart of [_syncCircles], for waypoints that have a
+  /// locally-assigned icon file. Deliberately mirrors _syncCircles step for
+  /// step (readiness guard, stale-manager reconciliation, remove-then-add,
+  /// applied-key caching) -- see that method's comments for why each step is
+  /// there; the only extra work here is resolving the icon file and
+  /// registering its rendered bitmap as a named style image.
+  Future<void> _syncSymbols(List<Waypoint> waypoints, Map<String, String> iconAssignments) async {
+    final controller = _controller;
+    if (controller == null || controller.symbolManager == null) return;
+
+    final liveSymbolIds = controller.symbols.map((s) => s.id).toSet();
+    _symbolsByWaypointId.removeWhere((id, symbol) {
+      final stale = !liveSymbolIds.contains(symbol.id);
+      if (stale) _appliedSymbolKeys.remove(id);
+      return stale;
+    });
+
+    final symbolModeWaypoints =
+        waypoints.where((w) => renderModeForWaypoint(iconAssignments[w.id]) == WaypointRenderMode.symbol).toList();
+    final currentIds = symbolModeWaypoints.map((w) => w.id).toSet();
+    for (final id in _symbolsByWaypointId.keys.toList()) {
+      if (!currentIds.contains(id)) {
+        await controller.removeSymbol(_symbolsByWaypointId.remove(id)!);
+        _appliedSymbolKeys.remove(id);
+      }
+    }
+
+    for (final waypoint in symbolModeWaypoints) {
+      // Non-null by construction: renderModeForWaypoint only returns symbol
+      // for a waypoint that has an assignment.
+      final fileName = iconAssignments[waypoint.id]!;
+      // The rendered bitmap is a pure function of (icon file, effective
+      // color) -- raster icons ignore the color entirely (symbolImageName
+      // encodes that), so this key is a safe "would the image change" proxy.
+      final colorHex = waypoint.color ?? waypointTypeColors[waypoint.type] ?? waypointTypeColors[defaultWaypointType]!;
+      final key = '$fileName|$colorHex';
+      final existing = _symbolsByWaypointId[waypoint.id];
+      if (existing != null && _appliedSymbolKeys[waypoint.id] == key) continue;
+
+      final iconFile = await _resolveIconFile(fileName);
+      // The file was deleted from the device folder: leave whatever is
+      // currently rendered in place rather than crashing or silently blanking
+      // the marker. The next sync after the user clears/reassigns the icon
+      // picks the waypoint up again.
+      if (iconFile == null) continue;
+      final imageName = await _iconImageCache.resolve(iconFile, colorHex);
+      final options = SymbolOptions(
+        geometry: LatLng(waypoint.lat, waypoint.lng),
+        iconImage: imageName,
+        // Every rendered icon bitmap is normalized to the same fixed canvas
+        // (kIconCanvasSize), so a single constant scale is correct for all of
+        // them -- no per-waypoint sizing needed.
+        iconSize: 1,
+      );
+      if (existing == null) {
+        _symbolsByWaypointId[waypoint.id] = await controller.addSymbol(options, {'waypointId': waypoint.id});
+      } else {
+        await controller.updateSymbol(existing, options);
+      }
+      _appliedSymbolKeys[waypoint.id] = key;
+    }
+  }
+
+  /// Resolves an assigned icon file name to the [IconFile] describing it,
+  /// scanning the device folder at most once per unresolvable name (see
+  /// [_iconFilesByFileName]). Returns null when no such file exists.
+  Future<IconFile?> _resolveIconFile(String fileName) async {
+    final cached = _iconFilesByFileName[fileName];
+    if (cached != null) return cached;
+    if (_iconFilesLoaded && _unresolvableIconFileNames.contains(fileName)) return null;
+
+    final files = await _iconLibraryScanner.scan();
+    _iconFilesByFileName
+      ..clear()
+      ..addEntries(files.map((f) => MapEntry(f.fileName, f)));
+    _iconFilesLoaded = true;
+    final resolved = _iconFilesByFileName[fileName];
+    if (resolved == null) _unresolvableIconFileNames.add(fileName);
+    return resolved;
   }
 
   Future<void> _syncLines() async {
@@ -391,10 +544,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return;
     }
     final coordinates = cameraPosition.target;
-    final result = await showWaypointFormSheet(context);
+    final result = await showWaypointFormSheet(context, iconScanner: _iconLibraryScanner);
     if (result == null || !mounted) return;
     try {
-      await ref.read(waypointsControllerProvider.notifier).createWaypoint(
+      final created = await ref.read(waypointsControllerProvider.notifier).createWaypoint(
             ownerId: _currentUserId(),
             name: result.name,
             type: result.type,
@@ -403,6 +556,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             lat: coordinates.latitude,
             lng: coordinates.longitude,
           );
+      try {
+        await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(created.id, result.iconFileName);
+      } catch (_) {
+        // The waypoint itself was created; a local icon-bookkeeping failure
+        // is a soft failure and shouldn't be reported as a failed creation.
+        // Same reasoning as editWaypoint/deleteWaypoint in
+        // waypoint_actions.dart.
+      }
     } on WaypointException catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     }
@@ -410,6 +571,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _onCircleTapped(Circle circle) {
     final waypointId = circle.data?['waypointId'] as String?;
+    if (waypointId == null) return;
+    final waypoints = ref.read(waypointsControllerProvider);
+    final index = waypoints.indexWhere((w) => w.id == waypointId);
+    if (index == -1) return;
+    showWaypointDetails(context, ref, waypoints[index]);
+  }
+
+  /// Same routing as [_onCircleTapped], for waypoints rendered as image
+  /// Symbols -- tapping either kind of marker opens the same details sheet.
+  void _onSymbolTapped(Symbol symbol) {
+    final waypointId = symbol.data?['waypointId'] as String?;
     if (waypointId == null) return;
     final waypoints = ref.read(waypointsControllerProvider);
     final index = waypoints.indexWhere((w) => w.id == waypointId);
@@ -498,6 +670,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _requestSync();
     });
     ref.listen<TrackRecordingState>(trackRecordingControllerProvider, (previous, next) {
+      _requestSync();
+    });
+    // An icon assignment changing flips a waypoint between the circle and
+    // symbol renderer, which only happens on a sync pass -- so it has to
+    // request one just like a waypoint list change does.
+    ref.listen<Map<String, String>>(waypointIconAssignmentsControllerProvider, (previous, next) {
       _requestSync();
     });
 
