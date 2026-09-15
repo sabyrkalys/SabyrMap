@@ -40,9 +40,6 @@ final tokenStorageProvider = Provider<TokenStorage>((ref) {
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthController.new);
 
-// TEMPORARY: skips the login screen by auto-authenticating a dev account so the
-// main app flow can be tested without typing credentials. Remove before release.
-const bool _devAutoLoginEnabled = true;
 const String _devAutoLoginEmail = 'dev@alpinequest.local';
 const String _devAutoLoginPassword = 'dev-password-123';
 
@@ -56,7 +53,7 @@ class AuthController extends Notifier<AuthState> {
   Future<void> bootstrap() async {
     final token = await _storage.read();
     if (token == null) {
-      if (_devAutoLoginEnabled) {
+      if (AppConfig.devAutoLoginEnabled) {
         await _devAutoLogin();
       } else {
         state = const AuthUnauthenticated();
@@ -71,7 +68,7 @@ class AuthController extends Notifier<AuthState> {
       if (e.isAuthFailure) {
         await _storage.delete();
       }
-      if (_devAutoLoginEnabled) {
+      if (AppConfig.devAutoLoginEnabled) {
         await _devAutoLogin();
       } else {
         state = const AuthUnauthenticated();
