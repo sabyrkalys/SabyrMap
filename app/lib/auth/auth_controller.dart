@@ -40,7 +40,7 @@ final tokenStorageProvider = Provider<TokenStorage>((ref) {
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthController.new);
 
-const String _devAutoLoginEmail = 'dev@alpinequest.local';
+const String _devAutoLoginEmail = 'alpinequest.dev@example.com';
 const String _devAutoLoginPassword = 'dev-password-123';
 
 class AuthController extends Notifier<AuthState> {
