@@ -216,7 +216,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     setState(() => _crosshairPosition = target);
   }
 
-  void _onStyleLoaded() {
+  Future<void> _onStyleLoaded() async {
     // Every style (re)load disposes and re-creates maplibre_gl's annotation
     // managers, which wipes their internal id tracking. Drop our own
     // tracking too so the next sync re-adds every circle/line from scratch
@@ -233,6 +233,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _appliedSymbolKeys.clear();
     _iconImageCache.clear();
     _myLocationCircle = null;
+    // The symbol manager defaults to iconAllowOverlap/iconIgnorePlacement:
+    // false, so symbol placement collides against every symbol on the map
+    // (including the basemap style's own POI/label symbols). Without this,
+    // nearby waypoint icons -- or one sitting under a basemap label -- can
+    // be silently culled. The setter is idempotent, so it's safe to call on
+    // every style load.
+    await _controller?.symbolManager?.setIconAllowOverlap(true);
     _maybeCenterCamera();
     _requestSync();
   }
