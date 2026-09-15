@@ -73,9 +73,16 @@ Future<void> editWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoint
           note: result.note,
           color: result.color,
         );
-    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, result.iconFileName);
   } on WaypointException catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    return;
+  }
+  try {
+    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, result.iconFileName);
+  } catch (_) {
+    // The server-side update already succeeded; a local icon-bookkeeping
+    // failure here is a soft failure and shouldn't be surfaced as if the
+    // whole edit failed.
   }
 }
 
@@ -93,8 +100,15 @@ Future<void> deleteWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoi
   if (confirmed != true || !context.mounted) return;
   try {
     await ref.read(waypointsControllerProvider.notifier).deleteWaypoint(waypoint.id);
-    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, null);
   } on WaypointException catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    return;
+  }
+  try {
+    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, null);
+  } catch (_) {
+    // The server-side delete already succeeded; a local icon-bookkeeping
+    // failure here is a soft failure and shouldn't be surfaced as if the
+    // whole delete failed.
   }
 }
