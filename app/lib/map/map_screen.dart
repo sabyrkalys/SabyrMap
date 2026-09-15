@@ -238,8 +238,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // (including the basemap style's own POI/label symbols). Without this,
     // nearby waypoint icons -- or one sitting under a basemap label -- can
     // be silently culled. The setter is idempotent, so it's safe to call on
-    // every style load.
-    await _controller?.symbolManager?.setIconAllowOverlap(true);
+    // every style load. Wrapped in try/catch since this callback is invoked
+    // fire-and-forget by maplibre_gl (no await, no error handler upstream):
+    // an unguarded throw here (e.g. a style-reload/dispose race) would both
+    // surface as an unhandled async error and skip _maybeCenterCamera()/
+    // _requestSync() below, silently leaving the map empty until some
+    // unrelated state change happens to trigger another sync.
+    try {
+      await _controller?.symbolManager?.setIconAllowOverlap(true);
+    } catch (_) {}
     _maybeCenterCamera();
     _requestSync();
   }

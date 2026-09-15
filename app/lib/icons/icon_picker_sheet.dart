@@ -1,11 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'icon_library_scanner.dart';
 
 class IconPickResult {
-  const IconPickResult.file(String fileName) : fileName = fileName;
+  const IconPickResult.file(this.fileName);
   const IconPickResult.reset() : fileName = null;
 
   final String? fileName;
@@ -58,7 +59,12 @@ class _IconPickerSheetState extends State<_IconPickerSheet> {
                   key: Key('icon_picker_tile_${file.fileName}'),
                   label: file.displayName,
                   icon: file.format == IconFileFormat.svg
-                      ? const Icon(Icons.image, size: 32)
+                      ? SvgPicture.file(
+                          File(file.path),
+                          width: 32,
+                          height: 32,
+                          placeholderBuilder: (_) => const Icon(Icons.image, size: 32),
+                        )
                       : Image.file(File(file.path), width: 32, height: 32, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)),
                   onTap: () => Navigator.of(context).pop(IconPickResult.file(file.fileName)),
                 );

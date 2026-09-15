@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
+import '../icons/waypoint_icon_store.dart';
 import 'waypoint_form_sheet.dart';
 import 'waypoint_models.dart';
 import 'waypoint_types.dart';
@@ -57,7 +58,14 @@ Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, Waypoint w
 }
 
 Future<void> editWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoint, {IconLibraryScanner? iconScanner}) async {
-  final currentIcon = ref.read(waypointIconAssignmentsControllerProvider)[waypoint.id];
+  // Read directly from the underlying store rather than the in-memory
+  // controller state: if the controller's load() (fired from initState on
+  // the map/list screen) failed or hasn't resolved yet, the reactive state
+  // would be an empty map, making a real stored assignment look absent. The
+  // user would then save with "Стандартная" pre-selected and unknowingly
+  // wipe a real icon assignment via setIcon(waypoint.id, null) below.
+  final currentIcon = await ref.read(waypointIconStoreProvider).iconFor(waypoint.id);
+  if (!context.mounted) return;
   final result = await showWaypointFormSheet(
     context,
     existing: waypoint,
