@@ -1,7 +1,9 @@
+import 'package:app/icons/icon_library_scanner.dart';
 import 'package:app/waypoints/waypoint_color.dart';
 import 'package:app/waypoints/waypoint_form_sheet.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoint_types.dart';
+import 'package:file/memory.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -21,14 +23,19 @@ Waypoint _existingWaypoint() {
   );
 }
 
-Widget _harness(VoidCallback onOpen, ValueChanged<WaypointFormResult?> onResult, {Waypoint? existing}) {
+Widget _harness(
+  VoidCallback onOpen,
+  ValueChanged<WaypointFormResult?> onResult, {
+  Waypoint? existing,
+  IconLibraryScanner? iconScanner,
+}) {
   return MaterialApp(
     home: Scaffold(
       body: Builder(
         builder: (context) => ElevatedButton(
           onPressed: () async {
             onOpen();
-            final result = await showWaypointFormSheet(context, existing: existing);
+            final result = await showWaypointFormSheet(context, existing: existing, iconScanner: iconScanner);
             onResult(result);
           },
           child: const Text('Open'),
@@ -77,7 +84,7 @@ void main() {
 
   testWidgets('returns null when dismissed without saving', (tester) async {
     WaypointFormResult? result =
-        const WaypointFormResult(name: 'sentinel', type: 'generic', note: '', color: null);
+        const WaypointFormResult(name: 'sentinel', type: 'generic', note: '', color: null, iconFileName: null);
     await tester.pumpWidget(_harness(() {}, (r) => result = r));
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
@@ -191,5 +198,96 @@ void main() {
 
     expect(result!.type, 'water');
     expect(result!.color, waypointTypeColors[defaultWaypointType]);
+  });
+
+  testWidgets('picking a raster icon hides the color swatch', (tester) async {
+    final fs = MemoryFileSystem();
+    final dir = fs.directory('/base')..createSync(recursive: true);
+    dir.childFile('camp.png').createSync();
+    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
+
+    await tester.pumpWidget(_harness(() {}, (_) {}, iconScanner: scanner));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('waypoint_color_swatch')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('waypoint_icon_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('icon_picker_tile_camp.png')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('waypoint_color_swatch')), findsNothing);
+  });
+
+  testWidgets('picking an svg icon keeps the color swatch visible', (tester) async {
+    final fs = MemoryFileSystem();
+    final dir = fs.directory('/base')..createSync(recursive: true);
+    dir.childFile('marker.svg').createSync();
+    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
+
+    await tester.pumpWidget(_harness(() {}, (_) {}, iconScanner: scanner));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('waypoint_icon_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('icon_picker_tile_marker.svg')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('waypoint_color_swatch')), findsOneWidget);
+  });
+
+  testWidgets('picking "Стандартная" after a raster pick brings the color swatch back and clears iconFileName', (tester) async {
+    final fs = MemoryFileSystem();
+    final dir = fs.directory('/base')..createSync(recursive: true);
+    dir.childFile('camp.png').createSync();
+    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
+    WaypointFormResult? result;
+
+    await tester.pumpWidget(_harness(() {}, (r) => result = r, iconScanner: scanner));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('waypoint_name_field')), 'Summit');
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('waypoint_icon_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('icon_picker_tile_camp.png')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('waypoint_icon_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('icon_picker_default_tile')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('waypoint_color_swatch')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('waypoint_save_button')));
+    await tester.pumpAndSettle();
+
+    expect(result!.iconFileName, isNull);
+  });
+
+  testWidgets('submitted result carries the picked icon file name', (tester) async {
+    final fs = MemoryFileSystem();
+    final dir = fs.directory('/base')..createSync(recursive: true);
+    dir.childFile('marker.svg').createSync();
+    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
+    WaypointFormResult? result;
+
+    await tester.pumpWidget(_harness(() {}, (r) => result = r, iconScanner: scanner));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('waypoint_name_field')), 'Summit');
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('waypoint_icon_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('icon_picker_tile_marker.svg')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('waypoint_save_button')));
+    await tester.pumpAndSettle();
+
+    expect(result!.iconFileName, 'marker.svg');
   });
 }
