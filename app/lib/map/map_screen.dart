@@ -607,17 +607,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
           ),
-          const IgnorePointer(
+          IgnorePointer(
             child: Center(
-              child: Icon(Icons.add, key: Key('map_crosshair'), size: 32, color: Colors.black87),
+              child: Container(
+                key: const Key('map_crosshair'),
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
+                ),
+                child: Center(
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         key: const Key('create_waypoint_button'),
         onPressed: _createWaypointAtCrosshair,
-        child: const Icon(Icons.add_location_alt),
+        icon: const Icon(Icons.add_location_alt),
+        label: const Text('Метка здесь'),
       ),
     );
   }

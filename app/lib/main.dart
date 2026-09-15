@@ -5,6 +5,7 @@ import 'auth/auth_controller.dart';
 import 'auth/login_screen.dart';
 import 'auth/register_screen.dart';
 import 'map/map_screen.dart';
+import 'theme/app_theme.dart';
 
 void main() {
   runApp(const ProviderScope(child: AlpineQuestApp()));
@@ -17,6 +18,9 @@ class AlpineQuestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'AlpineQuest',
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       home: const AuthGate(),
       routes: {
         '/register': (context) => const RegisterScreen(),
