@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../icons/icon_library_scanner.dart';
+import '../icons/waypoint_icon_assignments_controller.dart';
 import 'waypoint_form_sheet.dart';
 import 'waypoint_models.dart';
 import 'waypoint_types.dart';
@@ -54,8 +56,14 @@ Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, Waypoint w
   }
 }
 
-Future<void> editWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoint) async {
-  final result = await showWaypointFormSheet(context, existing: waypoint);
+Future<void> editWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoint, {IconLibraryScanner? iconScanner}) async {
+  final currentIcon = ref.read(waypointIconAssignmentsControllerProvider)[waypoint.id];
+  final result = await showWaypointFormSheet(
+    context,
+    existing: waypoint,
+    initialIconFileName: currentIcon,
+    iconScanner: iconScanner,
+  );
   if (result == null || !context.mounted) return;
   try {
     await ref.read(waypointsControllerProvider.notifier).updateWaypoint(
@@ -65,6 +73,7 @@ Future<void> editWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoint
           note: result.note,
           color: result.color,
         );
+    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, result.iconFileName);
   } on WaypointException catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
   }
@@ -84,6 +93,7 @@ Future<void> deleteWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoi
   if (confirmed != true || !context.mounted) return;
   try {
     await ref.read(waypointsControllerProvider.notifier).deleteWaypoint(waypoint.id);
+    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, null);
   } on WaypointException catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
   }

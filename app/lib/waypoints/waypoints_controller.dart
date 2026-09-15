@@ -32,7 +32,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     }
   }
 
-  Future<void> createWaypoint({
+  Future<Waypoint> createWaypoint({
     required String ownerId,
     required String name,
     required String type,
@@ -42,7 +42,9 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required String? color,
   }) async {
     final token = await _storage.read();
-    if (token == null) return;
+    if (token == null) {
+      throw const WaypointException('Не выполнен вход');
+    }
 
     final tempId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
     final optimistic = Waypoint(
@@ -63,6 +65,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     try {
       final created = await _repository.create(token, name: name, type: type, note: note, color: color, lat: lat, lng: lng);
       state = [for (final w in state) if (w.id == tempId) created else w];
+      return created;
     } on WaypointException {
       state = [for (final w in state) if (w.id != tempId) w];
       rethrow;

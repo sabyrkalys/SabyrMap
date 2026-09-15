@@ -112,6 +112,25 @@ void main() {
       expect(container.read(waypointsControllerProvider).single.color, '#FF00AA');
     });
 
+    test('returns the server-created waypoint', () async {
+      final created = _waypoint(id: 'server-id');
+      final repo = FakeWaypointsRepository()..createResult = created;
+      final container = _buildContainer(repo: repo);
+      addTearDown(container.dispose);
+
+      final result = await container.read(waypointsControllerProvider.notifier).createWaypoint(
+            ownerId: 'u1',
+            name: 'Test',
+            type: 'generic',
+            note: '',
+            color: null,
+            lat: 1.0,
+            lng: 2.0,
+          );
+
+      expect(result, created);
+    });
+
     test('rolls back the optimistic waypoint and rethrows on failure', () async {
       final repo = FakeWaypointsRepository()..createResult = const WaypointException('Could not create waypoint');
       final container = _buildContainer(repo: repo);

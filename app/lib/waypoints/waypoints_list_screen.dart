@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../icons/waypoint_icon_assignments_controller.dart';
 import 'waypoint_actions.dart';
 import 'waypoint_color.dart';
 import 'waypoint_types.dart';
@@ -18,6 +19,7 @@ class _WaypointsListScreenState extends ConsumerState<WaypointsListScreen> {
   void initState() {
     super.initState();
     Future.microtask(() => ref.read(waypointsControllerProvider.notifier).loadWaypoints());
+    Future.microtask(() => ref.read(waypointIconAssignmentsControllerProvider.notifier).load());
   }
 
   @override
