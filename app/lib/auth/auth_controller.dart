@@ -40,6 +40,12 @@ final tokenStorageProvider = Provider<TokenStorage>((ref) {
 
 final authControllerProvider = NotifierProvider<AuthController, AuthState>(AuthController.new);
 
+// TEMPORARY: skips the login screen by auto-authenticating a dev account so the
+// main app flow can be tested without typing credentials. Remove before release.
+const bool _devAutoLoginEnabled = true;
+const String _devAutoLoginEmail = 'dev@alpinequest.local';
+const String _devAutoLoginPassword = 'dev-password-123';
+
 class AuthController extends Notifier<AuthState> {
   @override
   AuthState build() => const AuthUnauthenticated();
@@ -50,7 +56,11 @@ class AuthController extends Notifier<AuthState> {
   Future<void> bootstrap() async {
     final token = await _storage.read();
     if (token == null) {
-      state = const AuthUnauthenticated();
+      if (_devAutoLoginEnabled) {
+        await _devAutoLogin();
+      } else {
+        state = const AuthUnauthenticated();
+      }
       return;
     }
     state = const AuthAuthenticating();
@@ -61,7 +71,32 @@ class AuthController extends Notifier<AuthState> {
       if (e.isAuthFailure) {
         await _storage.delete();
       }
-      state = const AuthUnauthenticated();
+      if (_devAutoLoginEnabled) {
+        await _devAutoLogin();
+      } else {
+        state = const AuthUnauthenticated();
+      }
+    }
+  }
+
+  Future<void> _devAutoLogin() async {
+    state = const AuthAuthenticating();
+    try {
+      final token = await _repository.login(_devAutoLoginEmail, _devAutoLoginPassword);
+      final user = await _repository.me(token);
+      await _storage.write(token);
+      state = AuthAuthenticated(user);
+      return;
+    } on AuthException {
+      // Falls through to registration below (e.g. dev account doesn't exist yet).
+    }
+    try {
+      final token = await _repository.register(_devAutoLoginEmail, _devAutoLoginPassword);
+      final user = await _repository.me(token);
+      await _storage.write(token);
+      state = AuthAuthenticated(user);
+    } on AuthException catch (e) {
+      state = AuthUnauthenticated(errorMessage: e.message);
     }
   }
 
