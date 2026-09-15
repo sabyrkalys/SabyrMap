@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../icons/waypoint_icon_assignments_controller.dart';
+import '../mediafile/mediafile_folder_screen.dart';
 import 'waypoint_actions.dart';
 import 'waypoint_color.dart';
 import 'waypoint_types.dart';
@@ -22,11 +23,32 @@ class _WaypointsListScreenState extends ConsumerState<WaypointsListScreen> {
     Future.microtask(() => ref.read(waypointIconAssignmentsControllerProvider.notifier).load());
   }
 
+  void _openFiles() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const MediaFileFolderScreen(
+          title: 'Файлы меток',
+          subfolder: 'custom-types',
+          allowedExtensions: ['png', 'jpg', 'jpeg', 'svg'],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final waypoints = ref.watch(waypointsControllerProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('Метки')),
+      appBar: AppBar(
+        title: const Text('Метки'),
+        actions: [
+          IconButton(
+            key: const Key('waypoint_files_button'),
+            icon: const Icon(Icons.folder_open),
+            onPressed: _openFiles,
+          ),
+        ],
+      ),
       body: waypoints.isEmpty
           ? const Center(child: Text('Пока нет меток'))
           : ListView.builder(
