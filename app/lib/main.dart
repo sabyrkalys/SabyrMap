@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'auth/auth_controller.dart';
 import 'auth/login_screen.dart';
 import 'auth/register_screen.dart';
-import 'map/map_screen.dart';
+import 'home/home_shell.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -47,7 +47,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
   Widget build(BuildContext context) {
     final state = ref.watch(authControllerProvider);
     return switch (state) {
-      AuthAuthenticated() => const MapScreen(),
+      AuthAuthenticated() => const HomeShell(),
       AuthAuthenticating() => const Scaffold(body: Center(child: CircularProgressIndicator())),
       AuthUnauthenticated() => const LoginScreen(),
     };

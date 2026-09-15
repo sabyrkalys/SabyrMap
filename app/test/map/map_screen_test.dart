@@ -39,7 +39,7 @@ _baseOverrides({
 }
 
 void main() {
-  testWidgets('MapScreen builds without throwing and shows a logout action', (tester) async {
+  testWidgets('MapScreen builds without throwing', (tester) async {
     final storage = FakeTokenStorage();
     await storage.write('tok-1');
     final repo = FakeAuthRepository(
@@ -55,33 +55,6 @@ void main() {
     await tester.pump();
 
     expect(find.byType(MapScreen), findsOneWidget);
-    expect(find.byIcon(Icons.logout), findsOneWidget);
-  });
-
-  testWidgets('tapping logout calls AuthController.logout', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final repo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
-    final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: repo, storage: storage),
-    );
-    addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MapScreen()),
-      ),
-    );
-    await tester.pump();
-
-    await tester.tap(find.byIcon(Icons.logout));
-    await tester.pump();
-
-    expect(container.read(authControllerProvider), isA<AuthUnauthenticated>());
   });
 
   testWidgets('creating a waypoint via the controller updates the rendered state', (tester) async {

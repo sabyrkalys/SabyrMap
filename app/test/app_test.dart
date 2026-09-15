@@ -1,11 +1,17 @@
 import 'package:app/auth/auth_controller.dart';
 import 'package:app/auth/auth_models.dart';
+import 'package:app/compass/compass_source.dart';
 import 'package:app/main.dart';
+import 'package:app/tracks/tracks_controller.dart';
+import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'auth/fakes.dart';
+import 'compass/fakes.dart';
+import 'tracks/fakes.dart';
+import 'waypoints/fakes.dart';
 
 void main() {
   testWidgets('login then logout then login again returns to LoginScreen each time', (tester) async {
@@ -18,6 +24,9 @@ void main() {
         overrides: [
           authRepositoryProvider.overrideWithValue(repo),
           tokenStorageProvider.overrideWithValue(storage),
+          waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
+          tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
+          compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
         ],
         child: const AlpineQuestApp(),
       ),
@@ -32,14 +41,15 @@ void main() {
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.logout), findsOneWidget);
     expect(find.text('Вход'), findsNothing);
+    expect(find.byKey(const Key('nav_settings')), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.logout));
+    await tester.tap(find.byKey(const Key('nav_settings')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('settings_logout_button')));
     await tester.pumpAndSettle();
 
     expect(find.text('Вход'), findsWidgets);
-    expect(find.byIcon(Icons.logout), findsNothing);
 
     // log back in a second time, proving AuthGate is still the live navigation authority
     await tester.enterText(find.byKey(const Key('login_email_field')), 'a@b.test');
@@ -48,6 +58,6 @@ void main() {
     await tester.tap(find.byType(ElevatedButton));
     await tester.pumpAndSettle();
 
-    expect(find.byIcon(Icons.logout), findsOneWidget);
+    expect(find.byKey(const Key('nav_settings')), findsOneWidget);
   });
 }

@@ -4,11 +4,13 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../auth/auth_controller.dart';
 import '../config.dart';
+import 'geo_utils.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_name_form_sheet.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
 import '../tracks/tracks_list_screen.dart';
+import '../waypoints/waypoint_actions.dart';
 import '../waypoints/waypoint_form_sheet.dart';
 import '../waypoints/waypoint_models.dart';
 import '../waypoints/waypoint_types.dart';
@@ -58,6 +60,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   TrackPoint? _myLocation;
   Circle? _myLocationCircle;
   bool _hasCenteredCamera = false;
+
+  // Crosshair coordinate readout: refreshed whenever the camera settles
+  // (not on every drag frame, to avoid rebuilding the HUD on each pixel of
+  // a pan gesture).
+  LatLng? _crosshairPosition;
 
   bool _tracksVisible = false;
   // Tracks whether loadTracks() has run this session. Using this instead of
@@ -150,6 +157,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onMapCreated(MapLibreMapController controller) {
     _controller = controller;
     controller.onCircleTapped.add(_onCircleTapped);
+  }
+
+  void _onCameraIdle() {
+    final target = _controller?.cameraPosition?.target;
+    if (target == null) return;
+    setState(() => _crosshairPosition = target);
   }
 
   void _onStyleLoaded() {
@@ -401,88 +414,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final waypoints = ref.read(waypointsControllerProvider);
     final index = waypoints.indexWhere((w) => w.id == waypointId);
     if (index == -1) return;
-    _showWaypointDetails(waypoints[index]);
-  }
-
-  Future<void> _showWaypointDetails(Waypoint waypoint) async {
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(waypoint.name, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(waypointTypeLabels[waypoint.type] ?? waypoint.type),
-            if (waypoint.note != null && waypoint.note!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text(waypoint.note!),
-            ],
-            if (waypoint.canEdit) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  TextButton(
-                    key: const Key('waypoint_edit_button'),
-                    onPressed: () => Navigator.of(context).pop('edit'),
-                    child: const Text('Изменить'),
-                  ),
-                  TextButton(
-                    key: const Key('waypoint_delete_button'),
-                    onPressed: () => Navigator.of(context).pop('delete'),
-                    child: const Text('Удалить'),
-                  ),
-                ],
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-
-    if (!mounted || action == null) return;
-    if (action == 'edit') {
-      await _editWaypoint(waypoint);
-    } else if (action == 'delete') {
-      await _deleteWaypoint(waypoint);
-    }
-  }
-
-  Future<void> _editWaypoint(Waypoint waypoint) async {
-    final result = await showWaypointFormSheet(context, existing: waypoint);
-    if (result == null || !mounted) return;
-    try {
-      await ref.read(waypointsControllerProvider.notifier).updateWaypoint(
-            waypoint.id,
-            name: result.name,
-            type: result.type,
-            note: result.note,
-            color: result.color,
-          );
-    } on WaypointException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
-
-  Future<void> _deleteWaypoint(Waypoint waypoint) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Удалить метку?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
-          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Удалить')),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await ref.read(waypointsControllerProvider.notifier).deleteWaypoint(waypoint.id);
-    } on WaypointException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    }
+    showWaypointDetails(context, ref, waypoints[index]);
   }
 
   String _defaultTrackName() {
@@ -592,10 +524,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               MaterialPageRoute(builder: (_) => const TracksListScreen()),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-          ),
         ],
       ),
       body: Stack(
@@ -606,7 +534,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             trackCameraPosition: true,
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
+            onCameraIdle: _onCameraIdle,
           ),
+          if (_crosshairPosition != null)
+            Positioned(top: 12, left: 12, child: _CoordinateHud(target: _crosshairPosition!, myLocation: _myLocation)),
           IgnorePointer(
             child: Center(
               child: Container(
@@ -637,6 +568,45 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         onPressed: _createWaypointAtCrosshair,
         icon: const Icon(Icons.add_location_alt),
         label: const Text('Метка здесь'),
+      ),
+    );
+  }
+}
+
+/// Small HUD card showing the crosshair's coordinates and, when the user's
+/// own position is known, the distance and bearing from it to the crosshair.
+class _CoordinateHud extends StatelessWidget {
+  const _CoordinateHud({required this.target, required this.myLocation});
+
+  final LatLng target;
+  final TrackPoint? myLocation;
+
+  @override
+  Widget build(BuildContext context) {
+    final location = myLocation;
+    final distance = location == null
+        ? null
+        : distanceMeters(location.lat, location.lng, target.latitude, target.longitude);
+    final bearing =
+        location == null ? null : bearingDegrees(location.lat, location.lng, target.latitude, target.longitude);
+
+    return Card(
+      key: const Key('coordinate_hud'),
+      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${target.latitude.toStringAsFixed(5)}, ${target.longitude.toStringAsFixed(5)}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            if (distance != null && bearing != null)
+              Text('${distance.round()} м · ${bearing.round()}°'),
+          ],
+        ),
       ),
     );
   }
