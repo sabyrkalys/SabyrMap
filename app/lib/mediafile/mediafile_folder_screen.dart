@@ -1,3 +1,4 @@
+import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -38,10 +39,19 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
       type: FileType.custom,
       allowedExtensions: widget.allowedExtensions,
     );
-    final path = result?.files.first.path;
+    final path = result?.files.firstOrNull?.path;
     if (path == null) return;
-    await _service.importFile(path);
-    _reload();
+    try {
+      await _service.importFile(path);
+      if (!mounted) return;
+      _reload();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось импортировать файл')),
+        );
+      }
+    }
   }
 
   Future<void> _delete(String fileName) async {
@@ -55,9 +65,18 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
         ],
       ),
     );
-    if (confirmed != true) return;
-    await _service.delete(fileName);
-    _reload();
+    if (confirmed != true || !mounted) return;
+    try {
+      await _service.delete(fileName);
+      if (!mounted) return;
+      _reload();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Не удалось удалить файл')),
+        );
+      }
+    }
   }
 
   @override
@@ -76,6 +95,9 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
       body: FutureBuilder<List<MediaFileEntry>>(
         future: _future,
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const Center(child: Text('Не удалось открыть папку'));
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }

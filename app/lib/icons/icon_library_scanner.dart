@@ -2,6 +2,8 @@ import 'package:file/file.dart';
 import 'package:file/local.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../mediafile/mediafile_subfolders.dart';
+
 enum IconFileFormat { svg, raster }
 
 class IconFile {
@@ -33,7 +35,7 @@ class IconLibraryScanner {
   final FileSystem _fileSystem;
   final String? baseDirectoryPath;
 
-  static const _folderSuffix = 'mediafile/custom-types';
+  static const _folderSuffix = 'mediafile/$kCustomTypesSubfolder';
 
   Future<Directory> resolveBaseDirectory() async {
     final fixed = baseDirectoryPath;

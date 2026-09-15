@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../icons/waypoint_icon_assignments_controller.dart';
 import '../mediafile/mediafile_folder_screen.dart';
+import '../mediafile/mediafile_subfolders.dart';
 import 'waypoint_actions.dart';
 import 'waypoint_color.dart';
 import 'waypoint_types.dart';
@@ -28,7 +29,7 @@ class _WaypointsListScreenState extends ConsumerState<WaypointsListScreen> {
       MaterialPageRoute(
         builder: (_) => const MediaFileFolderScreen(
           title: 'Файлы меток',
-          subfolder: 'custom-types',
+          subfolder: kCustomTypesSubfolder,
           allowedExtensions: ['png', 'jpg', 'jpeg', 'svg'],
         ),
       ),

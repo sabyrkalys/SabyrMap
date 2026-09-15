@@ -45,6 +45,7 @@ dependencies:
   file: ^7.0.1
   flutter_svg: ^2.2.4
   file_picker: ^11.0.3
+  collection: ^1.19.1
 
 dev_dependencies:
   flutter_test:

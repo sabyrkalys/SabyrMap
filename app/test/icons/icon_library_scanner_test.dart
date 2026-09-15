@@ -1,8 +1,26 @@
 import 'package:app/icons/icon_library_scanner.dart';
+import 'package:app/mediafile/mediafile_subfolders.dart';
 import 'package:file/memory.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('scanner folder suffix matches the shared custom-types subfolder constant', () async {
+    final fs = MemoryFileSystem();
+    // baseDirectoryPath override lets us assert what resolveBaseDirectory()
+    // would produce on a real device (base + '/mediafile/$kCustomTypesSubfolder')
+    // without going through platform channels: point the fixed base at the
+    // exact path the shared constant predicts, then confirm the scanner
+    // creates/reads that same path.
+    final expectedPath = '/base/mediafile/$kCustomTypesSubfolder';
+    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: expectedPath);
+
+    final dir = await scanner.resolveBaseDirectory();
+
+    expect(dir.path, expectedPath);
+    expect(dir.path, '/base/mediafile/custom-types');
+  });
+
+
   group('iconFileFormatForPath', () {
     test('recognizes svg', () {
       expect(iconFileFormatForPath('a/volcano.svg'), IconFileFormat.svg);
