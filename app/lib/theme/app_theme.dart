@@ -9,6 +9,10 @@ const Color _seedError = Color(0xFFE53935);
 
 const double _minTapHeight = 52;
 
+/// The only typeface used in the UI (bundled from assets/fonts, see OFL.txt).
+const String appFontFamily = 'Roboto';
+const List<String> appFontFamilyFallback = ['Noto Sans'];
+
 class AppTheme {
   AppTheme._();
 
@@ -23,7 +27,13 @@ class AppTheme {
       brightness: brightness,
     );
 
-    final base = ThemeData(colorScheme: colorScheme, useMaterial3: true, brightness: brightness);
+    final base = ThemeData(
+      colorScheme: colorScheme,
+      useMaterial3: true,
+      brightness: brightness,
+      fontFamily: appFontFamily,
+      fontFamilyFallback: appFontFamilyFallback,
+    );
 
     return base.copyWith(
       scaffoldBackgroundColor: colorScheme.surface,
