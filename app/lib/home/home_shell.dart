@@ -38,6 +38,7 @@ class _HomeShellState extends State<HomeShell> {
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         onDestinationSelected: (index) => setState(() => _index = index),
         destinations: const [
           NavigationDestination(key: Key('nav_settings'), icon: AppIcon(AppIcons.peakMark), label: 'Настройки'),
