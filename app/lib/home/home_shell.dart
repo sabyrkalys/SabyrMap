@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../app_icons.dart';
 import '../compass/compass_screen.dart';
 import '../map/map_screen.dart';
 import '../settings/settings_screen.dart';
+import '../widgets/app_icon.dart';
 import '../waypoints/waypoints_list_screen.dart';
 
 /// Bottom-nav shell with the app's four top-level destinations. Uses
@@ -34,10 +36,10 @@ class _HomeShellState extends State<HomeShell> {
         selectedIndex: _index,
         onDestinationSelected: (index) => setState(() => _index = index),
         destinations: const [
-          NavigationDestination(key: Key('nav_map'), icon: Icon(Icons.map), label: 'Карты'),
-          NavigationDestination(key: Key('nav_waypoints'), icon: Icon(Icons.location_on), label: 'Метки'),
-          NavigationDestination(key: Key('nav_compass'), icon: Icon(Icons.explore), label: 'Компас'),
-          NavigationDestination(key: Key('nav_settings'), icon: Icon(Icons.tune), label: 'Настройки'),
+          NavigationDestination(key: Key('nav_map'), icon: AppIcon(AppIcons.map), label: 'Карты'),
+          NavigationDestination(key: Key('nav_waypoints'), icon: AppIcon(AppIcons.flag), label: 'Метки'),
+          NavigationDestination(key: Key('nav_compass'), icon: AppIcon(AppIcons.compass), label: 'Компас'),
+          NavigationDestination(key: Key('nav_settings'), icon: AppIcon(AppIcons.settings), label: 'Настройки'),
         ],
       ),
     );

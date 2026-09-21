@@ -8,6 +8,8 @@ import 'waypoint_actions.dart';
 import 'waypoint_color.dart';
 import 'waypoint_types.dart';
 import 'waypoints_controller.dart';
+import '../widgets/app_icon.dart';
+import '../app_icons.dart';
 
 class WaypointsListScreen extends ConsumerStatefulWidget {
   const WaypointsListScreen({super.key});
@@ -45,7 +47,7 @@ class _WaypointsListScreenState extends ConsumerState<WaypointsListScreen> {
         actions: [
           IconButton(
             key: const Key('waypoint_files_button'),
-            icon: const Icon(Icons.folder_open),
+            icon: const AppIcon(AppIcons.folder),
             onPressed: _openFiles,
           ),
         ],

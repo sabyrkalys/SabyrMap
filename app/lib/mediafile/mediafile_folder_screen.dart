@@ -3,6 +3,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'mediafile_folder_service.dart';
+import '../widgets/app_icon.dart';
+import '../app_icons.dart';
 
 class MediaFileFolderScreen extends StatefulWidget {
   const MediaFileFolderScreen({
@@ -87,7 +89,7 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
         actions: [
           IconButton(
             key: const Key('mediafile_import_button'),
-            icon: const Icon(Icons.file_upload_outlined),
+            icon: const AppIcon(AppIcons.upload),
             onPressed: _import,
           ),
         ],
@@ -115,7 +117,7 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
                 subtitle: Text('${(entry.sizeBytes / 1024).ceil()} КБ'),
                 trailing: IconButton(
                   key: Key('mediafile_delete_${entry.fileName}'),
-                  icon: const Icon(Icons.delete_outline),
+                  icon: const AppIcon(AppIcons.trash),
                   onPressed: () => _delete(entry.fileName),
                 ),
               );

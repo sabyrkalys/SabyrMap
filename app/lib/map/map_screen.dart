@@ -18,6 +18,8 @@ import '../waypoints/waypoint_form_sheet.dart';
 import '../waypoints/waypoint_models.dart';
 import '../waypoints/waypoint_types.dart';
 import '../waypoints/waypoints_controller.dart';
+import '../widgets/app_icon.dart';
+import '../app_icons.dart';
 
 /// Pure mapping from a waypoint (plus the current user id, to distinguish
 /// own vs. shared waypoints) to the [CircleOptions] used to render it.
@@ -706,12 +708,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           ),
           IconButton(
             key: const Key('layers_button'),
-            icon: const Icon(Icons.layers),
+            icon: const AppIcon(AppIcons.layers),
             onPressed: _onLayersButtonPressed,
           ),
           IconButton(
             key: const Key('tracks_list_button'),
-            icon: const Icon(Icons.list),
+            icon: const AppIcon(AppIcons.list),
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const TracksListScreen()),
             ),
@@ -758,7 +760,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('create_waypoint_button'),
         onPressed: _createWaypointAtCrosshair,
-        icon: const Icon(Icons.add_location_alt),
+        icon: const AppIcon(AppIcons.flagPlus),
         label: const Text('Метка здесь'),
       ),
     );
