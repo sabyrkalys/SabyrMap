@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../auth/fakes.dart';
 import 'fakes.dart';
 
 Track _track({String id = 't1', String name = 'Morning walk'}) {
@@ -24,11 +23,9 @@ Track _track({String id = 't1', String name = 'Morning walk'}) {
 
 void main() {
   testWidgets('shows an empty message when there are no tracks', (tester) async {
-    final tokenStorage = FakeTokenStorage()..write('tok-1');
     final container = ProviderContainer(
       overrides: [
         tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
-        tokenStorageProvider.overrideWithValue(tokenStorage),
       ],
     );
     addTearDown(container.dispose);
@@ -42,11 +39,9 @@ void main() {
   });
 
   testWidgets('lists tracks with formatted length and duration', (tester) async {
-    final tokenStorage = FakeTokenStorage()..write('tok-1');
     final container = ProviderContainer(
       overrides: [
         tracksRepositoryProvider.overrideWithValue(FakeTracksRepository(initial: [_track()])),
-        tokenStorageProvider.overrideWithValue(tokenStorage),
       ],
     );
     addTearDown(container.dispose);
@@ -62,11 +57,9 @@ void main() {
   });
 
   testWidgets('tapping a track card navigates to its detail screen', (tester) async {
-    final tokenStorage = FakeTokenStorage()..write('tok-1');
     final container = ProviderContainer(
       overrides: [
         tracksRepositoryProvider.overrideWithValue(FakeTracksRepository(initial: [_track()])),
-        tokenStorageProvider.overrideWithValue(tokenStorage),
       ],
     );
     addTearDown(container.dispose);

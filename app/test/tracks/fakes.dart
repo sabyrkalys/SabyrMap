@@ -13,11 +13,10 @@ class FakeTracksRepository implements TracksRepository {
   DateTime? lastCreateFinishedAt;
 
   @override
-  Future<List<Track>> list(String token) async => List.of(items);
+  Future<List<Track>> list() async => List.of(items);
 
   @override
-  Future<Track> create(
-    String token, {
+  Future<Track> create({
     required String name,
     required List<TrackPoint> points,
     DateTime? startedAt,

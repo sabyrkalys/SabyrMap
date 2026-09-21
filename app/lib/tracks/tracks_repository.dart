@@ -5,10 +5,9 @@ import 'package:app/api/api_client.dart';
 import 'track_models.dart';
 
 abstract class TracksRepository {
-  Future<List<Track>> list(String token);
+  Future<List<Track>> list();
 
-  Future<Track> create(
-    String token, {
+  Future<Track> create({
     required String name,
     required List<TrackPoint> points,
     DateTime? startedAt,
@@ -22,8 +21,8 @@ class HttpTracksRepository implements TracksRepository {
   final ApiClient _client;
 
   @override
-  Future<List<Track>> list(String token) async {
-    final response = await _client.get('/tracks?limit=200', token: token);
+  Future<List<Track>> list() async {
+    final response = await _client.get('/tracks?limit=200');
     if (response.statusCode != 200) {
       throw const TrackException('Could not load tracks');
     }
@@ -33,8 +32,7 @@ class HttpTracksRepository implements TracksRepository {
   }
 
   @override
-  Future<Track> create(
-    String token, {
+  Future<Track> create({
     required String name,
     required List<TrackPoint> points,
     DateTime? startedAt,
@@ -42,7 +40,6 @@ class HttpTracksRepository implements TracksRepository {
   }) async {
     final response = await _client.post(
       '/tracks',
-      token: token,
       body: {
         'name': name,
         'geom': {

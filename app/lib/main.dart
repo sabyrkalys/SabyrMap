@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'auth/auth_controller.dart';
-import 'auth/login_screen.dart';
-import 'auth/register_screen.dart';
 import 'home/home_shell.dart';
 import 'theme/app_theme.dart';
 
@@ -21,35 +18,7 @@ class AlpineQuestApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
-      home: const AuthGate(),
-      routes: {
-        '/register': (context) => const RegisterScreen(),
-      },
+      home: const HomeShell(),
     );
-  }
-}
-
-class AuthGate extends ConsumerStatefulWidget {
-  const AuthGate({super.key});
-
-  @override
-  ConsumerState<AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends ConsumerState<AuthGate> {
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() => ref.read(authControllerProvider.notifier).bootstrap());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final state = ref.watch(authControllerProvider);
-    return switch (state) {
-      AuthAuthenticated() => const HomeShell(),
-      AuthAuthenticating() => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      AuthUnauthenticated() => const LoginScreen(),
-    };
   }
 }

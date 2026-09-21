@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import '../auth/auth_controller.dart';
 import '../config.dart';
 import '../icons/icon_image_cache.dart';
 import '../icons/icon_library_scanner.dart';
@@ -21,18 +20,16 @@ import '../waypoints/waypoints_controller.dart';
 import '../widgets/app_icon.dart';
 import '../app_icons.dart';
 
-/// Pure mapping from a waypoint (plus the current user id, to distinguish
-/// own vs. shared waypoints) to the [CircleOptions] used to render it.
+/// Pure mapping from a waypoint to the [CircleOptions] used to render it.
 /// Extracted as a top-level function so it can be unit-tested without a
 /// real [MapLibreMapController]/platform view.
-CircleOptions circleOptionsForWaypoint(Waypoint waypoint, String currentUserId) {
-  final isOwn = waypoint.ownerId == currentUserId;
+CircleOptions circleOptionsForWaypoint(Waypoint waypoint) {
   return CircleOptions(
     geometry: LatLng(waypoint.lat, waypoint.lng),
     circleRadius: 8,
     circleColor: waypoint.color ?? waypointTypeColors[waypoint.type] ?? waypointTypeColors[defaultWaypointType]!,
-    circleStrokeColor: isOwn ? '#FFFFFF' : '#000000',
-    circleStrokeWidth: isOwn ? 1 : 2,
+    circleStrokeColor: '#FFFFFF',
+    circleStrokeWidth: 1,
   );
 }
 
@@ -312,7 +309,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (stale) _appliedCircleKeys.remove(id);
       return stale;
     });
-    final currentUserId = _currentUserId();
 
     // Waypoints with a locally-assigned icon are rendered by _syncSymbols
     // instead, so they're excluded here. Because the exclusion happens before
@@ -332,18 +328,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     for (final waypoint in circleModeWaypoints) {
       // circleOptionsForWaypoint is a pure function of (waypoint.type,
-      // isOwn, waypoint.color) — nothing else it reads ever varies for a
-      // given waypoint id — so this key cheaply captures "would the
-      // rendered options change".
-      final isOwn = waypoint.ownerId == currentUserId;
-      final key = '${waypoint.type}|$isOwn|${waypoint.color ?? ''}';
+      // waypoint.color) — nothing else it reads ever varies for a given
+      // waypoint id — so this key cheaply captures "would the rendered
+      // options change".
+      final key = '${waypoint.type}|${waypoint.color ?? ''}';
       final existing = _circlesByWaypointId[waypoint.id];
       if (existing == null) {
-        final options = circleOptionsForWaypoint(waypoint, currentUserId);
+        final options = circleOptionsForWaypoint(waypoint);
         _circlesByWaypointId[waypoint.id] = await controller.addCircle(options, {'waypointId': waypoint.id});
         _appliedCircleKeys[waypoint.id] = key;
       } else if (_appliedCircleKeys[waypoint.id] != key) {
-        await controller.updateCircle(existing, circleOptionsForWaypoint(waypoint, currentUserId));
+        await controller.updateCircle(existing, circleOptionsForWaypoint(waypoint));
         _appliedCircleKeys[waypoint.id] = key;
       }
     }
@@ -545,11 +540,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return '${points.length}|${last.$1}|${last.$2}';
   }
 
-  String _currentUserId() {
-    final auth = ref.read(authControllerProvider);
-    return auth is AuthAuthenticated ? auth.user.id : '';
-  }
-
   Future<void> _createWaypointAtCrosshair() async {
     final controller = _controller;
     final cameraPosition = controller?.cameraPosition;
@@ -564,7 +554,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (result == null || !mounted) return;
     try {
       final created = await ref.read(waypointsControllerProvider.notifier).createWaypoint(
-            ownerId: _currentUserId(),
             name: result.name,
             type: result.type,
             note: result.note,

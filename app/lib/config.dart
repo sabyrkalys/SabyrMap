@@ -8,9 +8,4 @@ class AppConfig {
 
   static const String mapStyleUrl =
       'https://tiles.openfreemap.org/styles/liberty';
-
-  // TEMPORARY: skips the login screen by auto-authenticating a dev account so
-  // the main app flow can be tested without typing credentials. Off by
-  // default (and thus in tests/CI); enable with --dart-define=DEV_AUTO_LOGIN=true.
-  static const bool devAutoLoginEnabled = bool.fromEnvironment('DEV_AUTO_LOGIN');
 }

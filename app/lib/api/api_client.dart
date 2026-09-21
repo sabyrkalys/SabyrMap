@@ -9,41 +9,29 @@ class ApiClient {
   final String baseUrl;
   final http.Client _httpClient;
 
-  Future<http.Response> get(String path, {String? token}) {
-    return _httpClient.get(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
-    );
+  static const Map<String, String> _headers = {'Content-Type': 'application/json'};
+
+  Future<http.Response> get(String path) {
+    return _httpClient.get(Uri.parse('$baseUrl$path'), headers: _headers);
   }
 
-  Future<http.Response> post(String path, {Map<String, dynamic>? body, String? token}) {
+  Future<http.Response> post(String path, {Map<String, dynamic>? body}) {
     return _httpClient.post(
       Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
+      headers: _headers,
       body: jsonEncode(body ?? const {}),
     );
   }
 
-  Future<http.Response> patch(String path, {Map<String, dynamic>? body, String? token}) {
+  Future<http.Response> patch(String path, {Map<String, dynamic>? body}) {
     return _httpClient.patch(
       Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
+      headers: _headers,
       body: jsonEncode(body ?? const {}),
     );
   }
 
-  Future<http.Response> delete(String path, {String? token}) {
-    return _httpClient.delete(
-      Uri.parse('$baseUrl$path'),
-      headers: _headers(token),
-    );
-  }
-
-  Map<String, String> _headers(String? token) {
-    final headers = <String, String>{'Content-Type': 'application/json'};
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-    return headers;
+  Future<http.Response> delete(String path) {
+    return _httpClient.delete(Uri.parse('$baseUrl$path'), headers: _headers);
   }
 }

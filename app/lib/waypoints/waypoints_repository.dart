@@ -5,10 +5,9 @@ import 'package:app/api/api_client.dart';
 import 'waypoint_models.dart';
 
 abstract class WaypointsRepository {
-  Future<List<Waypoint>> list(String token);
+  Future<List<Waypoint>> list();
 
-  Future<Waypoint> create(
-    String token, {
+  Future<Waypoint> create({
     required String name,
     required String type,
     required String note,
@@ -18,7 +17,6 @@ abstract class WaypointsRepository {
   });
 
   Future<Waypoint> update(
-    String token,
     String id, {
     required String name,
     required String type,
@@ -26,7 +24,7 @@ abstract class WaypointsRepository {
     required String? color,
   });
 
-  Future<void> delete(String token, String id);
+  Future<void> delete(String id);
 }
 
 class HttpWaypointsRepository implements WaypointsRepository {
@@ -35,8 +33,8 @@ class HttpWaypointsRepository implements WaypointsRepository {
   final ApiClient _client;
 
   @override
-  Future<List<Waypoint>> list(String token) async {
-    final response = await _client.get('/waypoints?limit=200', token: token);
+  Future<List<Waypoint>> list() async {
+    final response = await _client.get('/waypoints?limit=200');
     if (response.statusCode != 200) {
       throw const WaypointException('Could not load waypoints');
     }
@@ -46,8 +44,7 @@ class HttpWaypointsRepository implements WaypointsRepository {
   }
 
   @override
-  Future<Waypoint> create(
-    String token, {
+  Future<Waypoint> create({
     required String name,
     required String type,
     required String note,
@@ -57,7 +54,6 @@ class HttpWaypointsRepository implements WaypointsRepository {
   }) async {
     final response = await _client.post(
       '/waypoints',
-      token: token,
       body: {
         'name': name,
         'type': type,
@@ -77,7 +73,6 @@ class HttpWaypointsRepository implements WaypointsRepository {
 
   @override
   Future<Waypoint> update(
-    String token,
     String id, {
     required String name,
     required String type,
@@ -86,7 +81,6 @@ class HttpWaypointsRepository implements WaypointsRepository {
   }) async {
     final response = await _client.patch(
       '/waypoints/$id',
-      token: token,
       body: {'name': name, 'type': type, 'note': note, 'color': color},
     );
     if (response.statusCode != 200) {
@@ -96,8 +90,8 @@ class HttpWaypointsRepository implements WaypointsRepository {
   }
 
   @override
-  Future<void> delete(String token, String id) async {
-    final response = await _client.delete('/waypoints/$id', token: token);
+  Future<void> delete(String id) async {
+    final response = await _client.delete('/waypoints/$id');
     if (response.statusCode != 204) {
       throw const WaypointException('Could not delete waypoint');
     }

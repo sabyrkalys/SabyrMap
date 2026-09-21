@@ -18,11 +18,10 @@ class FakeWaypointsRepository implements WaypointsRepository {
   String? lastUpdateColor;
 
   @override
-  Future<List<Waypoint>> list(String token) async => List.of(items);
+  Future<List<Waypoint>> list() async => List.of(items);
 
   @override
-  Future<Waypoint> create(
-    String token, {
+  Future<Waypoint> create({
     required String name,
     required String type,
     required String note,
@@ -36,7 +35,6 @@ class FakeWaypointsRepository implements WaypointsRepository {
 
   @override
   Future<Waypoint> update(
-    String token,
     String id, {
     required String name,
     required String type,
@@ -49,7 +47,7 @@ class FakeWaypointsRepository implements WaypointsRepository {
   }
 
   @override
-  Future<void> delete(String token, String id) async {
+  Future<void> delete(String id) async {
     if (deleteResult is WaypointException) throw deleteResult as WaypointException;
   }
 }

@@ -39,7 +39,7 @@ void main() {
       );
       final repo = HttpTracksRepository(client);
 
-      final tracks = await repo.list('tok-1');
+      final tracks = await repo.list();
 
       expect(tracks, hasLength(1));
       expect(tracks.first.id, 't1');
@@ -52,7 +52,7 @@ void main() {
       );
       final repo = HttpTracksRepository(client);
 
-      await expectLater(repo.list('tok-1'), throwsA(isA<TrackException>()));
+      await expectLater(repo.list(), throwsA(isA<TrackException>()));
     });
   });
 
@@ -70,7 +70,6 @@ void main() {
       final repo = HttpTracksRepository(client);
 
       final track = await repo.create(
-        'tok-1',
         name: 'Morning walk',
         points: const [TrackPoint(lat: 45.9, lng: 7.6), TrackPoint(lat: 46.0, lng: 7.7)],
       );
@@ -96,7 +95,7 @@ void main() {
       final repo = HttpTracksRepository(client);
 
       await expectLater(
-        repo.create('tok-1', name: 'x', points: const [TrackPoint(lat: 0, lng: 0), TrackPoint(lat: 1, lng: 1)]),
+        repo.create(name: 'x', points: const [TrackPoint(lat: 0, lng: 0), TrackPoint(lat: 1, lng: 1)]),
         throwsA(isA<TrackException>()),
       );
     });

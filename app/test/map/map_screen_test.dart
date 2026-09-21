@@ -1,5 +1,3 @@
-import 'package:app/auth/auth_controller.dart';
-import 'package:app/auth/auth_models.dart';
 import 'package:app/icons/waypoint_icon_assignments_controller.dart';
 import 'package:app/icons/waypoint_icon_store.dart';
 import 'package:app/map/map_screen.dart';
@@ -14,7 +12,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import '../auth/fakes.dart';
 import '../icons/fakes.dart';
 import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
@@ -28,15 +25,11 @@ import '../waypoints/fakes.dart';
 // `List<Override>` from the `.overrideWithValue()` calls inside, which is
 // assignable everywhere `ProviderContainer`/`ProviderScope` expect one.
 _baseOverrides({
-  required FakeAuthRepository authRepo,
-  required FakeTokenStorage storage,
   FakeWaypointsRepository? waypointsRepo,
   FakeTracksRepository? tracksRepo,
   FakeWaypointIconStore? iconStore,
 }) {
   return [
-    authRepositoryProvider.overrideWithValue(authRepo),
-    tokenStorageProvider.overrideWithValue(storage),
     waypointsRepositoryProvider.overrideWithValue(waypointsRepo ?? FakeWaypointsRepository()),
     tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
     // MapScreen loads the local icon assignments on open; the real store
@@ -48,15 +41,10 @@ _baseOverrides({
 
 void main() {
   testWidgets('MapScreen builds without throwing', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final repo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: _baseOverrides(authRepo: repo, storage: storage),
+        overrides: _baseOverrides(),
         child: const MaterialApp(home: MapScreen()),
       ),
     );
@@ -66,11 +54,6 @@ void main() {
   });
 
   testWidgets('creating a waypoint via the controller updates the rendered state', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final waypointsRepo = FakeWaypointsRepository()
       ..createResult = Waypoint(
         id: 'w1',
@@ -85,10 +68,9 @@ void main() {
         createdAt: DateTime.utc(2026, 8, 22),
       );
     final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: authRepo, storage: storage, waypointsRepo: waypointsRepo),
+      overrides: _baseOverrides(waypointsRepo: waypointsRepo),
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -106,7 +88,6 @@ void main() {
     // correctly; the long-press gesture itself is covered by manual
     // device verification (see Step 9 in the task brief).
     await container.read(waypointsControllerProvider.notifier).createWaypoint(
-          ownerId: 'u1',
           name: 'Summit',
           type: 'generic',
           note: '',
@@ -120,16 +101,10 @@ void main() {
   });
 
   testWidgets('shows a persistent crosshair and a create-waypoint button, with no long-press wiring', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: authRepo, storage: storage),
+      overrides: _baseOverrides(),
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -147,16 +122,10 @@ void main() {
   });
 
   testWidgets('tapping create-waypoint button before the map controller is ready shows a message, no crash', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: authRepo, storage: storage),
+      overrides: _baseOverrides(),
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -194,7 +163,7 @@ void main() {
     test('falls back to the default type color for an unrecognized type', () {
       final waypoint = waypointWith(ownerId: 'u1', type: 'not-a-real-type');
 
-      final options = circleOptionsForWaypoint(waypoint, 'u1');
+      final options = circleOptionsForWaypoint(waypoint);
 
       expect(options.circleColor, waypointTypeColors[defaultWaypointType]);
     });
@@ -202,27 +171,18 @@ void main() {
     test('uses the type color for a recognized type', () {
       final waypoint = waypointWith(ownerId: 'u1', type: 'danger');
 
-      final options = circleOptionsForWaypoint(waypoint, 'u1');
+      final options = circleOptionsForWaypoint(waypoint);
 
       expect(options.circleColor, waypointTypeColors['danger']);
     });
 
-    test('own waypoints get a thin white stroke', () {
+    test('waypoints get a thin white stroke', () {
       final waypoint = waypointWith(ownerId: 'u1', type: 'generic');
 
-      final options = circleOptionsForWaypoint(waypoint, 'u1');
+      final options = circleOptionsForWaypoint(waypoint);
 
       expect(options.circleStrokeColor, '#FFFFFF');
       expect(options.circleStrokeWidth, 1);
-    });
-
-    test('shared waypoints get a thicker black stroke', () {
-      final waypoint = waypointWith(ownerId: 'someone-else', type: 'generic');
-
-      final options = circleOptionsForWaypoint(waypoint, 'u1');
-
-      expect(options.circleStrokeColor, '#000000');
-      expect(options.circleStrokeWidth, 2);
     });
 
     test('a custom color overrides the type color', () {
@@ -240,24 +200,18 @@ void main() {
         createdAt: DateTime.utc(2026, 8, 22),
       );
 
-      final options = circleOptionsForWaypoint(waypoint, 'u1');
+      final options = circleOptionsForWaypoint(waypoint);
 
       expect(options.circleColor, '#123456');
     });
   });
 
   testWidgets('opening the map loads the locally-stored icon assignments', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final iconStore = FakeWaypointIconStore()..icons.addAll({'w1': 'camp.png'});
     final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: authRepo, storage: storage, iconStore: iconStore),
+      overrides: _baseOverrides(iconStore: iconStore),
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -287,16 +241,10 @@ void main() {
   });
 
   testWidgets('record toggle icon switches between start and stop', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: authRepo, storage: storage),
+      overrides: _baseOverrides(),
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -311,16 +259,10 @@ void main() {
   });
 
   testWidgets('layers button opens a sheet with a tracks-visibility switch, off by default', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: authRepo, storage: storage),
+      overrides: _baseOverrides(),
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -338,11 +280,6 @@ void main() {
   });
 
   testWidgets('turning on the tracks-visibility switch loads tracks', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final tracksRepo = FakeTracksRepository(
       initial: [
         Track(
@@ -356,10 +293,9 @@ void main() {
       ],
     );
     final container = ProviderContainer(
-      overrides: _baseOverrides(authRepo: authRepo, storage: storage, tracksRepo: tracksRepo),
+      overrides: _baseOverrides(tracksRepo: tracksRepo),
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -383,20 +319,14 @@ void main() {
   });
 
   testWidgets('stopping a too-short recording shows a message and does not open the save form', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final locationSource = FakeLocationSource();
     final container = ProviderContainer(
       overrides: [
-        ..._baseOverrides(authRepo: authRepo, storage: storage),
+        ..._baseOverrides(),
         locationSourceProvider.overrideWithValue(locationSource),
       ],
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -423,21 +353,15 @@ void main() {
   });
 
   testWidgets('a TrackException on save shows a SnackBar with the error message', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final locationSource = FakeLocationSource();
     final tracksRepo = FakeTracksRepository()..createResult = const TrackException('Could not create track');
     final container = ProviderContainer(
       overrides: [
-        ..._baseOverrides(authRepo: authRepo, storage: storage, tracksRepo: tracksRepo),
+        ..._baseOverrides(tracksRepo: tracksRepo),
         locationSourceProvider.overrideWithValue(locationSource),
       ],
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -469,20 +393,14 @@ void main() {
   });
 
   testWidgets('builds without throwing when the location source has no position available', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     final locationSource = FakeLocationSource(permissionGranted: false);
     final container = ProviderContainer(
       overrides: [
-        ..._baseOverrides(authRepo: authRepo, storage: storage),
+        ..._baseOverrides(),
         locationSourceProvider.overrideWithValue(locationSource),
       ],
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -496,11 +414,6 @@ void main() {
   });
 
   testWidgets('builds without throwing when the location source resolves a position', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
-    final authRepo = FakeAuthRepository(
-      meResult: const AuthUser(id: 'u1', email: 'a@b.test', role: 'owner', orgId: 'o1'),
-    );
     // MapLibreMap has no real platform view under flutter test, so
     // onMapCreated/onStyleLoadedCallback never fire and the camera-centering
     // / "my location" circle code path (which requires a live controller)
@@ -511,12 +424,11 @@ void main() {
     final locationSource = FakeLocationSource(currentPosition: const TrackPoint(lat: 45.9, lng: 7.6));
     final container = ProviderContainer(
       overrides: [
-        ..._baseOverrides(authRepo: authRepo, storage: storage),
+        ..._baseOverrides(),
         locationSourceProvider.overrideWithValue(locationSource),
       ],
     );
     addTearDown(container.dispose);
-    await container.read(authControllerProvider.notifier).bootstrap();
 
     await tester.pumpWidget(
       UncontrolledProviderScope(

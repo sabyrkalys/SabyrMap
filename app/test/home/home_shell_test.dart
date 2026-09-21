@@ -11,19 +11,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../auth/fakes.dart';
 import '../compass/fakes.dart';
 import '../tracks/fakes.dart';
 import '../waypoints/fakes.dart';
 
 void main() {
   Future<void> pumpShell(WidgetTester tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
           waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
           tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
           compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),

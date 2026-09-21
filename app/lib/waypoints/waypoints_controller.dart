@@ -1,9 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../auth/auth_controller.dart' show apiClientProvider, tokenStorageProvider;
-import '../auth/token_storage.dart';
-
-export '../auth/auth_controller.dart' show tokenStorageProvider;
+import '../api/api_client_provider.dart';
 import 'waypoint_models.dart';
 import 'waypoints_repository.dart';
 
@@ -18,13 +15,10 @@ class WaypointsController extends Notifier<List<Waypoint>> {
   List<Waypoint> build() => const [];
 
   WaypointsRepository get _repository => ref.read(waypointsRepositoryProvider);
-  TokenStorage get _storage => ref.read(tokenStorageProvider);
 
   Future<void> loadWaypoints() async {
-    final token = await _storage.read();
-    if (token == null) return;
     try {
-      state = await _repository.list(token);
+      state = await _repository.list();
     } on WaypointException {
       // Initial-load failures aren't surfaced in this slice; the map just
       // stays at whatever it already had (empty, on first load) until the
@@ -33,7 +27,6 @@ class WaypointsController extends Notifier<List<Waypoint>> {
   }
 
   Future<Waypoint> createWaypoint({
-    required String ownerId,
     required String name,
     required String type,
     required String note,
@@ -41,16 +34,13 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required double lng,
     required String? color,
   }) async {
-    final token = await _storage.read();
-    if (token == null) {
-      throw const WaypointException('Не выполнен вход');
-    }
-
     final tempId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
+    // ownerId is unknown client-side (single implicit user); the server
+    // response replaces this optimistic entry.
     final optimistic = Waypoint(
       id: tempId,
       orgId: '',
-      ownerId: ownerId,
+      ownerId: '',
       name: name,
       type: type,
       note: note.isEmpty ? null : note,
@@ -63,7 +53,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     state = [...state, optimistic];
 
     try {
-      final created = await _repository.create(token, name: name, type: type, note: note, color: color, lat: lat, lng: lng);
+      final created = await _repository.create(name: name, type: type, note: note, color: color, lat: lat, lng: lng);
       state = [for (final w in state) if (w.id == tempId) created else w];
       return created;
     } on WaypointException {
@@ -79,9 +69,6 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required String note,
     required String? color,
   }) async {
-    final token = await _storage.read();
-    if (token == null) return;
-
     final index = state.indexWhere((w) => w.id == id);
     if (index == -1) return;
     final previous = state[index];
@@ -101,7 +88,7 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     state = [for (final w in state) if (w.id == id) optimistic else w];
 
     try {
-      final updated = await _repository.update(token, id, name: name, type: type, note: note, color: color);
+      final updated = await _repository.update(id, name: name, type: type, note: note, color: color);
       state = [for (final w in state) if (w.id == id) updated else w];
     } on WaypointException {
       state = [for (final w in state) if (w.id == id) previous else w];
@@ -110,16 +97,13 @@ class WaypointsController extends Notifier<List<Waypoint>> {
   }
 
   Future<void> deleteWaypoint(String id) async {
-    final token = await _storage.read();
-    if (token == null) return;
-
     final index = state.indexWhere((w) => w.id == id);
     if (index == -1) return;
     final previous = state[index];
     state = [for (final w in state) if (w.id != id) w];
 
     try {
-      await _repository.delete(token, id);
+      await _repository.delete(id);
     } on WaypointException {
       state = [...state, previous];
       rethrow;

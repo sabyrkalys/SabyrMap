@@ -1,10 +1,8 @@
-import 'package:app/auth/token_storage.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../auth/fakes.dart';
 import 'fakes.dart';
 
 Track _track({String id = 't1', String name = 'Morning walk'}) {
@@ -20,13 +18,10 @@ Track _track({String id = 't1', String name = 'Morning walk'}) {
 
 ProviderContainer _buildContainer({
   required FakeTracksRepository repo,
-  TokenStorage? storage,
 }) {
-  final tokenStorage = storage ?? (FakeTokenStorage()..write('tok-1'));
   return ProviderContainer(
     overrides: [
       tracksRepositoryProvider.overrideWithValue(repo),
-      tokenStorageProvider.overrideWithValue(tokenStorage),
     ],
   );
 }
@@ -48,16 +43,6 @@ void main() {
       await container.read(tracksControllerProvider.notifier).loadTracks();
 
       expect(container.read(tracksControllerProvider), hasLength(1));
-    });
-
-    test('leaves state empty when no token is stored', () async {
-      final storage = FakeTokenStorage();
-      final container = _buildContainer(repo: FakeTracksRepository(initial: [_track()]), storage: storage);
-      addTearDown(container.dispose);
-
-      await container.read(tracksControllerProvider.notifier).loadTracks();
-
-      expect(container.read(tracksControllerProvider), isEmpty);
     });
   });
 

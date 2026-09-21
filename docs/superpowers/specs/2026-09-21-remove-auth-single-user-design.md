@@ -44,6 +44,11 @@ request as one fixed user.
   `apiClientProvider` moves to a non-auth location.
 - `SettingsScreen`: remove the logout tile; leave an empty screen with the existing
   app bar title.
+- Own-vs-shared waypoint styling on the map (`currentUserId` in `map_screen.dart`) is
+  removed: with a single user every waypoint is "own", so `circleOptionsForWaypoint`
+  takes only the waypoint and always uses the thin white stroke. The optimistic
+  waypoint created by `createWaypoint` gets an empty `ownerId`; the server response
+  replaces it.
 - Tests: delete login/register/token-storage/auth-controller tests; update the rest
   (`app_test`, `home_shell_test`, repository/controller tests) for the removed token.
 

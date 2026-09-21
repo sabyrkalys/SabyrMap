@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../auth/fakes.dart';
 import '../icons/fakes.dart';
 import 'fakes.dart';
 
@@ -32,13 +31,10 @@ void main() {
     final dir = fs.directory('/base')..createSync(recursive: true);
     dir.childFile('camp.png').createSync();
     final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
     final repo = FakeWaypointsRepository()..updateResult = _waypoint();
     final iconStore = FakeWaypointIconStore();
     final container = ProviderContainer(
       overrides: [
-        tokenStorageProvider.overrideWithValue(storage),
         waypointsRepositoryProvider.overrideWithValue(repo),
         waypointIconStoreProvider.overrideWithValue(iconStore),
       ],
@@ -80,8 +76,6 @@ void main() {
     final dir = fs.directory('/base')..createSync(recursive: true);
     dir.childFile('camp.png').createSync();
     final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
     final updated = Waypoint(
       id: 'w1',
       orgId: 'o1',
@@ -98,7 +92,6 @@ void main() {
     final iconStore = FakeWaypointIconStore()..setIconError = Exception('local storage boom');
     final container = ProviderContainer(
       overrides: [
-        tokenStorageProvider.overrideWithValue(storage),
         waypointsRepositoryProvider.overrideWithValue(repo),
         waypointIconStoreProvider.overrideWithValue(iconStore),
       ],
@@ -137,13 +130,10 @@ void main() {
   });
 
   testWidgets('deleteWaypoint: a setIcon failure does not propagate and does not undo the server delete', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
     final repo = FakeWaypointsRepository(initial: [_waypoint()]);
     final iconStore = FakeWaypointIconStore()..setIconError = Exception('local storage boom');
     final container = ProviderContainer(
       overrides: [
-        tokenStorageProvider.overrideWithValue(storage),
         waypointsRepositoryProvider.overrideWithValue(repo),
         waypointIconStoreProvider.overrideWithValue(iconStore),
       ],

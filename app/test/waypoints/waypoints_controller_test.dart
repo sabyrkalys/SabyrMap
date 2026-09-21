@@ -1,10 +1,8 @@
-import 'package:app/auth/token_storage.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../auth/fakes.dart';
 import 'fakes.dart';
 
 Waypoint _waypoint({
@@ -31,13 +29,10 @@ Waypoint _waypoint({
 
 ProviderContainer _buildContainer({
   required FakeWaypointsRepository repo,
-  TokenStorage? storage,
 }) {
-  final tokenStorage = storage ?? (FakeTokenStorage()..write('tok-1'));
   return ProviderContainer(
     overrides: [
       waypointsRepositoryProvider.overrideWithValue(repo),
-      tokenStorageProvider.overrideWithValue(tokenStorage),
     ],
   );
 }
@@ -60,16 +55,6 @@ void main() {
 
       expect(container.read(waypointsControllerProvider), hasLength(1));
     });
-
-    test('leaves state empty when no token is stored', () async {
-      final storage = FakeTokenStorage();
-      final container = _buildContainer(repo: FakeWaypointsRepository(initial: [_waypoint()]), storage: storage);
-      addTearDown(container.dispose);
-
-      await container.read(waypointsControllerProvider.notifier).loadWaypoints();
-
-      expect(container.read(waypointsControllerProvider), isEmpty);
-    });
   });
 
   group('createWaypoint', () {
@@ -79,7 +64,6 @@ void main() {
       addTearDown(container.dispose);
 
       await container.read(waypointsControllerProvider.notifier).createWaypoint(
-            ownerId: 'u1',
             name: 'Test',
             type: 'generic',
             note: '',
@@ -100,7 +84,6 @@ void main() {
       addTearDown(container.dispose);
 
       await container.read(waypointsControllerProvider.notifier).createWaypoint(
-            ownerId: 'u1',
             name: 'Test',
             type: 'generic',
             note: '',
@@ -119,7 +102,6 @@ void main() {
       addTearDown(container.dispose);
 
       final result = await container.read(waypointsControllerProvider.notifier).createWaypoint(
-            ownerId: 'u1',
             name: 'Test',
             type: 'generic',
             note: '',
@@ -138,7 +120,6 @@ void main() {
 
       await expectLater(
         container.read(waypointsControllerProvider.notifier).createWaypoint(
-              ownerId: 'u1',
               name: 'Test',
               type: 'generic',
               note: '',

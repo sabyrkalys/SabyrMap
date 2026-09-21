@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../auth/fakes.dart';
 import 'fakes.dart';
 
 Waypoint _waypoint({required String id, required String name}) => Waypoint(
@@ -25,12 +24,9 @@ Waypoint _waypoint({required String id, required String name}) => Waypoint(
 
 void main() {
   testWidgets('shows an empty message when there are no waypoints', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
           waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
         ],
         child: const MaterialApp(home: WaypointsListScreen()),
@@ -42,8 +38,6 @@ void main() {
   });
 
   testWidgets('lists waypoints with name and type label', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
     final repo = FakeWaypointsRepository(
       initial: [_waypoint(id: 'w1', name: 'Родник')],
     );
@@ -51,7 +45,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
           waypointsRepositoryProvider.overrideWithValue(repo),
         ],
         child: const MaterialApp(home: WaypointsListScreen()),
@@ -64,12 +57,9 @@ void main() {
   });
 
   testWidgets('AppBar action opens the icon files screen', (tester) async {
-    final storage = FakeTokenStorage();
-    await storage.write('tok-1');
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          tokenStorageProvider.overrideWithValue(storage),
           waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
         ],
         child: const MaterialApp(home: WaypointsListScreen()),

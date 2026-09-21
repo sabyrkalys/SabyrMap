@@ -39,7 +39,7 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      final waypoints = await repo.list('tok-1');
+      final waypoints = await repo.list();
 
       expect(waypoints, hasLength(1));
       expect(waypoints.first.id, 'w1');
@@ -52,7 +52,7 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      await expectLater(repo.list('tok-1'), throwsA(isA<WaypointException>()));
+      await expectLater(repo.list(), throwsA(isA<WaypointException>()));
     });
   });
 
@@ -70,7 +70,6 @@ void main() {
       final repo = HttpWaypointsRepository(client);
 
       final waypoint = await repo.create(
-        'tok-1',
         name: 'Trailhead',
         type: 'generic',
         note: '',
@@ -103,7 +102,7 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      await repo.create('tok-1', name: 'Trailhead', type: 'generic', note: '', color: null, lat: 45.9, lng: 7.6);
+      await repo.create(name: 'Trailhead', type: 'generic', note: '', color: null, lat: 45.9, lng: 7.6);
 
       expect(capturedBody!['color'], isNull);
       expect(capturedBody!.containsKey('color'), isTrue);
@@ -121,7 +120,6 @@ void main() {
       final repo = HttpWaypointsRepository(client);
 
       await repo.create(
-        'tok-1',
         name: 'Trailhead',
         type: 'generic',
         note: '',
@@ -141,7 +139,7 @@ void main() {
       final repo = HttpWaypointsRepository(client);
 
       await expectLater(
-        repo.create('tok-1', name: '', type: 'generic', note: '', color: null, lat: 0, lng: 0),
+        repo.create(name: '', type: 'generic', note: '', color: null, lat: 0, lng: 0),
         throwsA(isA<WaypointException>()),
       );
     });
@@ -159,7 +157,7 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      await repo.update('tok-1', 'w1', name: 'New name', type: 'danger', note: 'Careful', color: '#00FF00');
+      await repo.update('w1', name: 'New name', type: 'danger', note: 'Careful', color: '#00FF00');
 
       expect(capturedBody!['color'], '#00FF00');
     });
@@ -177,7 +175,7 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      final waypoint = await repo.update('tok-1', 'w1', name: 'New name', type: 'danger', note: 'Careful', color: null);
+      final waypoint = await repo.update('w1', name: 'New name', type: 'danger', note: 'Careful', color: null);
 
       expect(waypoint.id, 'w1');
       expect(capturedBody, {'name': 'New name', 'type': 'danger', 'note': 'Careful', 'color': null});
@@ -191,7 +189,7 @@ void main() {
       final repo = HttpWaypointsRepository(client);
 
       await expectLater(
-        repo.update('tok-1', 'w1', name: 'x', type: 'generic', note: '', color: null),
+        repo.update('w1', name: 'x', type: 'generic', note: '', color: null),
         throwsA(isA<WaypointException>()),
       );
     });
@@ -209,7 +207,7 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      await repo.delete('tok-1', 'w1');
+      await repo.delete('w1');
     });
 
     test('throws WaypointException on non-204', () async {
@@ -219,7 +217,7 @@ void main() {
       );
       final repo = HttpWaypointsRepository(client);
 
-      await expectLater(repo.delete('tok-1', 'w1'), throwsA(isA<WaypointException>()));
+      await expectLater(repo.delete('w1'), throwsA(isA<WaypointException>()));
     });
   });
 }
