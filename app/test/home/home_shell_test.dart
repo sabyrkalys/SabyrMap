@@ -2,6 +2,7 @@ import 'package:app/compass/compass_screen.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
+import 'package:app/positioning/positioning_screen.dart';
 import 'package:app/settings/settings_screen.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
@@ -39,29 +40,39 @@ void main() {
   testWidgets('starts on the map tab and switches tabs via the bottom nav', (tester) async {
     await pumpShell(tester);
 
-    // All four destinations exist in one IndexedStack, so widget presence
+    // All five destinations exist in one IndexedStack, so widget presence
     // alone doesn't prove which tab is active -- assert on the nav bar's
     // selected index instead.
-    expect(selectedIndex(tester), 0);
-
-    await tester.tap(find.byKey(const Key('nav_waypoints')));
-    await tester.pump();
     expect(selectedIndex(tester), 1);
-
-    await tester.tap(find.byKey(const Key('nav_compass')));
-    await tester.pump();
-    expect(selectedIndex(tester), 2);
+    expect(find.byType(MapScreen), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('nav_settings')));
     await tester.pump();
+    expect(selectedIndex(tester), 0);
+    expect(find.byType(SettingsScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav_waypoints')));
+    await tester.pump();
+    expect(selectedIndex(tester), 2);
+    expect(find.byType(WaypointsListScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav_positioning')));
+    await tester.pump();
     expect(selectedIndex(tester), 3);
+    expect(find.byType(PositioningScreen), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav_compass')));
+    await tester.pump();
+    expect(selectedIndex(tester), 4);
+    expect(find.byType(CompassScreen), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('nav_map')));
     await tester.pump();
-    expect(selectedIndex(tester), 0);
+    expect(selectedIndex(tester), 1);
+    expect(find.byType(MapScreen), findsOneWidget);
   });
 
-  testWidgets('all four destination screens are built (kept alive offstage by IndexedStack)', (tester) async {
+  testWidgets('all five destination screens are built (kept alive offstage by IndexedStack)', (tester) async {
     await pumpShell(tester);
 
     // IndexedStack keeps every tab's widget tree built (that's how tab
@@ -70,6 +81,7 @@ void main() {
     // elements -- needs skipOffstage: false here.
     expect(find.byType(MapScreen, skipOffstage: false), findsOneWidget);
     expect(find.byType(WaypointsListScreen, skipOffstage: false), findsOneWidget);
+    expect(find.byType(PositioningScreen, skipOffstage: false), findsOneWidget);
     expect(find.byType(CompassScreen, skipOffstage: false), findsOneWidget);
     expect(find.byType(SettingsScreen, skipOffstage: false), findsOneWidget);
   });
