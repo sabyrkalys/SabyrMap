@@ -1,4 +1,6 @@
 import 'package:app/mediafile/mediafile_folder_screen.dart';
+import 'package:app/tracks/track_models.dart';
+import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:app/waypoints/waypoints_list_screen.dart';
@@ -6,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../tracks/fakes.dart';
 import 'fakes.dart';
 
 Waypoint _waypoint({required String id, required String name}) => Waypoint(
@@ -78,5 +81,66 @@ void main() {
     await tester.pump();
 
     expect(find.byType(MediaFileFolderScreen), findsOneWidget);
+  });
+
+  testWidgets('layers button opens a sheet with a tracks-visibility switch, off by default', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
+          tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
+        ],
+        child: const MaterialApp(home: WaypointsListScreen()),
+      ),
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('layers_button')));
+    await tester.pumpAndSettle();
+
+    final switchWidget = tester.widget<Switch>(find.byKey(const Key('tracks_visibility_switch')));
+    expect(switchWidget.value, isFalse);
+  });
+
+  testWidgets('turning on the tracks-visibility switch loads tracks', (tester) async {
+    final tracksRepo = FakeTracksRepository(
+      initial: [
+        Track(
+          id: 't1',
+          orgId: 'o1',
+          ownerId: 'u1',
+          name: 'Old track',
+          points: const [TrackPoint(lat: 1.0, lng: 2.0), TrackPoint(lat: 1.1, lng: 2.1)],
+          createdAt: DateTime.utc(2026, 8, 20),
+        ),
+      ],
+    );
+    final container = ProviderContainer(
+      overrides: [
+        waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
+        tracksRepositoryProvider.overrideWithValue(tracksRepo),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: WaypointsListScreen()),
+      ),
+    );
+    await tester.pump();
+    expect(container.read(tracksControllerProvider), isEmpty);
+
+    await tester.tap(find.byKey(const Key('layers_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tracks_visibility_switch')));
+    await tester.pumpAndSettle();
+
+    // loadTracks() actually ran and populated state from the (seeded, not
+    // empty) fake repository -- this is a meaningful assertion, unlike
+    // relying on the fake repo staying empty.
+    expect(container.read(tracksControllerProvider), hasLength(1));
+    expect(container.read(tracksControllerProvider).single.name, 'Old track');
   });
 }

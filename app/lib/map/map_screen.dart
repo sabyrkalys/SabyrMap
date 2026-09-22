@@ -8,10 +8,9 @@ import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
 import 'geo_utils.dart';
 import '../tracks/track_models.dart';
-import '../tracks/track_name_form_sheet.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
-import '../tracks/tracks_list_screen.dart';
+import '../tracks/tracks_visibility_controller.dart';
 import '../waypoints/waypoint_actions.dart';
 import '../waypoints/waypoint_form_sheet.dart';
 import '../waypoints/waypoint_models.dart';
@@ -102,15 +101,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // (not on every drag frame, to avoid rebuilding the HUD on each pixel of
   // a pan gesture).
   LatLng? _crosshairPosition;
-
-  bool _tracksVisible = false;
-  // Tracks whether loadTracks() has run this session. Using this instead of
-  // `tracksControllerProvider`'s emptiness avoids skipping the initial load
-  // after the user has recorded-and-saved a track (which appends directly
-  // into that state via TracksController.saveTrack, making it non-empty
-  // even though the server's other previously-saved tracks were never
-  // fetched).
-  bool _tracksLoaded = false;
 
   // Serializes _syncCircles/_syncLines runs together: at most one combined
   // sync runs at a time, and any state change that arrives while a run is
@@ -442,7 +432,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return stale;
     });
 
-    final tracks = _tracksVisible ? ref.read(tracksControllerProvider) : const <Track>[];
+    final tracksVisible = ref.read(tracksVisibilityControllerProvider);
+    final tracks = tracksVisible ? ref.read(tracksControllerProvider) : const <Track>[];
     final currentIds = tracks.map((t) => t.id).toSet();
     for (final id in _linesByTrackId.keys.toList()) {
       if (id == _recordingLineKey) continue;
@@ -594,78 +585,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     showWaypointDetails(context, ref, waypoints[index]);
   }
 
-  String _defaultTrackName() {
-    final now = DateTime.now();
-    String two(int n) => n.toString().padLeft(2, '0');
-    return 'Трек ${two(now.day)}.${two(now.month)}.${now.year} ${two(now.hour)}:${two(now.minute)}';
-  }
-
-  Future<void> _onRecordToggle(TrackRecordingState recordingState) async {
-    if (recordingState is TrackRecordingActive) {
-      final stopResult = ref.read(trackRecordingControllerProvider.notifier).stop();
-      if (stopResult == null || stopResult.points.length < 2) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Трек слишком короткий, чтобы сохранить')),
-          );
-        }
-        return;
-      }
-      final result = await showTrackNameFormSheet(context, initialName: _defaultTrackName());
-      if (result == null || !mounted) return;
-      try {
-        await ref.read(tracksControllerProvider.notifier).saveTrack(
-              name: result.name,
-              points: stopResult.points,
-              startedAt: stopResult.startedAt,
-              finishedAt: stopResult.finishedAt,
-            );
-      } on TrackException catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } else {
-      await ref.read(trackRecordingControllerProvider.notifier).start();
-      final newState = ref.read(trackRecordingControllerProvider);
-      if (newState is TrackRecordingIdle && newState.errorMessage != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(newState.errorMessage!)));
-      }
-    }
-  }
-
-  Future<void> _onTracksVisibilityChanged(bool visible) async {
-    setState(() => _tracksVisible = visible);
-    if (visible && !_tracksLoaded) {
-      await ref.read(tracksControllerProvider.notifier).loadTracks();
-      _tracksLoaded = true;
-    }
-    _requestSync();
-  }
-
-  void _onLayersButtonPressed() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (sheetContext, setSheetState) => Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Показывать треки'),
-              Switch(
-                key: const Key('tracks_visibility_switch'),
-                value: _tracksVisible,
-                onChanged: (value) {
-                  setSheetState(() {});
-                  _onTracksVisibilityChanged(value);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     ref.listen<List<Waypoint>>(waypointsControllerProvider, (previous, next) {
@@ -683,32 +602,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.listen<Map<String, String>>(waypointIconAssignmentsControllerProvider, (previous, next) {
       _requestSync();
     });
-
-    final recordingState = ref.watch(trackRecordingControllerProvider);
+    // The visibility toggle lives on the Метки tab now; a change there
+    // still has to reach this screen's own sync loop.
+    ref.listen<bool>(tracksVisibilityControllerProvider, (previous, next) {
+      _requestSync();
+    });
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Карта'),
-        actions: [
-          IconButton(
-            key: const Key('track_record_toggle'),
-            icon: Icon(recordingState is TrackRecordingActive ? Icons.stop_circle : Icons.fiber_manual_record),
-            onPressed: () => _onRecordToggle(recordingState),
-          ),
-          IconButton(
-            key: const Key('layers_button'),
-            icon: const AppIcon(AppIcons.layers),
-            onPressed: _onLayersButtonPressed,
-          ),
-          IconButton(
-            key: const Key('tracks_list_button'),
-            icon: const AppIcon(AppIcons.list),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const TracksListScreen()),
-            ),
-          ),
-        ],
-      ),
       body: Stack(
         children: [
           MapLibreMap(
@@ -720,7 +620,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onCameraIdle: _onCameraIdle,
           ),
           if (_crosshairPosition != null)
-            Positioned(top: 12, left: 12, child: _CoordinateHud(target: _crosshairPosition!, myLocation: _myLocation)),
+            Positioned(
+              top: 0,
+              left: 12,
+              right: 12,
+              // No AppBar above the map anymore, so the HUD sits directly
+              // under the status bar/notch -- SafeArea keeps it clear of
+              // those system icons instead of overlapping them.
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: _CoordinateHud(target: _crosshairPosition!, myLocation: _myLocation),
+                  ),
+                ),
+              ),
+            ),
           IgnorePointer(
             child: Center(
               child: Container(
