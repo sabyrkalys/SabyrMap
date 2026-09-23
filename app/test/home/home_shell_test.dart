@@ -9,6 +9,7 @@ import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:app/waypoints/waypoints_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../compass/fakes.dart';
@@ -30,8 +31,21 @@ void main() {
     await tester.pump();
   }
 
-  int selectedIndex(WidgetTester tester) =>
-      tester.widget<NavigationBar>(find.byType(NavigationBar)).selectedIndex;
+  const navKeys = ['nav_settings', 'nav_map', 'nav_waypoints', 'nav_positioning', 'nav_compass'];
+
+  // Index of the destination currently showing the selection indicator.
+  int selectedIndex(WidgetTester tester) {
+    final selected = [
+      for (var i = 0; i < navKeys.length; i++)
+        if (find
+            .descendant(of: find.byKey(Key(navKeys[i])), matching: find.byKey(const Key('nav_indicator')))
+            .evaluate()
+            .isNotEmpty)
+          i,
+    ];
+    expect(selected, hasLength(1));
+    return selected.single;
+  }
 
   testWidgets('starts on the map tab and switches tabs via the bottom nav', (tester) async {
     await pumpShell(tester);
@@ -80,5 +94,26 @@ void main() {
     expect(find.byType(PositioningScreen, skipOffstage: false), findsOneWidget);
     expect(find.byType(CompassScreen, skipOffstage: false), findsOneWidget);
     expect(find.byType(SettingsScreen, skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('bottom nav is 60 dp tall with 40 dp icons left-aligned at a 10 dp gap', (tester) async {
+    await pumpShell(tester);
+
+    final bar = find.byKey(const Key('bottom_nav'));
+    expect(tester.getSize(bar).height, 60);
+    final barLeft = tester.getTopLeft(bar).dx;
+
+    for (var i = 0; i < navKeys.length; i++) {
+      final icon = find.descendant(of: find.byKey(Key(navKeys[i])), matching: find.byType(SvgPicture));
+      expect(tester.getSize(icon), const Size(40, 40));
+      expect(tester.getTopLeft(icon).dx - barLeft, 10 + i * 50.0);
+      expect(tester.getCenter(icon).dy, tester.getCenter(bar).dy);
+    }
+  });
+
+  testWidgets('selection indicator is 48 dp square', (tester) async {
+    await pumpShell(tester);
+
+    expect(tester.getSize(find.byKey(const Key('nav_indicator'))), const Size(48, 48));
   });
 }

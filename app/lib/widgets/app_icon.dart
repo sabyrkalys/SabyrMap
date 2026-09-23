@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 /// Renders one of the bundled [AppIcons] SVGs, tinted with the ambient
-/// [IconTheme] so it follows light/dark theme and NavigationBar selection state.
+/// [IconTheme] so it follows light/dark theme, unless [color] is given.
 class AppIcon extends StatelessWidget {
   const AppIcon(this.asset, {super.key, this.size, this.color});
 
