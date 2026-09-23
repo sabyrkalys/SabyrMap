@@ -96,19 +96,27 @@ void main() {
     expect(find.byType(SettingsScreen, skipOffstage: false), findsOneWidget);
   });
 
-  testWidgets('bottom nav is 60 dp tall with 40 dp icons left-aligned at a 10 dp gap', (tester) async {
+  testWidgets('bottom nav is a 250x60 panel 5 dp from the left edge, icons 40 dp at a 10 dp gap', (tester) async {
     await pumpShell(tester);
 
     final bar = find.byKey(const Key('bottom_nav'));
-    expect(tester.getSize(bar).height, 60);
-    final barLeft = tester.getTopLeft(bar).dx;
+    expect(tester.getSize(bar), const Size(250, 60));
+    expect(tester.getTopLeft(bar).dx, 5);
 
     for (var i = 0; i < navKeys.length; i++) {
       final icon = find.descendant(of: find.byKey(Key(navKeys[i])), matching: find.byType(SvgPicture));
       expect(tester.getSize(icon), const Size(40, 40));
-      expect(tester.getTopLeft(icon).dx - barLeft, 10 + i * 50.0);
+      expect(tester.getTopLeft(icon).dx, 10 + i * 50.0);
       expect(tester.getCenter(icon).dy, tester.getCenter(bar).dy);
     }
+  });
+
+  testWidgets('bottom nav background is half transparent and the body extends under it', (tester) async {
+    await pumpShell(tester);
+
+    final decoration = tester.widget<Container>(find.byKey(const Key('bottom_nav'))).decoration! as BoxDecoration;
+    expect(decoration.color!.a, closeTo(0.5, 0.01));
+    expect(tester.widget<Scaffold>(find.byType(Scaffold).first).extendBody, isTrue);
   });
 
   testWidgets('selection indicator is 48 dp square', (tester) async {

@@ -43,6 +43,9 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // The nav panel is half transparent and doesn't span the full width,
+      // so the tab content (the map) must continue underneath it.
+      extendBody: true,
       body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: _BottomNav(
         destinations: _destinations,
@@ -61,10 +64,10 @@ class _NavDestination {
   final String label;
 }
 
-/// Compact bottom nav: 60 dp tall, 40 dp icons packed against the left edge
-/// with a 10 dp gap (and 10 dp from the screen edge). Material's
-/// [NavigationBar] always spreads destinations across the full width, hence
-/// the custom widget.
+/// Compact bottom nav: a half-transparent 60 dp panel sitting 5 dp from the
+/// left screen edge, sized to its 40 dp icons (10 dp gap between them and
+/// 5 dp to the panel edge). Material's [NavigationBar] always spreads
+/// destinations across the full width, hence the custom widget.
 class _BottomNav extends StatelessWidget {
   const _BottomNav({required this.destinations, required this.selectedIndex, required this.onSelected});
 
@@ -72,9 +75,11 @@ class _BottomNav extends StatelessWidget {
   static const double _iconSize = 40;
   static const double _gap = 10;
   static const double _indicatorSize = 48;
+  static const double _screenMargin = 5;
+  static const double _backgroundOpacity = 0.5;
 
   /// Each item is icon + gap wide, so half a gap sits on either side of the
-  /// icon; the outer half-gap padding makes the edge margin a full gap.
+  /// icon (5 dp to the panel edge for the outer ones).
   static const double _itemWidth = _iconSize + _gap;
 
   final List<_NavDestination> destinations;
@@ -84,20 +89,29 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Material(
-      color: colorScheme.surfaceContainer,
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          key: const Key('bottom_nav'),
-          height: _height,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: _gap / 2),
-            child: Row(
-              children: [
-                for (var i = 0; i < destinations.length; i++)
-                  _buildItem(destinations[i], selected: i == selectedIndex, onTap: () => onSelected(i), colorScheme: colorScheme),
-              ],
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.only(left: _screenMargin),
+        child: Align(
+          alignment: Alignment.bottomLeft,
+          heightFactor: 1,
+          child: Container(
+            key: const Key('bottom_nav'),
+            height: _height,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainer.withValues(alpha: _backgroundOpacity),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Material(
+              type: MaterialType.transparency,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < destinations.length; i++)
+                    _buildItem(destinations[i], selected: i == selectedIndex, onTap: () => onSelected(i), colorScheme: colorScheme),
+                ],
+              ),
             ),
           ),
         ),
