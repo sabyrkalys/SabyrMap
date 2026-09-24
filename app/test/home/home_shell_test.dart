@@ -95,17 +95,24 @@ void main() {
     expect(find.byType(CompassScreen, skipOffstage: false), findsOneWidget);
   });
 
-  testWidgets('settings opens as a panel over the map, above the nav', (tester) async {
+  testWidgets('settings opens as a panel over the map, its arrow pointing at the settings icon', (tester) async {
     await pumpShell(tester);
     await tester.tap(find.byKey(const Key('nav_settings')));
     await tester.pump();
 
     expect(find.byType(MapScreen), findsOneWidget);
-    final panel = find.byKey(const Key('settings_panel'));
+    final card = find.byKey(const Key('settings_panel_card'));
     final bar = find.byKey(const Key('bottom_nav'));
-    expect(tester.getBottomLeft(panel).dy, tester.getTopLeft(bar).dy - 5);
-    expect(tester.getTopLeft(panel).dx, 5);
-    expect(tester.getTopRight(panel).dx, tester.view.physicalSize.width / tester.view.devicePixelRatio - 5);
+    final barTop = tester.getTopLeft(bar).dy;
+    expect(tester.getBottomLeft(card).dy, barTop - 8);
+    expect(tester.getTopLeft(card).dx, 5);
+    expect(tester.getTopRight(card).dx, tester.view.physicalSize.width / tester.view.devicePixelRatio - 5);
+
+    final arrow = find.byKey(const Key('settings_panel_arrow'));
+    expect(tester.getSize(arrow), const Size(16, 8));
+    final settingsIcon = find.descendant(of: find.byKey(const Key('nav_settings')), matching: find.byType(SvgPicture));
+    expect(tester.getBottomLeft(arrow).dy, barTop);
+    expect(tester.getCenter(arrow).dx, tester.getCenter(settingsIcon).dx);
   });
 
   testWidgets('switching to another tab closes the settings panel', (tester) async {

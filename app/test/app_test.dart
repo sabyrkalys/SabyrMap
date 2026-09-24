@@ -48,4 +48,13 @@ void main() {
     );
     expect(regions.first.value.systemNavigationBarColor, Colors.transparent);
   });
+
+  testWidgets('stays in the light theme when the system theme is dark', (tester) async {
+    tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+    addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+    await pumpApp(tester);
+
+    final context = tester.element(find.byKey(const Key('nav_map')));
+    expect(Theme.of(context).brightness, Brightness.light);
+  });
 }

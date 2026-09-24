@@ -64,8 +64,12 @@ class _HomeShellState extends State<HomeShell> {
                   left: _settingsPanelMargin,
                   right: _settingsPanelMargin,
                   // With extendBody the bottom padding is the nav panel's height.
-                  bottom: MediaQuery.paddingOf(context).bottom + _settingsPanelMargin,
-                  child: const SettingsPanel(key: Key('settings_panel')),
+                  // The panel's arrow fills the gap down to the nav panel.
+                  bottom: MediaQuery.paddingOf(context).bottom,
+                  child: const SettingsPanel(
+                    key: Key('settings_panel'),
+                    arrowCenterX: _BottomNav.firstIconCenterX - _settingsPanelMargin,
+                  ),
                 ),
             ],
           ),
@@ -105,6 +109,9 @@ class _BottomNav extends StatelessWidget {
   /// Each item is icon + gap wide, so half a gap sits on either side of the
   /// icon (5 dp to the panel edge for the outer ones).
   static const double _itemWidth = _iconSize + _gap;
+
+  /// Horizontal center of the first (settings) icon, from the screen edge.
+  static const double firstIconCenterX = _screenMargin + _itemWidth / 2;
 
   final List<_NavDestination> destinations;
   final int selectedIndex;

@@ -21,7 +21,9 @@ class AlpineQuestApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      // Always light, independent of the Android system theme; the dark
+      // theme is kept for a future in-app night mode.
+      themeMode: ThemeMode.light,
       home: const HomeShell(),
     );
   }

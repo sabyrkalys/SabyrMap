@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const items = ['Скрыть кнопки меню', 'Блокировка экрана', 'Снимок экрана', 'Настройки'];
+  const mainItems = ['Скрыть кнопки меню', 'Блокировка экрана', 'Снимок экрана', 'Настройки'];
+  const optionItems = ['Координатная сетка СК-42 (Гаусса-Крюгера)', 'Ночной режим', 'Координаты центра экрана'];
 
   Future<void> pumpPanel(WidgetTester tester) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
-          body: Align(alignment: Alignment.bottomCenter, child: SettingsPanel()),
+          body: Align(alignment: Alignment.bottomCenter, child: SettingsPanel(arrowCenterX: 25)),
         ),
       ),
     );
@@ -21,42 +22,50 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('starts collapsed with only the options header', (tester) async {
+  double top(WidgetTester tester, String text) => tester.getTopLeft(find.text(text)).dy;
+
+  void expectInOrder(WidgetTester tester, List<String> texts) {
+    for (var i = 1; i < texts.length; i++) {
+      expect(top(tester, texts[i]), greaterThan(top(tester, texts[i - 1])), reason: texts[i]);
+    }
+  }
+
+  testWidgets('opens with the main items and the options header, options collapsed', (tester) async {
     await pumpPanel(tester);
 
-    expect(find.text('ОПЦИИ'), findsOneWidget);
-    for (final item in items) {
+    expectInOrder(tester, [...mainItems, 'ОПЦИИ']);
+    for (final item in optionItems) {
       expect(find.text(item), findsNothing);
     }
   });
 
-  testWidgets('tapping the header expands the four items above it, in order', (tester) async {
+  testWidgets('tapping the options header shows the option items below it', (tester) async {
     await pumpPanel(tester);
     await tapHeader(tester);
 
-    final tops = [for (final item in items) tester.getTopLeft(find.text(item)).dy];
-    for (var i = 1; i < tops.length; i++) {
-      expect(tops[i], greaterThan(tops[i - 1]));
-    }
-    expect(tester.getTopLeft(find.text('ОПЦИИ')).dy, greaterThan(tops.last));
+    expectInOrder(tester, [...mainItems, 'ОПЦИИ', ...optionItems]);
+    expect(find.byKey(const Key('settings_option_checkbox')), findsNWidgets(optionItems.length));
   });
 
-  testWidgets('tapping the header again collapses the panel', (tester) async {
+  testWidgets('tapping the options header again hides the option items only', (tester) async {
     await pumpPanel(tester);
     await tapHeader(tester);
     await tapHeader(tester);
 
-    for (final item in items) {
+    for (final item in optionItems) {
       expect(find.text(item), findsNothing);
     }
+    for (final item in mainItems) {
+      expect(find.text(item), findsOneWidget);
+    }
   });
 
-  testWidgets('items are placeholders shown in the disabled style', (tester) async {
+  testWidgets('all items are placeholders shown in the disabled style', (tester) async {
     await pumpPanel(tester);
     await tapHeader(tester);
 
     final context = tester.element(find.byType(SettingsPanel));
-    for (final item in items) {
+    for (final item in [...mainItems, ...optionItems]) {
       expect(tester.widget<Text>(find.text(item)).style, AppTextStyles.menuItemDisabled(context));
     }
   });
