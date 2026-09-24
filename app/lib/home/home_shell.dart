@@ -5,7 +5,7 @@ import '../app_icons.dart';
 import '../compass/compass_screen.dart';
 import '../map/map_screen.dart';
 import '../positioning/positioning_screen.dart';
-import '../settings/settings_screen.dart';
+import '../settings/settings_panel.dart';
 import '../system_ui.dart';
 import '../waypoints/waypoints_list_screen.dart';
 import '../widgets/app_icon.dart';
@@ -22,12 +22,16 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
+  static const _settingsIndex = 0;
   static const _mapIndex = 1;
+  static const double _settingsPanelMargin = 5;
 
   int _index = _mapIndex;
 
+  /// Tab content, indexed like [_destinations]. Settings has no screen of
+  /// its own: it shows the map with [SettingsPanel] floating over it.
   static const _screens = [
-    SettingsScreen(),
+    SizedBox.shrink(),
     MapScreen(),
     WaypointsListScreen(),
     PositioningScreen(),
@@ -50,7 +54,22 @@ class _HomeShellState extends State<HomeShell> {
         // The nav panel is half transparent and doesn't span the full width,
         // so the tab content (the map) must continue underneath it.
         extendBody: true,
-        body: IndexedStack(index: _index, children: _screens),
+        // Builder: the extendBody bottom padding only exists below the Scaffold.
+        body: Builder(
+          builder: (context) => Stack(
+            children: [
+              IndexedStack(index: _index == _settingsIndex ? _mapIndex : _index, children: _screens),
+              if (_index == _settingsIndex)
+                Positioned(
+                  left: _settingsPanelMargin,
+                  right: _settingsPanelMargin,
+                  // With extendBody the bottom padding is the nav panel's height.
+                  bottom: MediaQuery.paddingOf(context).bottom + _settingsPanelMargin,
+                  child: const SettingsPanel(key: Key('settings_panel')),
+                ),
+            ],
+          ),
+        ),
         bottomNavigationBar: _BottomNav(
           destinations: _destinations,
           selectedIndex: _index,

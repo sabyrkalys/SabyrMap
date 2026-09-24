@@ -3,7 +3,7 @@ import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/positioning/positioning_screen.dart';
-import 'package:app/settings/settings_screen.dart';
+import 'package:app/settings/settings_panel.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:app/waypoints/waypoints_list_screen.dart';
@@ -59,7 +59,7 @@ void main() {
     await tester.tap(find.byKey(const Key('nav_settings')));
     await tester.pump();
     expect(selectedIndex(tester), 0);
-    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(SettingsPanel), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('nav_waypoints')));
     await tester.pump();
@@ -82,7 +82,7 @@ void main() {
     expect(find.byType(MapScreen), findsOneWidget);
   });
 
-  testWidgets('all five destination screens are built (kept alive offstage by IndexedStack)', (tester) async {
+  testWidgets('all four tab screens are built (kept alive offstage by IndexedStack)', (tester) async {
     await pumpShell(tester);
 
     // IndexedStack keeps every tab's widget tree built (that's how tab
@@ -93,7 +93,30 @@ void main() {
     expect(find.byType(WaypointsListScreen, skipOffstage: false), findsOneWidget);
     expect(find.byType(PositioningScreen, skipOffstage: false), findsOneWidget);
     expect(find.byType(CompassScreen, skipOffstage: false), findsOneWidget);
-    expect(find.byType(SettingsScreen, skipOffstage: false), findsOneWidget);
+  });
+
+  testWidgets('settings opens as a panel over the map, above the nav', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const Key('nav_settings')));
+    await tester.pump();
+
+    expect(find.byType(MapScreen), findsOneWidget);
+    final panel = find.byKey(const Key('settings_panel'));
+    final bar = find.byKey(const Key('bottom_nav'));
+    expect(tester.getBottomLeft(panel).dy, tester.getTopLeft(bar).dy - 5);
+    expect(tester.getTopLeft(panel).dx, 5);
+    expect(tester.getTopRight(panel).dx, tester.view.physicalSize.width / tester.view.devicePixelRatio - 5);
+  });
+
+  testWidgets('switching to another tab closes the settings panel', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const Key('nav_settings')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('nav_waypoints')));
+    await tester.pump();
+
+    expect(find.byType(SettingsPanel), findsNothing);
+    expect(find.byType(SettingsPanel, skipOffstage: false), findsNothing);
   });
 
   testWidgets('bottom nav is a 250x60 panel 5 dp from the left edge, icons 40 dp at a 10 dp gap', (tester) async {
