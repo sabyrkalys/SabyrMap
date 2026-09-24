@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app_icons.dart';
 import '../compass/compass_screen.dart';
 import '../map/map_screen.dart';
 import '../positioning/positioning_screen.dart';
 import '../settings/settings_screen.dart';
+import '../system_ui.dart';
 import '../waypoints/waypoints_list_screen.dart';
 import '../widgets/app_icon.dart';
 
@@ -42,15 +44,18 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // The nav panel is half transparent and doesn't span the full width,
-      // so the tab content (the map) must continue underneath it.
-      extendBody: true,
-      body: IndexedStack(index: _index, children: _screens),
-      bottomNavigationBar: _BottomNav(
-        destinations: _destinations,
-        selectedIndex: _index,
-        onSelected: (index) => setState(() => _index = index),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: systemNavigationBarStyle(Theme.of(context).brightness),
+      child: Scaffold(
+        // The nav panel is half transparent and doesn't span the full width,
+        // so the tab content (the map) must continue underneath it.
+        extendBody: true,
+        body: IndexedStack(index: _index, children: _screens),
+        bottomNavigationBar: _BottomNav(
+          destinations: _destinations,
+          selectedIndex: _index,
+          onSelected: (index) => setState(() => _index = index),
+        ),
       ),
     );
   }
@@ -109,7 +114,12 @@ class _BottomNav extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   for (var i = 0; i < destinations.length; i++)
-                    _buildItem(destinations[i], selected: i == selectedIndex, onTap: () => onSelected(i), colorScheme: colorScheme),
+                    _buildItem(
+                      destinations[i],
+                      selected: i == selectedIndex,
+                      onTap: () => onSelected(i),
+                      colorScheme: colorScheme,
+                    ),
                 ],
               ),
             ),
