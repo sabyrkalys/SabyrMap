@@ -59,9 +59,11 @@ void main() {
   });
 
   test('formatDistance', () {
-    expect(formatDistance(0), '0 м');
-    expect(formatDistance(349.6), '350 м');
-    expect(formatDistance(999.4), '999 м');
+    expect(formatDistance(0), '0.0 м');
+    expect(formatDistance(349.6), '349.6 м');
+    expect(formatDistance(1.26), '1.3 м');
+    expect(formatDistance(999.4), '999.4 м');
+    expect(formatDistance(999.96), '1.0 км');
     expect(formatDistance(1000), '1.0 км');
     expect(formatDistance(1234), '1.2 км');
   });

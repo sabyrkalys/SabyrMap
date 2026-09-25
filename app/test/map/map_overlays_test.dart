@@ -40,7 +40,7 @@ void main() {
       ),
     );
 
-    final text = tester.widget<Text>(find.text('0 м'));
+    final text = tester.widget<Text>(find.text('0.0 м'));
     expect(text.style!.color, targetColor);
   });
 }

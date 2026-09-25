@@ -64,8 +64,8 @@ class CrosshairMenuOpen extends Notifier<bool> {
 
 final crosshairMenuOpenProvider = NotifierProvider<CrosshairMenuOpen, bool>(CrosshairMenuOpen.new);
 
-/// «350 м» under a kilometre, «1.2 км» from one kilometre up.
+/// «349.6 м» (to 0.1 m) under a kilometre, «1.2 км» from one kilometre up.
 String formatDistance(double meters) {
-  if (meters < 999.5) return '${meters.round()} м';
+  if (meters < 999.95) return '${meters.toStringAsFixed(1)} м';
   return '${(meters / 1000).toStringAsFixed(1)} км';
 }

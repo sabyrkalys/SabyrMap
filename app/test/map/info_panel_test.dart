@@ -49,7 +49,7 @@ void main() {
   testWidgets('line 2: scale and zoom follow «Масштаб карты», bar follows «Масштабная линейка»', (tester) async {
     await pump(tester);
     expect(find.byKey(const Key('info_scale_text')), findsOneWidget);
-    expect(find.text('6/20'), findsOneWidget);
+    expect(find.text('6/22'), findsOneWidget);
     expect(find.byKey(const Key('info_scale_bar')), findsOneWidget);
 
     await pump(tester, t: toggles({MenuToggle.mapsMapScale: false}));
@@ -76,7 +76,7 @@ void main() {
 
     await pump(tester, target: center);
     expect(find.byKey(const Key('info_line_target')), findsOneWidget);
-    expect(find.text('→ 0 м 0.0°'), findsOneWidget);
+    expect(find.text('→ 0,0 м 0.0°'), findsOneWidget);
 
     await pump(tester, target: center, t: toggles({MenuToggle.waypointsTargetStatus: false}));
     expect(find.byKey(const Key('info_line_target')), findsNothing);

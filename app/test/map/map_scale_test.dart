@@ -30,10 +30,10 @@ void main() {
   });
 
   test('zoomText rounds and never exceeds the max', () {
-    expect(zoomText(6.2), '6/20');
-    expect(zoomText(19.6), '20/20');
-    expect(zoomText(20.4), '20/20');
-    expect(zoomText(0), '0/20');
+    expect(zoomText(6.2), '6/22');
+    expect(zoomText(19.6), '20/22');
+    expect(zoomText(22.4), '22/22');
+    expect(zoomText(0), '0/22');
   });
 
   test('scaleBar picks 1/2/5 x 10^n within the width', () {
@@ -52,9 +52,15 @@ void main() {
 
   test('targetText', () {
     expect(targetText(232030, 348.63), '→ 232,03 км 348.6°');
-    expect(targetText(349.6, 12.04), '→ 350 м 12.0°');
-    expect(targetText(0, 0), '→ 0 м 0.0°');
+    expect(targetText(349.6, 12.04), '→ 349,6 м 12.0°');
+    expect(targetText(1.26, 90), '→ 1,3 м 90.0°');
+    expect(targetText(0, 0), '→ 0,0 м 0.0°');
     expect(targetText(1000, 359.96), '→ 1,00 км 360.0°');
+  });
+
+  test('at the max zoom the scale bar reaches 1 m, on the equator and at 48°', () {
+    expect(scaleBar(mapMaxZoom, 0).label, '1 м');
+    expect(scaleBar(mapMaxZoom, 48).label, '1 м');
   });
 }
 

@@ -205,7 +205,7 @@ void main() {
       ..pick(const LatLng(48, 37.8));
     await tester.pump();
     expect(find.byKey(const Key('target_distance_label')), findsOneWidget);
-    expect(find.text('0 м'), findsOneWidget);
+    expect(find.text('0.0 м'), findsOneWidget);
 
     container.read(menuTogglesProvider.notifier).set(MenuToggle.waypointsTargetStatus, false);
     await tester.pump();
@@ -298,10 +298,10 @@ void main() {
     expect(consumed, containsAll([AnnotationType.circle, AnnotationType.symbol]));
   });
 
-  testWidgets('the map is capped at zoom 20 and the old coordinate HUD is gone', (tester) async {
+  testWidgets('the map is capped at zoom 22 and the old coordinate HUD is gone', (tester) async {
     await pumpMap(tester);
     final map = tester.widget<MapLibreMap>(find.byType(MapLibreMap));
-    expect(map.minMaxZoomPreference.maxZoom, 20);
+    expect(map.minMaxZoomPreference.maxZoom, 22);
     expect(find.byKey(const Key('coordinate_hud')), findsNothing);
   });
 

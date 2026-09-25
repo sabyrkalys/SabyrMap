@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
-/// The map never zooms past this; also the denominator of «6/20».
-const double mapMaxZoom = 20;
+/// The map never zooms past this; also the denominator of «6/22». 22 is
+/// deep enough for a 1 m scale bar at any latitude.
+const double mapMaxZoom = 22;
 
 const double _earthCircumference = 40075016.686;
 const double _tileSize = 512;
@@ -54,10 +55,10 @@ String zoomText(double zoom) {
   return (meters: meters, widthDp: meters / perDp, label: label);
 }
 
-/// «→ 232,03 км 348.6°»; under a kilometre «→ 350 м 12.0°».
+/// «→ 232,03 км 348.6°»; under a kilometre, to 0.1 m: «→ 349,6 м 12.0°».
 String targetText(double meters, double azimuth) {
-  final distance = meters < 999.995
-      ? '${meters.round()} м'
+  final distance = meters < 999.95
+      ? '${meters.toStringAsFixed(1).replaceAll('.', ',')} м'
       : '${(meters / 1000).toStringAsFixed(2).replaceAll('.', ',')} км';
   return '→ $distance ${azimuth.toStringAsFixed(1)}°';
 }
