@@ -723,6 +723,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraIdle: _onCameraIdle,
             onMapClick: _onMapClick,
+            // Lines (tracks, the target line) must not swallow taps: the
+            // target line always runs through the crosshair, so a consumed
+            // tap there could never reach _onMapClick to open the card.
+            annotationConsumeTapEvents: const [AnnotationType.symbol, AnnotationType.circle, AnnotationType.fill],
             onCameraMove: _onCameraMove,
           ),
           if (_crosshairPosition != null)

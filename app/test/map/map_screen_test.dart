@@ -255,6 +255,13 @@ void main() {
     }
   });
 
+  testWidgets('lines do not swallow taps, so the crosshair still opens the card over the target line', (tester) async {
+    await pumpMap(tester);
+    final consumed = tester.widget<MapLibreMap>(find.byType(MapLibreMap)).annotationConsumeTapEvents;
+    expect(consumed, isNot(contains(AnnotationType.line)));
+    expect(consumed, containsAll([AnnotationType.circle, AnnotationType.symbol]));
+  });
+
   group('circleOptionsForWaypoint', () {
     Waypoint waypointWith({required String ownerId, required String type}) => Waypoint(
           id: 'w1',
