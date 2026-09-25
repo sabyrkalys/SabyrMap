@@ -27,4 +27,21 @@ void main() {
     expect(toSk42(43.0, 42.0).zone, 8);
     expect(toSk42(43.0, 42.0).y, greaterThan(8000000));
   });
+
+  // pyproj Proj(tmerc krass, lon_0 = 6*zone-3).get_factors(lon, lat).meridian_convergence
+  const convergence = [
+    (47.9958, 37.81465, -0.88089),
+    (55.75, 37.62, -1.14076),
+    (43.0, 41.99, 2.04018),
+    (59.94, 30.31, -2.32863),
+  ];
+  for (final (lat, lng, gamma) in convergence) {
+    test('convergence ($lat, $lng) matches pyproj', () {
+      expect(sk42Convergence(lat, lng), closeTo(gamma, 0.01));
+    });
+  }
+
+  test('convergence is zero on the central meridian', () {
+    expect(sk42Convergence(50, 39), closeTo(0, 1e-9));
+  });
 }

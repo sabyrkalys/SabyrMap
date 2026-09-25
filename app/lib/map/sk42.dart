@@ -106,3 +106,21 @@ Sk42Point toSk42(double lat, double lng) {
               (61 - 58 * t + t * t + 600 * c - 330 * ep2) * math.pow(aa, 6) / 720);
   return Sk42Point(x: northing, y: zone * 1000000 + 500000 + easting, zone: zone);
 }
+/// Meridian convergence (degrees): the angle from true north to grid north
+/// (the X axis) in the point's 6° Gauss–Krüger zone on the Krasovsky
+/// ellipsoid; positive east of the zone's central meridian.
+double sk42Convergence(double lat, double lng) {
+  final zone = (lng / 6).floor() + 1;
+  final dl = _rad(lng - (zone * 6 - 3));
+  final phi = _rad(lat);
+  const e2 = _krassF * (2 - _krassF);
+  const ep2 = e2 / (1 - e2);
+  final cosPhi = math.cos(phi);
+  final eta2 = ep2 * cosPhi * cosPhi;
+  final t2 = math.tan(phi) * math.tan(phi);
+  final l2 = math.pow(dl * cosPhi, 2).toDouble();
+  final gamma = dl *
+      math.sin(phi) *
+      (1 + l2 / 3 * (1 + 3 * eta2 + 2 * eta2 * eta2) + l2 * l2 / 15 * (2 - t2));
+  return _deg(gamma);
+}
