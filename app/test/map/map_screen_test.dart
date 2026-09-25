@@ -1,5 +1,7 @@
 import 'package:app/icons/waypoint_icon_assignments_controller.dart';
 import 'package:app/icons/waypoint_icon_store.dart';
+import 'dart:math';
+
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/map/map_target.dart';
@@ -111,6 +113,18 @@ void main() {
     expect(container.read(waypointsControllerProvider).single.name, 'Summit');
   });
 
+  // Taps reach the map as MapLibre onMapClick calls with projection
+  // (physical) pixels, the way the Android plugin reports them.
+  void mapClickAt(WidgetTester tester, Offset logical, [LatLng coordinates = const LatLng(48, 37.8)]) {
+    final ratio = tester.view.devicePixelRatio;
+    tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick!(
+      Point<double>(logical.dx * ratio, logical.dy * ratio),
+      coordinates,
+    );
+  }
+
+  Offset screenCenter(WidgetTester tester) => tester.getCenter(find.byType(MapLibreMap));
+
   Future<ProviderContainer> pumpMap(WidgetTester tester) async {
     final container = ProviderContainer(overrides: _baseOverrides());
     addTearDown(container.dispose);
@@ -135,7 +149,7 @@ void main() {
   testWidgets('tapping the crosshair opens the card above it; tapping again closes it', (tester) async {
     await pumpMap(tester);
 
-    await tester.tap(find.byKey(const Key('map_crosshair')));
+    mapClickAt(tester, screenCenter(tester));
     await tester.pumpAndSettle();
     final card = find.byKey(const Key('crosshair_menu'));
     expect(card, findsOneWidget);
@@ -148,14 +162,15 @@ void main() {
       closeTo(tester.getCenter(find.byKey(const Key('map_crosshair'))).dx, 0.5),
     );
 
-    await tester.tap(find.byKey(const Key('map_crosshair')));
+    // A second tap on the crosshair lands on the card's barrier.
+    await tester.tapAt(screenCenter(tester));
     await tester.pumpAndSettle();
     expect(card, findsNothing);
   });
 
   testWidgets('tapping outside the card closes it', (tester) async {
     await pumpMap(tester);
-    await tester.tap(find.byKey(const Key('map_crosshair')));
+    mapClickAt(tester, screenCenter(tester));
     await tester.pumpAndSettle();
 
     await tester.tapAt(const Offset(20, 300));
@@ -165,7 +180,7 @@ void main() {
 
   testWidgets('«Задать цель» closes the card and arms picking; with a target the item is «Убрать цель»', (tester) async {
     final container = await pumpMap(tester);
-    await tester.tap(find.byKey(const Key('map_crosshair')));
+    mapClickAt(tester, screenCenter(tester));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Задать цель'));
@@ -174,7 +189,7 @@ void main() {
     expect(container.read(mapTargetProvider), isA<MapTargetPicking>());
 
     container.read(mapTargetProvider.notifier).pick(const LatLng(48, 37.8));
-    await tester.tap(find.byKey(const Key('map_crosshair')));
+    mapClickAt(tester, screenCenter(tester));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Убрать цель'));
     await tester.pumpAndSettle();
@@ -199,13 +214,45 @@ void main() {
 
   testWidgets('«Новая метка...» before the map settles reports the map is not ready', (tester) async {
     await pumpMap(tester);
-    await tester.tap(find.byKey(const Key('map_crosshair')));
+    mapClickAt(tester, screenCenter(tester));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Новая метка...'));
     await tester.pumpAndSettle();
     expect(find.text('Карта ещё не готова'), findsOneWidget);
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
+
+  testWidgets('a map tap away from the crosshair does not open the card', (tester) async {
+    await pumpMap(tester);
+    mapClickAt(tester, screenCenter(tester) + const Offset(60, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
+
+  testWidgets('while picking, a tap on the crosshair sets the target instead of opening the card', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(mapTargetProvider.notifier).startPicking();
+    mapClickAt(tester, screenCenter(tester), const LatLng(1, 2));
+    await tester.pumpAndSettle();
+    expect(container.read(mapTargetProvider).point, const LatLng(1, 2));
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
+
+  testWidgets('crosshair and distance label let map gestures through', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
+    container.read(mapTargetProvider.notifier)
+      ..startPicking()
+      ..pick(const LatLng(48, 37.8));
+    await tester.pump();
+
+    for (final key in ['map_crosshair', 'target_distance_label']) {
+      final ignoring = tester
+          .widgetList<IgnorePointer>(find.ancestor(of: find.byKey(Key(key)), matching: find.byType(IgnorePointer)))
+          .any((w) => w.ignoring);
+      expect(ignoring, isTrue, reason: key);
+    }
   });
 
   group('circleOptionsForWaypoint', () {

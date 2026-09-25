@@ -33,7 +33,9 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onNavSelected(int index) {
     final tab = MenuTab.values[index];
-    ProviderScope.containerOf(context, listen: false).read(crosshairMenuOpenProvider.notifier).close();
+    final container = ProviderScope.containerOf(context, listen: false);
+    container.read(crosshairMenuOpenProvider.notifier).close();
+    container.read(mapTargetProvider.notifier).cancelPicking();
     setState(() => _openTab = _openTab == tab ? null : tab);
   }
 

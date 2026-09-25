@@ -1,6 +1,9 @@
+import 'dart:math';
+
 import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
+import 'package:app/map/map_target.dart';
 import 'package:app/menu/menu_toggles.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
@@ -8,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../compass/fakes.dart';
 import '../tracks/fakes.dart';
@@ -178,11 +182,25 @@ void main() {
 
   testWidgets('opening a nav panel closes the crosshair card', (tester) async {
     await pumpShell(tester);
-    await tester.tap(find.byKey(const Key('map_crosshair')));
+    final center = tester.getCenter(find.byType(MapLibreMap));
+    final ratio = tester.view.devicePixelRatio;
+    tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick!(
+      Point<double>(center.dx * ratio, center.dy * ratio),
+      const LatLng(48, 37.8),
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('crosshair_menu')), findsOneWidget);
 
     await tapNav(tester, 1);
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
+
+  testWidgets('opening a nav panel cancels an armed «Задать цель»', (tester) async {
+    await pumpShell(tester);
+    final container = ProviderScope.containerOf(tester.element(find.byType(HomeShell)));
+    container.read(mapTargetProvider.notifier).startPicking();
+
+    await tapNav(tester, 2);
+    expect(container.read(mapTargetProvider), isA<MapTargetNone>());
   });
 }

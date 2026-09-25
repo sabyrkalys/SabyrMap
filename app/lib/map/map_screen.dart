@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -236,14 +238,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _controller = controller;
     controller.onCircleTapped.add(_onCircleTapped);
     controller.onSymbolTapped.add(_onSymbolTapped);
-    controller.addListener(_onCameraChanged);
   }
 
-  void _onCameraChanged() {
+  // Driven by MapLibreMap.onCameraMove, not a controller listener: the
+  // controller also notifies its listeners after every add/update/removeLine,
+  // so listening there made each line update trigger the next one forever.
+  void _onCameraMove(CameraPosition position) {
     if (ref.read(mapTargetProvider).point == null) return;
-    final center = _controller?.cameraPosition?.target;
-    if (center != null && mounted) setState(() => _liveCenter = center);
+    if (mounted) setState(() => _liveCenter = position.target);
     _syncTargetLine();
+  }
+
+  static const double _crosshairHitRadius = 24;
+
+  // Taps reach the map through MapLibre (the crosshair itself ignores
+  // pointers so drags and pinches that start on it still move the map).
+  // While «Задать цель» is armed any tap sets the target; otherwise a tap on
+  // the crosshair opens the card.
+  void _onMapClick(Point<double> point, LatLng coordinates) {
+    if (ref.read(mapTargetProvider) is MapTargetPicking) {
+      ref.read(mapTargetProvider.notifier).pick(coordinates);
+      return;
+    }
+    // Android reports projection (physical) pixels.
+    final ratio = MediaQuery.devicePixelRatioOf(context);
+    final size = MediaQuery.sizeOf(context);
+    final dx = point.x / ratio - size.width / 2;
+    final dy = point.y / ratio - size.height / 2;
+    if (dx * dx + dy * dy <= _crosshairHitRadius * _crosshairHitRadius) {
+      ref.read(crosshairMenuOpenProvider.notifier).toggle();
+    }
   }
 
   Future<void> _syncTargetLine() async {
@@ -259,7 +283,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         if (controller == null) return;
         final target = ref.read(mapTargetProvider).point;
         final showLine = ref.read(menuTogglesProvider)[MenuToggle.waypointsTargetLine]!;
-        final center = controller.cameraPosition?.target;
+        final center = _liveCenter ?? controller.cameraPosition?.target;
         final existing = _targetLine;
         if (target == null || !showLine || center == null) {
           if (existing != null) {
@@ -396,8 +420,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // the removal branch below (dropping its now-obsolete circle) and gets
     // added as a Symbol on the same pass -- and vice versa when an icon is
     // cleared -- so it is never rendered as both at once.
-    final circleModeWaypoints =
-        waypoints.where((w) => renderModeForWaypoint(iconAssignments[w.id]) == WaypointRenderMode.circle).toList();
+    final circleModeWaypoints = waypoints
+        .where((w) => renderModeForWaypoint(iconAssignments[w.id]) == WaypointRenderMode.circle)
+        .toList();
     final currentIds = circleModeWaypoints.map((w) => w.id).toSet();
     for (final id in _circlesByWaypointId.keys.toList()) {
       if (!currentIds.contains(id)) {
@@ -441,8 +466,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return stale;
     });
 
-    final symbolModeWaypoints =
-        waypoints.where((w) => renderModeForWaypoint(iconAssignments[w.id]) == WaypointRenderMode.symbol).toList();
+    final symbolModeWaypoints = waypoints
+        .where((w) => renderModeForWaypoint(iconAssignments[w.id]) == WaypointRenderMode.symbol)
+        .toList();
     final currentIds = symbolModeWaypoints.map((w) => w.id).toSet();
     for (final id in _symbolsByWaypointId.keys.toList()) {
       if (!currentIds.contains(id)) {
@@ -622,6 +648,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onCircleTapped(Circle circle) {
+    // Annotations consume the tap before onMapClick, so picking a target on
+    // a waypoint has to be handled here.
+    final geometry = circle.options.geometry;
+    if (ref.read(mapTargetProvider) is MapTargetPicking && geometry != null) {
+      ref.read(mapTargetProvider.notifier).pick(geometry);
+      return;
+    }
     final waypointId = circle.data?['waypointId'] as String?;
     if (waypointId == null) return;
     final waypoints = ref.read(waypointsControllerProvider);
@@ -633,6 +666,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Same routing as [_onCircleTapped], for waypoints rendered as image
   /// Symbols -- tapping either kind of marker opens the same details sheet.
   void _onSymbolTapped(Symbol symbol) {
+    final geometry = symbol.options.geometry;
+    if (ref.read(mapTargetProvider) is MapTargetPicking && geometry != null) {
+      ref.read(mapTargetProvider.notifier).pick(geometry);
+      return;
+    }
     final waypointId = symbol.data?['waypointId'] as String?;
     if (waypointId == null) return;
     final waypoints = ref.read(waypointsControllerProvider);
@@ -684,7 +722,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraIdle: _onCameraIdle,
-            onMapClick: (point, coordinates) => ref.read(mapTargetProvider.notifier).pick(coordinates),
+            onMapClick: _onMapClick,
+            onCameraMove: _onCameraMove,
           ),
           if (_crosshairPosition != null)
             Positioned(
@@ -706,10 +745,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           if (target != null && center != null && toggles[MenuToggle.waypointsTargetStatus]!)
-            Center(
-              child: Transform.translate(
-                offset: const Offset(0, -34),
-                child: TargetDistanceLabel(key: const Key('target_distance_label'), from: center, to: target),
+            IgnorePointer(
+              child: Center(
+                child: Transform.translate(
+                  offset: const Offset(0, -34),
+                  child: TargetDistanceLabel(key: const Key('target_distance_label'), from: center, to: target),
+                ),
               ),
             ),
           Positioned(
@@ -759,30 +800,21 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ],
-          Center(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => ref.read(crosshairMenuOpenProvider.notifier).toggle(),
-              child: Padding(
-                // Larger hit area than the 32 dp ring.
-                padding: const EdgeInsets.all(8),
-                child: Container(
-                  key: const Key('map_crosshair'),
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Theme.of(context).colorScheme.onSurface,
-                      ),
-                    ),
+          IgnorePointer(
+            child: Center(
+              child: Container(
+                key: const Key('map_crosshair'),
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
+                ),
+                child: Center(
+                  child: Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.onSurface),
                   ),
                 ),
               ),
@@ -808,8 +840,9 @@ class _CoordinateHud extends StatelessWidget {
     final distance = location == null
         ? null
         : distanceMeters(location.lat, location.lng, target.latitude, target.longitude);
-    final bearing =
-        location == null ? null : bearingDegrees(location.lat, location.lng, target.latitude, target.longitude);
+    final bearing = location == null
+        ? null
+        : bearingDegrees(location.lat, location.lng, target.latitude, target.longitude);
 
     return Card(
       key: const Key('coordinate_hud'),
@@ -824,8 +857,7 @@ class _CoordinateHud extends StatelessWidget {
               '${target.latitude.toStringAsFixed(5)}, ${target.longitude.toStringAsFixed(5)}',
               style: const TextStyle(fontWeight: FontWeight.w600),
             ),
-            if (distance != null && bearing != null)
-              Text('${distance.round()} м · ${bearing.round()}°'),
+            if (distance != null && bearing != null) Text('${distance.round()} м · ${bearing.round()}°'),
           ],
         ),
       ),
