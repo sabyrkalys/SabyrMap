@@ -2,18 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app_icons.dart';
-import '../compass/compass_screen.dart';
 import '../map/map_screen.dart';
-import '../positioning/positioning_screen.dart';
-import '../settings/settings_panel.dart';
+import '../menu/menu_panels.dart';
 import '../system_ui.dart';
-import '../waypoints/waypoints_list_screen.dart';
 import '../widgets/app_icon.dart';
 
-/// Bottom-nav shell with the app's five top-level destinations. Uses
-/// [IndexedStack] rather than swapping widgets so MapScreen's state (GPS
-/// position, in-progress track recording, MapLibre controller) survives
-/// switching to another tab and back.
+/// The map is always on screen. Each bottom-nav icon opens its [MenuTab]
+/// panel over it; the same icon again, or a tap on the map, closes it.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -22,62 +17,73 @@ class HomeShell extends StatefulWidget {
 }
 
 class _HomeShellState extends State<HomeShell> {
-  static const _settingsIndex = 0;
-  static const _mapIndex = 1;
-  static const double _settingsPanelMargin = 5;
+  static const double _panelMargin = 5;
 
-  int _index = _mapIndex;
-
-  /// Tab content, indexed like [_destinations]. Settings has no screen of
-  /// its own: it shows the map with [SettingsPanel] floating over it.
-  static const _screens = [
-    SizedBox.shrink(),
-    MapScreen(),
-    WaypointsListScreen(),
-    PositioningScreen(),
-    CompassScreen(),
-  ];
+  MenuTab? _openTab;
 
   static const _destinations = [
     _NavDestination(key: Key('nav_settings'), icon: AppIcons.peakMark, label: 'Настройки'),
     _NavDestination(key: Key('nav_map'), icon: AppIcons.map, label: 'Карты'),
     _NavDestination(key: Key('nav_waypoints'), icon: AppIcons.flag, label: 'Метки'),
     _NavDestination(key: Key('nav_positioning'), icon: AppIcons.target, label: 'Позиционирование'),
-    _NavDestination(key: Key('nav_compass'), icon: AppIcons.compass, label: 'Компас'),
+    _NavDestination(key: Key('nav_compass'), icon: AppIcons.compass, label: 'Ориентирование'),
   ];
+
+  void _onNavSelected(int index) {
+    final tab = MenuTab.values[index];
+    setState(() => _openTab = _openTab == tab ? null : tab);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final openTab = _openTab;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: systemNavigationBarStyle(Theme.of(context).brightness),
       child: Scaffold(
         // The nav panel is half transparent and doesn't span the full width,
-        // so the tab content (the map) must continue underneath it.
+        // so the map must continue underneath it.
         extendBody: true,
         // Builder: the extendBody bottom padding only exists below the Scaffold.
         body: Builder(
-          builder: (context) => Stack(
-            children: [
-              IndexedStack(index: _index == _settingsIndex ? _mapIndex : _index, children: _screens),
-              if (_index == _settingsIndex)
-                Positioned(
-                  left: _settingsPanelMargin,
-                  right: _settingsPanelMargin,
-                  // With extendBody the bottom padding is the nav panel's height.
-                  // The panel's arrow fills the gap down to the nav panel.
-                  bottom: MediaQuery.paddingOf(context).bottom,
-                  child: const SettingsPanel(
-                    key: Key('settings_panel'),
-                    arrowCenterX: _BottomNav.firstIconCenterX - _settingsPanelMargin,
+          builder: (context) {
+            final padding = MediaQuery.paddingOf(context);
+            return Stack(
+              children: [
+                const MapScreen(),
+                if (openTab != null) ...[
+                  // Catches the tap that closes the panel so it never
+                  // reaches the map underneath.
+                  Positioned.fill(
+                    child: GestureDetector(
+                      key: const Key('menu_panel_barrier'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _openTab = null),
+                    ),
                   ),
-                ),
-            ],
-          ),
+                  Positioned(
+                    left: _panelMargin,
+                    right: _panelMargin,
+                    top: padding.top + _panelMargin,
+                    // With extendBody the bottom padding is the nav panel's
+                    // height; the panel's arrow fills the gap down to it.
+                    bottom: padding.bottom,
+                    child: Align(
+                      alignment: Alignment.bottomLeft,
+                      child: menuPanelFor(
+                        openTab,
+                        arrowCenterX: _BottomNav.iconCenterX(openTab.index) - _panelMargin,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
         bottomNavigationBar: _BottomNav(
           destinations: _destinations,
-          selectedIndex: _index,
-          onSelected: (index) => setState(() => _index = index),
+          selectedIndex: openTab?.index,
+          onSelected: _onNavSelected,
         ),
       ),
     );
@@ -110,11 +116,11 @@ class _BottomNav extends StatelessWidget {
   /// icon (5 dp to the panel edge for the outer ones).
   static const double _itemWidth = _iconSize + _gap;
 
-  /// Horizontal center of the first (settings) icon, from the screen edge.
-  static const double firstIconCenterX = _screenMargin + _itemWidth / 2;
+  /// Horizontal center of the icon at [index], from the screen edge.
+  static double iconCenterX(int index) => _screenMargin + _itemWidth / 2 + index * _itemWidth;
 
   final List<_NavDestination> destinations;
-  final int selectedIndex;
+  final int? selectedIndex;
   final ValueChanged<int> onSelected;
 
   @override

@@ -14,7 +14,7 @@ String _defaultTrackName() {
 
 /// Starts recording if idle, or stops-and-prompts-to-save if active. Shared
 /// between screens that expose the record toggle (currently the
-/// Позиционирование tab) since the underlying state lives in the root-scope
+/// ПОЗИЦИОНИРОВАНИЕ menu panel) since the underlying state lives in the root-scope
 /// [trackRecordingControllerProvider], not any one screen's widget state.
 Future<void> toggleTrackRecording(BuildContext context, WidgetRef ref, TrackRecordingState recordingState) async {
   if (recordingState is TrackRecordingActive) {
