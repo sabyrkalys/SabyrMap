@@ -11,7 +11,7 @@ The map is the app's base screen and is never hidden by the top-level menu. Ever
 - At launch only the map is shown; no nav icon is selected.
 - Tapping an icon opens its panel and selects the icon. Tapping the same icon again closes it. Tapping another icon switches to that panel.
 - While a panel is open, a transparent barrier covers the map outside the panel and the nav bar: a tap on it closes the panel and is not passed to the map. The map pans again once the panel is closed.
-- The full-screen tabs are gone. `WaypointsListScreen` and `CompassScreen` are pushed as routes from panel items (below). `PositioningScreen` (an empty placeholder whose only content was the record toggle) is deleted; the record toggle moves into the ПОЗИЦИОНИРОВАНИЕ panel.
+- The full-screen tabs are gone. `WaypointsListScreen` and `CompassScreen` are pushed as routes from panel items (below). The old full-screen `PositioningScreen` is deleted: its only content was a record button, now replaced by the «Запись трека» switch. The ПОЗИЦИОНИРОВАНИЕ panel carries the user's full positioning list (below).
 - Nav tooltip/semantics label of the compass icon changes from «Компас» to «Ориентирование».
 - `MapScreen` stays mounted for the whole session, as with the current `IndexedStack`, so its state (GPS, recording, controller) is preserved.
 
@@ -37,7 +37,7 @@ Default values are from the mockup; items marked *placeholder* only store their 
 - ОПЦИИ: Координатная сетка СК-42 (Гаусса-Крюгера), Ночной режим, Координаты центра экрана — checkboxes, default off, *placeholders*.
 
 **КАРТЫ** (map icon)
-- Items: Доступные карты, Карты на экране, Сохранить участок карты, Избранные карты — *placeholders*. Proposed icons, for the user to confirm: `folderMap`, `layers`, `download`, `star`.
+- Items: Доступные карты, Карты на экране, Сохранить участок карты, Избранные карты — *placeholders*. Icons (confirmed by the user): `folderMap`, `layers`, `download`, `star`.
 - ОПЦИИ: Использовать только сохранённый кэш карты, Индикаторы загрузки карты, Название карты, Масштаб карты, Масштабная линейка — checkboxes, default off, *placeholders*.
 
 **МЕТКИ** (flag icon)
