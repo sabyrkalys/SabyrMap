@@ -8,12 +8,13 @@ import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
 import 'geo_utils.dart';
 import 'map_camera_store.dart';
+import 'map_crosshair.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
 import '../tracks/tracks_visibility_controller.dart';
 import '../waypoints/waypoint_actions.dart';
-import '../waypoints/waypoint_form_sheet.dart';
+import '../waypoints/waypoint_create_action.dart';
 import '../waypoints/waypoint_models.dart';
 import '../waypoints/waypoint_types.dart';
 import '../waypoints/waypoints_controller.dart';
@@ -229,6 +230,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final position = _controller?.cameraPosition;
     if (position == null) return;
     setState(() => _crosshairPosition = position.target);
+    ref.read(mapCrosshairProvider.notifier).set(position.target);
     if (_savedCameraLoaded && shouldPersistCamera(position, cameraRestored: _hasCenteredCamera)) {
       ref.read(mapCameraStoreProvider).save(position).catchError((_) {});
     }
@@ -560,40 +562,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     return '${points.length}|${last.$1}|${last.$2}';
   }
 
-  Future<void> _createWaypointAtCrosshair() async {
-    final controller = _controller;
-    final cameraPosition = controller?.cameraPosition;
-    if (controller == null || cameraPosition == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Карта ещё не готова')),
-      );
-      return;
-    }
-    final coordinates = cameraPosition.target;
-    final result = await showWaypointFormSheet(context, iconScanner: _iconLibraryScanner);
-    if (result == null || !mounted) return;
-    try {
-      final created = await ref.read(waypointsControllerProvider.notifier).createWaypoint(
-            name: result.name,
-            type: result.type,
-            note: result.note,
-            color: result.color,
-            lat: coordinates.latitude,
-            lng: coordinates.longitude,
-          );
-      try {
-        await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(created.id, result.iconFileName);
-      } catch (_) {
-        // The waypoint itself was created; a local icon-bookkeeping failure
-        // is a soft failure and shouldn't be reported as a failed creation.
-        // Same reasoning as editWaypoint/deleteWaypoint in
-        // waypoint_actions.dart.
-      }
-    } on WaypointException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
-
   void _onCircleTapped(Circle circle) {
     final waypointId = circle.data?['waypointId'] as String?;
     if (waypointId == null) return;
@@ -694,7 +662,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         key: const Key('create_waypoint_button'),
-        onPressed: _createWaypointAtCrosshair,
+        onPressed: () => createWaypointAtCrosshair(context, ref, iconScanner: _iconLibraryScanner),
         icon: const AppIcon(AppIcons.flagPlus),
         label: const Text('Метка здесь'),
       ),
