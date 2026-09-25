@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
@@ -182,12 +180,7 @@ void main() {
 
   testWidgets('opening a nav panel closes the crosshair card', (tester) async {
     await pumpShell(tester);
-    final center = tester.getCenter(find.byType(MapLibreMap));
-    final ratio = tester.view.devicePixelRatio;
-    tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick!(
-      Point<double>(center.dx * ratio, center.dy * ratio),
-      const LatLng(48, 37.8),
-    );
+    await tester.tapAt(tester.getCenter(find.byType(MapLibreMap)));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('crosshair_menu')), findsOneWidget);
 

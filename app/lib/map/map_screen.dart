@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -249,25 +250,42 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _syncTargetLine();
   }
 
-  static const double _crosshairHitRadius = 24;
-
-  // Taps reach the map through MapLibre (the crosshair itself ignores
-  // pointers so drags and pinches that start on it still move the map).
-  // While «Задать цель» is armed any tap sets the target; otherwise a tap on
-  // the crosshair opens the card.
+  // While «Задать цель» is armed any map tap sets the target. MapLibre only
+  // reports taps once the style has loaded, so the crosshair menu is not
+  // driven from here (see _onCrosshairPointerUp).
   void _onMapClick(Point<double> point, LatLng coordinates) {
-    if (ref.read(mapTargetProvider) is MapTargetPicking) {
-      ref.read(mapTargetProvider.notifier).pick(coordinates);
-      return;
-    }
-    // Android reports projection (physical) pixels.
-    final ratio = MediaQuery.devicePixelRatioOf(context);
-    final size = MediaQuery.sizeOf(context);
-    final dx = point.x / ratio - size.width / 2;
-    final dy = point.y / ratio - size.height / 2;
-    if (dx * dx + dy * dy <= _crosshairHitRadius * _crosshairHitRadius) {
-      ref.read(crosshairMenuOpenProvider.notifier).toggle();
-    }
+    ref.read(mapTargetProvider.notifier).pick(coordinates);
+  }
+
+  // The crosshair watches raw pointers without taking part in gestures, so
+  // drags and pinches that start on it still reach the map. A short,
+  // single-finger tap that doesn't move opens or closes the card; this works
+  // even when the map style (and with it MapLibre's own tap handling) has
+  // not loaded.
+  static const Duration _crosshairTapTimeout = Duration(milliseconds: 500);
+  final Map<int, (Offset, Duration)> _crosshairPointers = {};
+  bool _crosshairMultiTouch = false;
+
+  void _onCrosshairPointerDown(PointerDownEvent event) {
+    _crosshairPointers[event.pointer] = (event.position, event.timeStamp);
+    if (_crosshairPointers.length > 1) _crosshairMultiTouch = true;
+  }
+
+  void _onCrosshairPointerUp(PointerUpEvent event) {
+    final down = _crosshairPointers.remove(event.pointer);
+    final multiTouch = _crosshairMultiTouch;
+    if (_crosshairPointers.isEmpty) _crosshairMultiTouch = false;
+    if (down == null || multiTouch) return;
+    final (position, time) = down;
+    if ((event.position - position).distance > kTouchSlop) return;
+    if (event.timeStamp - time > _crosshairTapTimeout) return;
+    if (ref.read(mapTargetProvider) is MapTargetPicking) return;
+    ref.read(crosshairMenuOpenProvider.notifier).toggle();
+  }
+
+  void _onCrosshairPointerCancel(PointerCancelEvent event) {
+    _crosshairPointers.remove(event.pointer);
+    if (_crosshairPointers.isEmpty) _crosshairMultiTouch = false;
   }
 
   Future<void> _syncTargetLine() async {
@@ -804,21 +822,38 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ],
-          IgnorePointer(
-            child: Center(
-              child: Container(
-                key: const Key('map_crosshair'),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
-                ),
-                child: Center(
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: Theme.of(context).colorScheme.onSurface),
+          Center(
+            child: Listener(
+              behavior: HitTestBehavior.translucent,
+              onPointerDown: _onCrosshairPointerDown,
+              onPointerUp: _onCrosshairPointerUp,
+              onPointerCancel: _onCrosshairPointerCancel,
+              // Nothing inside claims the hit, so the touch also goes on to
+              // the map underneath.
+              child: IgnorePointer(
+                child: SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Center(
+                    child: Container(
+                      key: const Key('map_crosshair'),
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
