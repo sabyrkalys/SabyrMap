@@ -26,16 +26,28 @@ jobs:
           channel: stable
           cache: true
 
-      # Gradle generates ~/.android/debug.keystore when it is missing, so a
-      # fresh runner signed every build with a new key and the phone refused
-      # to update over the previous install. The cached key keeps the
-      # signature stable, so a new APK installs as an update and keeps the
-      # app's local data. The key is never committed: the repo is public.
+      # Every CI build must be signed with the same debug key, otherwise the
+      # phone refuses to install a new APK over the previous one and the
+      # app's local data is lost to an uninstall. Caching ~/.android still
+      # produced a different key per build, so the key is now created here at
+      # a fixed path, cached, and handed to Gradle via DEBUG_KEYSTORE. Its
+      # SHA-256 is printed so builds can be compared. Not committed: the repo
+      # is public.
       - name: Restore debug signing key
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
+          path: ~/ci-debug-keystore
+          key: android-debug-keystore-v2
+
+      - name: Create debug signing key if missing
+        run: |
+          mkdir -p "$HOME/ci-debug-keystore"
+          KS="$HOME/ci-debug-keystore/debug.keystore"
+          if [ ! -f "$KS" ]; then
+            keytool -genkeypair -keystore "$KS" -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+          echo "DEBUG_KEYSTORE=$KS" >> "$GITHUB_ENV"
+          keytool -list -v -keystore "$KS" -storepass android | grep "SHA256:"
 
       - name: Install dependencies
         run: flutter pub get

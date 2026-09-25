@@ -30,6 +30,14 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // CI passes one cached keystore so every build has the same
+            // signature (see .github/workflows/flutter-build.yml).
+            System.getenv("DEBUG_KEYSTORE")?.let { storeFile = file(it) }
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
