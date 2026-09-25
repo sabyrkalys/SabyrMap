@@ -246,10 +246,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // Driven by MapLibreMap.onCameraMove, not a controller listener: the
   // controller also notifies its listeners after every add/update/removeLine,
   // so listening there made each line update trigger the next one forever.
+  //
+  // The zoom feeds the info panel's scale readout during a pinch; to avoid a
+  // rebuild on every frame it is only applied once it moved by 0.1 or more.
   void _onCameraMove(CameraPosition position) {
-    if (ref.read(mapTargetProvider).point == null) return;
-    if (mounted) setState(() => _liveCenter = position.target);
-    _syncTargetLine();
+    final zoomChanged = (position.zoom - _cameraZoom).abs() >= 0.1;
+    final hasTarget = ref.read(mapTargetProvider).point != null;
+    if (!zoomChanged && !hasTarget) return;
+    if (mounted) {
+      setState(() {
+        if (zoomChanged) _cameraZoom = position.zoom;
+        if (hasTarget) _liveCenter = position.target;
+      });
+    }
+    if (hasTarget) _syncTargetLine();
   }
 
   // While «Задать цель» is armed any map tap sets the target. MapLibre only
@@ -726,7 +736,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     });
 
     ref.listen<MapTargetState>(mapTargetProvider, (previous, next) {
-      _liveCenter = _controller?.cameraPosition?.target;
+      _liveCenter = next.point == null ? null : _controller?.cameraPosition?.target;
       _syncTargetLine();
     });
     ref.listen<Map<MenuToggle, bool>>(menuTogglesProvider, (previous, next) => _syncTargetLine());
@@ -768,7 +778,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: InfoPanel(
-                      center: _liveCenter ?? _crosshairPosition!,
+                      center: infoPanelCenter(target: target, liveCenter: _liveCenter, settled: _crosshairPosition!),
                       zoom: _cameraZoom,
                       target: target,
                       recording: ref.watch(trackRecordingControllerProvider) is TrackRecordingActive,

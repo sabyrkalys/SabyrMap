@@ -103,4 +103,36 @@ void main() {
     expect(decoration.borderRadius, isNotNull);
     expect(decoration.boxShadow, isNotEmpty);
   });
+
+  test('panel centre ignores a stale live centre once there is no target', () {
+    const settled = LatLng(10, 20);
+    const stale = LatLng(1, 2);
+    expect(infoPanelCenter(target: null, liveCenter: stale, settled: settled), settled);
+    expect(infoPanelCenter(target: const LatLng(3, 4), liveCenter: stale, settled: settled), stale);
+    expect(infoPanelCenter(target: const LatLng(3, 4), liveCenter: null, settled: settled), settled);
+  });
+
+  testWidgets('telemetry wraps instead of overflowing with a large system font on a narrow phone', (tester) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(size: Size(360, 640), textScaler: TextScaler.linear(2)),
+          child: Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: InfoPanel(center: center, zoom: 0, recording: true, toggles: toggles()),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
+

@@ -8,6 +8,12 @@ import 'geo_utils.dart';
 import 'map_scale.dart';
 import 'sk42.dart';
 
+/// Which centre the panel shows: the live camera centre only while a
+/// target exists (it is refreshed per frame then); otherwise the centre
+/// the camera last settled on, so a leftover live centre can't freeze it.
+LatLng infoPanelCenter({LatLng? target, LatLng? liveCenter, required LatLng settled}) =>
+    target != null ? (liveCenter ?? settled) : settled;
+
 /// Top-left overlay: centre coordinates, telemetry (recording icon, scale,
 /// zoom, scale bar) and, with a «Задать цель» target, its distance and
 /// azimuth. Each part follows its menu toggle; nothing shown → no block.
@@ -52,19 +58,18 @@ class InfoPanel extends StatelessWidget {
     if (showTrack || showScale || showBar) {
       final bar = scaleBar(zoom, center.latitude);
       lines.add(
-        Row(
+        // Wrap, not Row: with a large system font the scale, zoom and bar
+        // move to the next line instead of overflowing a narrow screen.
+        Wrap(
           key: const Key('info_line_telemetry'),
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
           children: [
-            if (showTrack) ...[
-              const Icon(Icons.timeline, key: Key('info_track_icon'), size: 18, color: textColor),
-              const SizedBox(width: 6),
-            ],
+            if (showTrack) const Icon(Icons.timeline, key: Key('info_track_icon'), size: 18, color: textColor),
             if (showScale) ...[
               Text(scaleText(zoom, center.latitude), key: const Key('info_scale_text'), style: style),
-              const SizedBox(width: 8),
               Text(zoomText(zoom), key: const Key('info_zoom_text'), style: style),
-              const SizedBox(width: 8),
             ],
             if (showBar)
               Column(
