@@ -38,6 +38,9 @@ void main() {
     expect(state[MenuToggle.positioningRotateByMovement], isFalse);
     expect(state[MenuToggle.orientationRotateByCompass], isTrue);
     expect(state[MenuToggle.orientationShowCompass], isFalse);
+    expect(state[MenuToggle.settingsCenterCoordinates], isTrue);
+    expect(state[MenuToggle.mapsMapScale], isTrue);
+    expect(state[MenuToggle.mapsScaleBar], isTrue);
     expect(state.length, MenuToggle.values.length);
   });
 
