@@ -24,6 +24,7 @@ void main() {
               onSetTarget: () => calls.add('set'),
               onRemoveTarget: () => calls.add('remove'),
               onNewWaypoint: () => calls.add('new'),
+              onInfo: () => calls.add('info'),
             ),
           ),
         ),
@@ -47,9 +48,9 @@ void main() {
     expect(find.byType(Divider), findsOneWidget);
   });
 
-  testWidgets('pin, camera and info are disabled placeholders', (tester) async {
+  testWidgets('pin and camera are disabled placeholders', (tester) async {
     await pump(tester);
-    for (final key in ['crosshair_menu_pin', 'crosshair_menu_camera', 'crosshair_menu_info']) {
+    for (final key in ['crosshair_menu_pin', 'crosshair_menu_camera']) {
       expect(tester.widget<IconButton>(find.byKey(Key(key))).onPressed, isNull, reason: key);
     }
   });
@@ -92,5 +93,12 @@ void main() {
     expect(tester.getTopLeft(triangle).dy, tester.getBottomLeft(card).dy);
     expect(tester.getCenter(triangle).dx, tester.getCenter(card).dx);
     expect(tester.getSize(card).width, lessThanOrEqualTo(320));
+  });
+
+  testWidgets('info icon is active and calls back', (tester) async {
+    final calls = await pump(tester);
+    expect(tester.widget<IconButton>(find.byKey(const Key('crosshair_menu_info'))).onPressed, isNotNull);
+    await tester.tap(find.byKey(const Key('crosshair_menu_info')));
+    expect(calls, ['info']);
   });
 }

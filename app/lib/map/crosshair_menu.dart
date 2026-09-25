@@ -17,6 +17,7 @@ class CrosshairMenu extends StatefulWidget {
     required this.onSetTarget,
     required this.onRemoveTarget,
     required this.onNewWaypoint,
+    required this.onInfo,
   });
 
   static const double triangleWidth = 16;
@@ -37,6 +38,7 @@ class CrosshairMenu extends StatefulWidget {
   final VoidCallback onSetTarget;
   final VoidCallback onRemoveTarget;
   final VoidCallback onNewWaypoint;
+  final VoidCallback onInfo;
 
   @override
   State<CrosshairMenu> createState() => _CrosshairMenuState();
@@ -84,10 +86,10 @@ class _CrosshairMenuState extends State<CrosshairMenu> {
   Widget _buildMain(BuildContext context) {
     final disabled = AppTextStyles.menuItemDisabled(context).color;
     Widget placeholderIcon(String key, String icon) => IconButton(
-          key: Key(key),
-          onPressed: null,
-          icon: AppIcon(icon, size: 24, color: disabled),
-        );
+      key: Key(key),
+      onPressed: null,
+      icon: AppIcon(icon, size: 24, color: disabled),
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -98,7 +100,11 @@ class _CrosshairMenuState extends State<CrosshairMenu> {
             children: [
               placeholderIcon('crosshair_menu_pin', AppIcons.pinPlus),
               placeholderIcon('crosshair_menu_camera', AppIcons.camera),
-              placeholderIcon('crosshair_menu_info', AppIcons.info),
+              IconButton(
+                key: const Key('crosshair_menu_info'),
+                onPressed: widget.onInfo,
+                icon: AppIcon(AppIcons.info, size: 24, color: AppTextStyles.menuItem(context).color),
+              ),
             ],
           ),
         ),
@@ -108,11 +114,7 @@ class _CrosshairMenuState extends State<CrosshairMenu> {
         else
           MenuListItem(icon: AppIcons.arrowRight, label: 'Задать цель', onTap: widget.onSetTarget),
         MenuListItem(icon: AppIcons.flagPlus, label: 'Новая метка...', onTap: widget.onNewWaypoint),
-        MenuListItem(
-          icon: AppIcons.wrench,
-          label: 'Инструменты...',
-          onTap: () => setState(() => _showTools = true),
-        ),
+        MenuListItem(icon: AppIcons.wrench, label: 'Инструменты...', onTap: () => setState(() => _showTools = true)),
       ],
     );
   }
@@ -131,10 +133,7 @@ class _CrosshairMenuState extends State<CrosshairMenu> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  Transform.flip(
-                    flipX: true,
-                    child: AppIcon(AppIcons.arrowRight, size: 24, color: style.color),
-                  ),
+                  Transform.flip(flipX: true, child: AppIcon(AppIcons.arrowRight, size: 24, color: style.color)),
                   const SizedBox(width: 16),
                   Text('Инструменты', style: style),
                 ],

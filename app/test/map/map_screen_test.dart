@@ -271,6 +271,30 @@ void main() {
     expect(find.byKey(const Key('coordinate_hud')), findsNothing);
   });
 
+  testWidgets('«i» opens the ИНФОРМАЦИЯ sheet for the point under the crosshair', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(mapCrosshairProvider.notifier).set(const LatLng(47.9958, 37.81465));
+    await tester.tapAt(screenCenter(tester));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('crosshair_menu_info')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+    expect(find.text('ИНФОРМАЦИЯ'), findsOneWidget);
+    expect(find.text('47.99580, 37.81465'), findsOneWidget);
+  });
+
+  testWidgets('«i» before the map has settled reports the map is not ready', (tester) async {
+    await pumpMap(tester);
+    await tester.tapAt(screenCenter(tester));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('crosshair_menu_info')));
+    await tester.pumpAndSettle();
+    expect(find.text('Карта ещё не готова'), findsOneWidget);
+    expect(find.text('ИНФОРМАЦИЯ'), findsNothing);
+  });
+
   group('circleOptionsForWaypoint', () {
     Waypoint waypointWith({required String ownerId, required String type}) => Waypoint(
           id: 'w1',

@@ -14,6 +14,7 @@ import 'map_crosshair.dart';
 import 'map_overlays.dart';
 import 'map_scale.dart';
 import 'map_target.dart';
+import 'point_info_sheet.dart';
 import '../menu/menu_toggles.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
@@ -833,6 +834,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   onRemoveTarget: () {
                     ref.read(crosshairMenuOpenProvider.notifier).close();
                     ref.read(mapTargetProvider.notifier).clear();
+                  },
+                  onInfo: () {
+                    ref.read(crosshairMenuOpenProvider.notifier).close();
+                    final center = _controller?.cameraPosition?.target ?? ref.read(mapCrosshairProvider);
+                    if (center == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Карта ещё не готова')));
+                      return;
+                    }
+                    showPointInfoSheet(
+                      context,
+                      point: center,
+                      sk42: ref.read(menuTogglesProvider)[MenuToggle.settingsSk42Grid]!,
+                    );
                   },
                   onNewWaypoint: () {
                     ref.read(crosshairMenuOpenProvider.notifier).close();
