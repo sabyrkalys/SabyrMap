@@ -1,6 +1,9 @@
 import 'package:app/icons/waypoint_icon_assignments_controller.dart';
 import 'package:app/icons/waypoint_icon_store.dart';
+import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/map_screen.dart';
+import 'package:app/map/map_target.dart';
+import 'package:app/menu/menu_toggles.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
 import 'package:app/tracks/tracks_controller.dart';
@@ -16,6 +19,13 @@ import '../icons/fakes.dart';
 import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
 import '../waypoints/fakes.dart';
+
+class _NoopTogglesStore implements MenuTogglesStore {
+  @override
+  Future<Map<String, bool>> load() async => {};
+  @override
+  Future<void> save(Map<String, bool> values) async {}
+}
 
 // riverpod 3.x's `Override` type isn't part of the package's public export
 // surface (package:riverpod/riverpod.dart and package:flutter_riverpod
@@ -36,6 +46,7 @@ _baseOverrides({
     // talks to flutter_secure_storage, which has no platform channel under
     // flutter test.
     waypointIconStoreProvider.overrideWithValue(iconStore ?? FakeWaypointIconStore()),
+    menuTogglesStoreProvider.overrideWithValue(_NoopTogglesStore()),
   ];
 }
 
@@ -100,50 +111,101 @@ void main() {
     expect(container.read(waypointsControllerProvider).single.name, 'Summit');
   });
 
-  testWidgets('shows a persistent crosshair and a create-waypoint button, with no long-press wiring', (tester) async {
-    final container = ProviderContainer(
-      overrides: _baseOverrides(),
-    );
+  Future<ProviderContainer> pumpMap(WidgetTester tester) async {
+    final container = ProviderContainer(overrides: _baseOverrides());
     addTearDown(container.dispose);
-
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MapScreen()),
-      ),
+      UncontrolledProviderScope(container: container, child: const MaterialApp(home: MapScreen())),
     );
     await tester.pump();
+    return container;
+  }
+
+  testWidgets('crosshair, zoom buttons, no «Метка здесь» button, no long-press wiring', (tester) async {
+    await pumpMap(tester);
 
     expect(find.byKey(const Key('map_crosshair')), findsOneWidget);
-    expect(find.byKey(const Key('create_waypoint_button')), findsOneWidget);
-
-    final map = tester.widget<MapLibreMap>(find.byType(MapLibreMap));
-    expect(map.onMapLongClick, isNull);
+    expect(find.byKey(const Key('zoom_in_button')), findsOneWidget);
+    expect(find.byKey(const Key('zoom_out_button')), findsOneWidget);
+    expect(find.text('Метка здесь'), findsNothing);
+    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapLongClick, isNull);
   });
 
-  testWidgets('tapping create-waypoint button before the map controller is ready shows a message, no crash', (tester) async {
-    final container = ProviderContainer(
-      overrides: _baseOverrides(),
-    );
-    addTearDown(container.dispose);
+  testWidgets('tapping the crosshair opens the card above it; tapping again closes it', (tester) async {
+    await pumpMap(tester);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MapScreen()),
-      ),
+    await tester.tap(find.byKey(const Key('map_crosshair')));
+    await tester.pumpAndSettle();
+    final card = find.byKey(const Key('crosshair_menu'));
+    expect(card, findsOneWidget);
+    expect(
+      tester.getBottomLeft(find.byKey(const Key('crosshair_menu_triangle'))).dy,
+      lessThanOrEqualTo(tester.getTopLeft(find.byKey(const Key('map_crosshair'))).dy),
     );
-    await tester.pump();
+    expect(
+      tester.getCenter(find.byKey(const Key('crosshair_menu_triangle'))).dx,
+      closeTo(tester.getCenter(find.byKey(const Key('map_crosshair'))).dx, 0.5),
+    );
 
-    // MapLibreMap has no real platform view under flutter test, so
-    // onMapCreated never fires and _controller stays null -- this exercises
-    // the FAB's fallback path (real crosshair-driven creation is covered by
-    // manual device verification, same precedent as the old long-press flow
-    // it replaces).
-    await tester.tap(find.byKey(const Key('create_waypoint_button')));
+    await tester.tap(find.byKey(const Key('map_crosshair')));
+    await tester.pumpAndSettle();
+    expect(card, findsNothing);
+  });
+
+  testWidgets('tapping outside the card closes it', (tester) async {
+    await pumpMap(tester);
+    await tester.tap(find.byKey(const Key('map_crosshair')));
     await tester.pumpAndSettle();
 
+    await tester.tapAt(const Offset(20, 300));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
+
+  testWidgets('«Задать цель» closes the card and arms picking; with a target the item is «Убрать цель»', (tester) async {
+    final container = await pumpMap(tester);
+    await tester.tap(find.byKey(const Key('map_crosshair')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Задать цель'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+    expect(container.read(mapTargetProvider), isA<MapTargetPicking>());
+
+    container.read(mapTargetProvider.notifier).pick(const LatLng(48, 37.8));
+    await tester.tap(find.byKey(const Key('map_crosshair')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Убрать цель'));
+    await tester.pumpAndSettle();
+    expect(container.read(mapTargetProvider), isA<MapTargetNone>());
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
+
+  testWidgets('distance label follows «Статус цели»', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
+    container.read(mapTargetProvider.notifier)
+      ..startPicking()
+      ..pick(const LatLng(48, 37.8));
+    await tester.pump();
+    expect(find.byKey(const Key('target_distance_label')), findsOneWidget);
+    expect(find.text('0 м'), findsOneWidget);
+
+    container.read(menuTogglesProvider.notifier).set(MenuToggle.waypointsTargetStatus, false);
+    await tester.pump();
+    expect(find.byKey(const Key('target_distance_label')), findsNothing);
+  });
+
+  testWidgets('«Новая метка...» before the map settles reports the map is not ready', (tester) async {
+    await pumpMap(tester);
+    await tester.tap(find.byKey(const Key('map_crosshair')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Новая метка...'));
+    await tester.pumpAndSettle();
     expect(find.text('Карта ещё не готова'), findsOneWidget);
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
   });
 
   group('circleOptionsForWaypoint', () {

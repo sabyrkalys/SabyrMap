@@ -7,8 +7,12 @@ import '../icons/icon_image_cache.dart';
 import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
 import 'geo_utils.dart';
+import 'crosshair_menu.dart';
 import 'map_camera_store.dart';
 import 'map_crosshair.dart';
+import 'map_overlays.dart';
+import 'map_target.dart';
+import '../menu/menu_toggles.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
@@ -18,8 +22,6 @@ import '../waypoints/waypoint_create_action.dart';
 import '../waypoints/waypoint_models.dart';
 import '../waypoints/waypoint_types.dart';
 import '../waypoints/waypoints_controller.dart';
-import '../widgets/app_icon.dart';
-import '../app_icons.dart';
 
 /// Pure mapping from a waypoint to the [CircleOptions] used to render it.
 /// Extracted as a top-level function so it can be unit-tested without a
@@ -109,6 +111,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // (not on every drag frame, to avoid rebuilding the HUD on each pixel of
   // a pan gesture).
   LatLng? _crosshairPosition;
+
+  // «Задать цель» line: one annotation, refreshed on every camera change
+  // while a target is set. Serialized like _requestSync so rapid camera
+  // ticks never run overlapping add/update calls.
+  Line? _targetLine;
+  bool _targetLineBusy = false;
+  bool _targetLinePending = false;
+  // Live camera centre, tracked only while a target is set so the distance
+  // label follows a drag without rebuilding on every frame otherwise.
+  LatLng? _liveCenter;
 
   // Serializes _syncCircles/_syncLines runs together: at most one combined
   // sync runs at a time, and any state change that arrives while a run is
@@ -224,6 +236,51 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _controller = controller;
     controller.onCircleTapped.add(_onCircleTapped);
     controller.onSymbolTapped.add(_onSymbolTapped);
+    controller.addListener(_onCameraChanged);
+  }
+
+  void _onCameraChanged() {
+    if (ref.read(mapTargetProvider).point == null) return;
+    final center = _controller?.cameraPosition?.target;
+    if (center != null && mounted) setState(() => _liveCenter = center);
+    _syncTargetLine();
+  }
+
+  Future<void> _syncTargetLine() async {
+    if (_targetLineBusy) {
+      _targetLinePending = true;
+      return;
+    }
+    _targetLineBusy = true;
+    try {
+      do {
+        _targetLinePending = false;
+        final controller = _controller;
+        if (controller == null) return;
+        final target = ref.read(mapTargetProvider).point;
+        final showLine = ref.read(menuTogglesProvider)[MenuToggle.waypointsTargetLine]!;
+        final center = controller.cameraPosition?.target;
+        final existing = _targetLine;
+        if (target == null || !showLine || center == null) {
+          if (existing != null) {
+            _targetLine = null;
+            await controller.removeLine(existing);
+          }
+        } else {
+          final options = LineOptions(geometry: [center, target], lineColor: targetLineColorHex, lineWidth: 3);
+          if (existing == null) {
+            _targetLine = await controller.addLine(options);
+          } else {
+            await controller.updateLine(existing, options);
+          }
+        }
+      } while (_targetLinePending);
+    } catch (_) {
+      // Same soft-failure policy as _runSync: a manager not ready yet or a
+      // style reload race; the next camera tick or state change retries.
+    } finally {
+      _targetLineBusy = false;
+    }
   }
 
   void _onCameraIdle() {
@@ -253,6 +310,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _appliedSymbolKeys.clear();
     _iconImageCache.clear();
     _myLocationCircle = null;
+    _targetLine = null;
     // The symbol manager defaults to iconAllowOverlap/iconIgnorePlacement:
     // false, so symbol placement collides against every symbol on the map
     // (including the basemap style's own POI/label symbols). Without this,
@@ -269,6 +327,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     } catch (_) {}
     _maybeCenterCamera();
     _requestSync();
+    _syncTargetLine();
   }
 
   /// Entry point for requesting a combined circle+symbol+line sync. Coalesces
@@ -605,6 +664,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _requestSync();
     });
 
+    ref.listen<MapTargetState>(mapTargetProvider, (previous, next) {
+      _liveCenter = _controller?.cameraPosition?.target;
+      _syncTargetLine();
+    });
+    ref.listen<Map<MenuToggle, bool>>(menuTogglesProvider, (previous, next) => _syncTargetLine());
+    final target = ref.watch(mapTargetProvider).point;
+    final toggles = ref.watch(menuTogglesProvider);
+    final menuOpen = ref.watch(crosshairMenuOpenProvider);
+    final center = _liveCenter ?? ref.watch(mapCrosshairProvider);
+
     return Scaffold(
       body: Stack(
         children: [
@@ -615,6 +684,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraIdle: _onCameraIdle,
+            onMapClick: (point, coordinates) => ref.read(mapTargetProvider.notifier).pick(coordinates),
           ),
           if (_crosshairPosition != null)
             Positioned(
@@ -635,23 +705,83 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ),
-          IgnorePointer(
-            child: Center(
-              child: Container(
-                key: const Key('map_crosshair'),
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
+          if (target != null && center != null && toggles[MenuToggle.waypointsTargetStatus]!)
+            Center(
+              child: Transform.translate(
+                offset: const Offset(0, -34),
+                child: TargetDistanceLabel(key: const Key('target_distance_label'), from: center, to: target),
+              ),
+            ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: SafeArea(
+              top: false,
+              left: false,
+              child: MapZoomButtons(
+                onZoomIn: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
+                onZoomOut: () => _controller?.animateCamera(CameraUpdate.zoomOut()),
+              ),
+            ),
+          ),
+          if (menuOpen) ...[
+            Positioned.fill(
+              child: GestureDetector(
+                key: const Key('crosshair_menu_barrier'),
+                behavior: HitTestBehavior.opaque,
+                onTap: () => ref.read(crosshairMenuOpenProvider.notifier).close(),
+              ),
+            ),
+            // The card's bottom (its triangle tip) sits just above the
+            // crosshair: half the screen minus the crosshair's radius.
+            Positioned(
+              left: 16,
+              right: 16,
+              top: MediaQuery.paddingOf(context).top + 8,
+              bottom: MediaQuery.sizeOf(context).height / 2 + 16 + 2,
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: CrosshairMenu(
+                  hasTarget: target != null,
+                  onSetTarget: () {
+                    ref.read(crosshairMenuOpenProvider.notifier).close();
+                    ref.read(mapTargetProvider.notifier).startPicking();
+                  },
+                  onRemoveTarget: () {
+                    ref.read(crosshairMenuOpenProvider.notifier).close();
+                    ref.read(mapTargetProvider.notifier).clear();
+                  },
+                  onNewWaypoint: () {
+                    ref.read(crosshairMenuOpenProvider.notifier).close();
+                    createWaypointAtCrosshair(context, ref, iconScanner: _iconLibraryScanner);
+                  },
                 ),
-                child: Center(
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+          Center(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => ref.read(crosshairMenuOpenProvider.notifier).toggle(),
+              child: Padding(
+                // Larger hit area than the 32 dp ring.
+                padding: const EdgeInsets.all(8),
+                child: Container(
+                  key: const Key('map_crosshair'),
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ),
                 ),
@@ -659,12 +789,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        key: const Key('create_waypoint_button'),
-        onPressed: () => createWaypointAtCrosshair(context, ref, iconScanner: _iconLibraryScanner),
-        icon: const AppIcon(AppIcons.flagPlus),
-        label: const Text('Метка здесь'),
       ),
     );
   }

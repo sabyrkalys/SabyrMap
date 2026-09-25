@@ -175,4 +175,14 @@ void main() {
     expect(tester.getTopLeft(find.byKey(const Key('menu_panel_card'))).dx, 126 / 2.625 + 5);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('opening a nav panel closes the crosshair card', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const Key('map_crosshair')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsOneWidget);
+
+    await tapNav(tester, 1);
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
 }

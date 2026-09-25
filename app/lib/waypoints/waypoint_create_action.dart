@@ -9,7 +9,7 @@ import 'waypoint_models.dart';
 import 'waypoints_controller.dart';
 
 /// Opens the new-waypoint form and creates the waypoint at the map's
-/// crosshair. Shared by the map's «Метка здесь» button and the МЕТКИ panel.
+/// crosshair. Shared by the crosshair menu and the МЕТКИ panel.
 ///
 /// The panel can be closed while the request is in flight, which unmounts
 /// [context] and disposes [ref]; the container and messenger are captured

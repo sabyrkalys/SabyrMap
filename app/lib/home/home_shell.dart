@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_icons.dart';
 import '../map/map_screen.dart';
+import '../map/map_target.dart';
 import '../menu/menu_panels.dart';
 import '../system_ui.dart';
 import '../widgets/app_icon.dart';
@@ -31,6 +33,7 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onNavSelected(int index) {
     final tab = MenuTab.values[index];
+    ProviderScope.containerOf(context, listen: false).read(crosshairMenuOpenProvider.notifier).close();
     setState(() => _openTab = _openTab == tab ? null : tab);
   }
 
