@@ -10,16 +10,22 @@ import 'waypoints_controller.dart';
 
 /// Opens the new-waypoint form and creates the waypoint at the map's
 /// crosshair. Shared by the map's «Метка здесь» button and the МЕТКИ panel.
+///
+/// The panel can be closed while the request is in flight, which unmounts
+/// [context] and disposes [ref]; the container and messenger are captured
+/// up front so the result is still applied and reported.
 Future<void> createWaypointAtCrosshair(BuildContext context, WidgetRef ref, {IconLibraryScanner? iconScanner}) async {
+  final container = ProviderScope.containerOf(context, listen: false);
+  final messenger = ScaffoldMessenger.of(context);
   final coordinates = ref.read(mapCrosshairProvider);
   if (coordinates == null) {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Карта ещё не готова')));
+    messenger.showSnackBar(const SnackBar(content: Text('Карта ещё не готова')));
     return;
   }
   final result = await showWaypointFormSheet(context, iconScanner: iconScanner);
-  if (result == null || !context.mounted) return;
+  if (result == null) return;
   try {
-    final created = await ref.read(waypointsControllerProvider.notifier).createWaypoint(
+    final created = await container.read(waypointsControllerProvider.notifier).createWaypoint(
           name: result.name,
           type: result.type,
           note: result.note,
@@ -28,13 +34,13 @@ Future<void> createWaypointAtCrosshair(BuildContext context, WidgetRef ref, {Ico
           lng: coordinates.longitude,
         );
     try {
-      await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(created.id, result.iconFileName);
+      await container.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(created.id, result.iconFileName);
     } catch (_) {
       // The waypoint itself was created; a local icon-bookkeeping failure
       // is a soft failure and shouldn't be reported as a failed creation.
       // Same reasoning as editWaypoint/deleteWaypoint in waypoint_actions.dart.
     }
   } on WaypointException catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    messenger.showSnackBar(SnackBar(content: Text(e.message)));
   }
 }

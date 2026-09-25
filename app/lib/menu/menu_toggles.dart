@@ -84,17 +84,25 @@ class MenuTogglesController extends Notifier<Map<MenuToggle, bool>> {
     } catch (_) {
       return;
     }
+    if (!ref.mounted) return;
     final next = {...state};
     for (final toggle in MenuToggle.values) {
       final value = saved[toggle.name];
       if (value != null && !_changedBeforeLoad.contains(toggle)) next[toggle] = value;
     }
     state = next;
+    // A set() before the read saved defaults for every other toggle; save
+    // again so the values just loaded are not lost from storage.
+    if (_changedBeforeLoad.isNotEmpty) _save();
   }
 
   void set(MenuToggle toggle, bool value) {
     _changedBeforeLoad.add(toggle);
     state = {...state, toggle: value};
+    _save();
+  }
+
+  void _save() {
     ref
         .read(menuTogglesStoreProvider)
         .save({for (final entry in state.entries) entry.key.name: entry.value})

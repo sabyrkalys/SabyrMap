@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/compass/compass_screen.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/menu/menu_panels.dart';
@@ -22,6 +24,19 @@ class _MemoryStore implements MenuTogglesStore {
   Future<Map<String, bool>> load() async => {...saved};
   @override
   Future<void> save(Map<String, bool> values) async => saved = {...values};
+}
+
+class _SlowTracksRepository extends FakeTracksRepository {
+  final pending = Completer<Track>();
+
+  @override
+  Future<Track> create({
+    required String name,
+    required List<TrackPoint> points,
+    DateTime? startedAt,
+    DateTime? finishedAt,
+  }) =>
+      pending.future;
 }
 
 void main() {
@@ -204,6 +219,57 @@ void main() {
     await tester.enterText(find.byKey(const Key('track_name_field')), 'My track');
     await tester.pump();
     await tester.tap(find.byKey(const Key('track_save_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Could not create track'), findsOneWidget);
+  });
+
+  testWidgets('a track save failure is still reported after the panel closes', (tester) async {
+    final locationSource = FakeLocationSource();
+    final repo = _SlowTracksRepository();
+    final container = ProviderContainer(
+      overrides: [
+        menuTogglesStoreProvider.overrideWithValue(_MemoryStore()),
+        tracksRepositoryProvider.overrideWithValue(repo),
+        locationSourceProvider.overrideWithValue(locationSource),
+      ],
+    );
+    addTearDown(container.dispose);
+    var showPanel = true;
+    late StateSetter setHostState;
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: StatefulBuilder(
+              builder: (context, setState) {
+                setHostState = setState;
+                return showPanel
+                    ? Align(alignment: Alignment.bottomLeft, child: menuPanelFor(MenuTab.positioning, arrowCenterX: 25))
+                    : const SizedBox.shrink();
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('track_record_toggle')));
+    await tester.pumpAndSettle();
+    locationSource.emit(const TrackPoint(lat: 1.0, lng: 2.0));
+    await tester.pump();
+    locationSource.emit(const TrackPoint(lat: 1.1, lng: 2.1));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('track_record_toggle')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('track_name_field')), 'My track');
+    await tester.tap(find.byKey(const Key('track_save_button')));
+    await tester.pumpAndSettle();
+
+    setHostState(() => showPanel = false);
+    await tester.pump();
+    repo.pending.completeError(const TrackException('Could not create track'));
     await tester.pumpAndSettle();
 
     expect(find.text('Could not create track'), findsOneWidget);

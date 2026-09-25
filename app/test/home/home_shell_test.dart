@@ -149,4 +149,30 @@ void main() {
 
     expect(tester.getSize(find.byKey(const Key('nav_indicator'))), const Size(48, 48));
   });
+
+  testWidgets('system back closes an open panel instead of leaving the app', (tester) async {
+    await pumpShell(tester);
+    await tapNav(tester, 1);
+
+    final handled = await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(handled, isTrue);
+    expect(find.byKey(const Key('maps_panel')), findsNothing);
+    expect(find.byType(MapScreen), findsOneWidget);
+  });
+
+  testWidgets('panel and arrow respect a left system inset in landscape', (tester) async {
+    tester.view.physicalSize = const Size(2400, 1080);
+    tester.view.devicePixelRatio = 2.625;
+    tester.view.padding = const FakeViewPadding(left: 126);
+    addTearDown(tester.view.reset);
+    await pumpShell(tester);
+    await tapNav(tester, 3);
+
+    final icon = find.descendant(of: find.byKey(const Key('nav_positioning')), matching: find.byType(SvgPicture));
+    expect(tester.getCenter(find.byKey(const Key('menu_panel_arrow'))).dx, tester.getCenter(icon).dx);
+    expect(tester.getTopLeft(find.byKey(const Key('menu_panel_card'))).dx, 126 / 2.625 + 5);
+    expect(tester.takeException(), isNull);
+  });
 }

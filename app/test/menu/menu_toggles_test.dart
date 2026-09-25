@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app/menu/menu_toggles.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -8,6 +10,15 @@ class _MemoryStore implements MenuTogglesStore {
   Map<String, bool> saved;
   @override
   Future<Map<String, bool>> load() async => {...saved};
+  @override
+  Future<void> save(Map<String, bool> values) async => saved = {...values};
+}
+
+class _SlowStore implements MenuTogglesStore {
+  final pendingLoad = Completer<Map<String, bool>>();
+  Map<String, bool> saved = {};
+  @override
+  Future<Map<String, bool>> load() => pendingLoad.future;
   @override
   Future<void> save(Map<String, bool> values) async => saved = {...values};
 }
@@ -51,6 +62,19 @@ void main() {
     expect(container.read(menuTogglesProvider)[MenuToggle.mapsScaleBar], isTrue);
     expect(store.saved['mapsScaleBar'], isTrue);
     expect(store.saved.length, MenuToggle.values.length);
+  });
+
+  test('a change made before the saved values load does not overwrite the other saved values', () async {
+    final store = _SlowStore();
+    final container = containerWith(store);
+    container.read(menuTogglesProvider);
+
+    container.read(menuTogglesProvider.notifier).set(MenuToggle.mapsScaleBar, true);
+    store.pendingLoad.complete({'waypointsNames': false});
+    await Future<void>.delayed(Duration.zero);
+
+    expect(store.saved['mapsScaleBar'], isTrue);
+    expect(store.saved['waypointsNames'], isFalse);
   });
 
   group('SecureMenuTogglesStore', () {

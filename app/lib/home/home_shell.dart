@@ -39,51 +39,60 @@ class _HomeShellState extends State<HomeShell> {
     final openTab = _openTab;
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: systemNavigationBarStyle(Theme.of(context).brightness),
-      child: Scaffold(
-        // The nav panel is half transparent and doesn't span the full width,
-        // so the map must continue underneath it.
-        extendBody: true,
-        // Builder: the extendBody bottom padding only exists below the Scaffold.
-        body: Builder(
-          builder: (context) {
-            final padding = MediaQuery.paddingOf(context);
-            return Stack(
-              children: [
-                const MapScreen(),
-                if (openTab != null) ...[
-                  // Catches the tap that closes the panel so it never
-                  // reaches the map underneath.
-                  Positioned.fill(
-                    child: GestureDetector(
-                      key: const Key('menu_panel_barrier'),
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => setState(() => _openTab = null),
-                    ),
-                  ),
-                  Positioned(
-                    left: _panelMargin,
-                    right: _panelMargin,
-                    top: padding.top + _panelMargin,
-                    // With extendBody the bottom padding is the nav panel's
-                    // height; the panel's arrow fills the gap down to it.
-                    bottom: padding.bottom,
-                    child: Align(
-                      alignment: Alignment.bottomLeft,
-                      child: menuPanelFor(
-                        openTab,
-                        arrowCenterX: _BottomNav.iconCenterX(openTab.index) - _panelMargin,
+      // System back closes an open panel before it can leave the app.
+      child: PopScope(
+        canPop: openTab == null,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) setState(() => _openTab = null);
+        },
+        child: Scaffold(
+          // The nav panel is half transparent and doesn't span the full width,
+          // so the map must continue underneath it.
+          extendBody: true,
+          // Builder: the extendBody bottom padding only exists below the Scaffold.
+          body: Builder(
+            builder: (context) {
+              final padding = MediaQuery.paddingOf(context);
+              return Stack(
+                children: [
+                  const MapScreen(),
+                  if (openTab != null) ...[
+                    // Catches the tap that closes the panel so it never
+                    // reaches the map underneath.
+                    Positioned.fill(
+                      child: GestureDetector(
+                        key: const Key('menu_panel_barrier'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setState(() => _openTab = null),
                       ),
                     ),
-                  ),
+                    Positioned(
+                      // The nav icons sit inside a SafeArea, so a side system
+                      // bar (landscape) shifts them; the panel follows.
+                      left: padding.left + _panelMargin,
+                      right: padding.right + _panelMargin,
+                      top: padding.top + _panelMargin,
+                      // With extendBody the bottom padding is the nav panel's
+                      // height; the panel's arrow fills the gap down to it.
+                      bottom: padding.bottom,
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child: menuPanelFor(
+                          openTab,
+                          arrowCenterX: _BottomNav.iconCenterX(openTab.index) - _panelMargin,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
-            );
-          },
-        ),
-        bottomNavigationBar: _BottomNav(
-          destinations: _destinations,
-          selectedIndex: openTab?.index,
-          onSelected: _onNavSelected,
+              );
+            },
+          ),
+          bottomNavigationBar: _BottomNav(
+            destinations: _destinations,
+            selectedIndex: openTab?.index,
+            onSelected: _onNavSelected,
+          ),
         ),
       ),
     );
