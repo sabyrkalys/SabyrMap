@@ -298,6 +298,13 @@ void main() {
     expect(consumed, containsAll([AnnotationType.circle, AnnotationType.symbol]));
   });
 
+  testWidgets('the map is capped at zoom 20 and the old coordinate HUD is gone', (tester) async {
+    await pumpMap(tester);
+    final map = tester.widget<MapLibreMap>(find.byType(MapLibreMap));
+    expect(map.minMaxZoomPreference.maxZoom, 20);
+    expect(find.byKey(const Key('coordinate_hud')), findsNothing);
+  });
+
   group('circleOptionsForWaypoint', () {
     Waypoint waypointWith({required String ownerId, required String type}) => Waypoint(
           id: 'w1',

@@ -9,11 +9,12 @@ import '../config.dart';
 import '../icons/icon_image_cache.dart';
 import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
-import 'geo_utils.dart';
 import 'crosshair_menu.dart';
+import 'info_panel.dart';
 import 'map_camera_store.dart';
 import 'map_crosshair.dart';
 import 'map_overlays.dart';
+import 'map_scale.dart';
 import 'map_target.dart';
 import '../menu/menu_toggles.dart';
 import '../tracks/track_models.dart';
@@ -114,6 +115,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // (not on every drag frame, to avoid rebuilding the HUD on each pixel of
   // a pan gesture).
   LatLng? _crosshairPosition;
+  double _cameraZoom = initialMapCamera.zoom;
 
   // «Задать цель» line: one annotation, refreshed on every camera change
   // while a target is set. Serialized like _requestSync so rapid camera
@@ -328,7 +330,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onCameraIdle() {
     final position = _controller?.cameraPosition;
     if (position == null) return;
-    setState(() => _crosshairPosition = position.target);
+    setState(() {
+      _crosshairPosition = position.target;
+      _cameraZoom = position.zoom;
+    });
     ref.read(mapCrosshairProvider.notifier).set(position.target);
     if (_savedCameraLoaded && shouldPersistCamera(position, cameraRestored: _hasCenteredCamera)) {
       ref.read(mapCameraStoreProvider).save(position).catchError((_) {});
@@ -741,6 +746,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraIdle: _onCameraIdle,
             onMapClick: _onMapClick,
+            minMaxZoomPreference: const MinMaxZoomPreference(null, mapMaxZoom),
             // Lines (tracks, the target line) must not swallow taps: the
             // target line always runs through the crosshair, so a consumed
             // tap there could never reach _onMapClick to open the card.
@@ -761,7 +767,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   padding: const EdgeInsets.only(top: 12),
                   child: Align(
                     alignment: Alignment.topLeft,
-                    child: _CoordinateHud(target: _crosshairPosition!, myLocation: _myLocation),
+                    child: InfoPanel(
+                      center: _liveCenter ?? _crosshairPosition!,
+                      zoom: _cameraZoom,
+                      target: target,
+                      recording: ref.watch(trackRecordingControllerProvider) is TrackRecordingActive,
+                      toggles: toggles,
+                    ),
                   ),
                 ),
               ),
@@ -860,45 +872,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Small HUD card showing the crosshair's coordinates and, when the user's
-/// own position is known, the distance and bearing from it to the crosshair.
-class _CoordinateHud extends StatelessWidget {
-  const _CoordinateHud({required this.target, required this.myLocation});
-
-  final LatLng target;
-  final TrackPoint? myLocation;
-
-  @override
-  Widget build(BuildContext context) {
-    final location = myLocation;
-    final distance = location == null
-        ? null
-        : distanceMeters(location.lat, location.lng, target.latitude, target.longitude);
-    final bearing = location == null
-        ? null
-        : bearingDegrees(location.lat, location.lng, target.latitude, target.longitude);
-
-    return Card(
-      key: const Key('coordinate_hud'),
-      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.9),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${target.latitude.toStringAsFixed(5)}, ${target.longitude.toStringAsFixed(5)}',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            if (distance != null && bearing != null) Text('${distance.round()} м · ${bearing.round()}°'),
-          ],
-        ),
       ),
     );
   }
