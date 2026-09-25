@@ -14,48 +14,29 @@ void main() {
     expect(container().read(mapTargetProvider), isA<MapTargetNone>());
   });
 
-  test('pick only sets a target while picking', () {
+  test('setAt sets the target start; clear removes it', () {
     final c = container();
-    c.read(mapTargetProvider.notifier).pick(const LatLng(1, 2));
-    expect(c.read(mapTargetProvider), isA<MapTargetNone>());
-
-    c.read(mapTargetProvider.notifier).startPicking();
-    expect(c.read(mapTargetProvider), isA<MapTargetPicking>());
-    c.read(mapTargetProvider.notifier).pick(const LatLng(1, 2));
+    c.read(mapTargetProvider.notifier).setAt(const LatLng(1, 2));
     expect(c.read(mapTargetProvider).point, const LatLng(1, 2));
 
-    c.read(mapTargetProvider.notifier).pick(const LatLng(3, 4));
-    expect(c.read(mapTargetProvider).point, const LatLng(1, 2), reason: 'not picking any more');
-  });
+    c.read(mapTargetProvider.notifier).setAt(const LatLng(3, 4));
+    expect(c.read(mapTargetProvider).point, const LatLng(3, 4));
 
-  test('clear removes the target', () {
-    final c = container();
-    c.read(mapTargetProvider.notifier)
-      ..startPicking()
-      ..pick(const LatLng(1, 2))
-      ..clear();
+    c.read(mapTargetProvider.notifier).clear();
     expect(c.read(mapTargetProvider), isA<MapTargetNone>());
   });
 
-  test('opening the menu cancels picking but keeps a set target', () {
+  test('the crosshair card opens, closes and toggles; a target survives it', () {
     final c = container();
-    c.read(mapTargetProvider.notifier).startPicking();
+    c.read(mapTargetProvider.notifier).setAt(const LatLng(1, 2));
     c.read(crosshairMenuOpenProvider.notifier).open();
-    expect(c.read(mapTargetProvider), isA<MapTargetNone>());
-    c.read(crosshairMenuOpenProvider.notifier).close();
-
-    c.read(mapTargetProvider.notifier)
-      ..startPicking()
-      ..pick(const LatLng(1, 2));
-    c.read(crosshairMenuOpenProvider.notifier).toggle();
     expect(c.read(crosshairMenuOpenProvider), isTrue);
-    expect(c.read(mapTargetProvider).point, const LatLng(1, 2));
-
     c.read(crosshairMenuOpenProvider.notifier).toggle();
     expect(c.read(crosshairMenuOpenProvider), isFalse);
-    c.read(crosshairMenuOpenProvider.notifier).open();
+    c.read(crosshairMenuOpenProvider.notifier).toggle();
     c.read(crosshairMenuOpenProvider.notifier).close();
     expect(c.read(crosshairMenuOpenProvider), isFalse);
+    expect(c.read(mapTargetProvider).point, const LatLng(1, 2));
   });
 
   test('formatDistance', () {

@@ -101,7 +101,7 @@ class InfoPanel extends StatelessWidget {
       final meters = distanceMeters(center.latitude, center.longitude, target.latitude, target.longitude);
       final azimuth = meters == 0
           ? 0.0
-          : bearingDegrees(center.latitude, center.longitude, target.latitude, target.longitude);
+          : bearingDegrees(target.latitude, target.longitude, center.latitude, center.longitude);
       lines.add(
         Row(
           key: const Key('info_line_target'),

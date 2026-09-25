@@ -35,7 +35,6 @@ class _HomeShellState extends State<HomeShell> {
     final tab = MenuTab.values[index];
     final container = ProviderScope.containerOf(context, listen: false);
     container.read(crosshairMenuOpenProvider.notifier).close();
-    container.read(mapTargetProvider.notifier).cancelPicking();
     setState(() => _openTab = _openTab == tab ? null : tab);
   }
 

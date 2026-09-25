@@ -24,7 +24,8 @@ Main list, top to bottom:
 ## Target («Задать цель»)
 
 - It is a measuring tool, not an object: it is kept only in memory and is gone after an app restart.
-- «Задать цель» closes the card and arms target picking. The next tap on the map sets the target at the tapped point (any point on the map). No hint is shown.
+- «Задать цель» closes the card and makes the point currently under the crosshair the target start (changed 2026-09-25 at the user's request; no map tap is needed). The user first moves the map so the crosshair is over the wanted point.
+- A dot the size of the crosshair's centre dot marks the start; the crosshair marks the other end.
 - The crosshair always stays at the screen centre. The target is a geographic point, so it moves with the map when the map is panned or zoomed.
 - A line is drawn from the crosshair (current camera centre) to the target. It is redrawn as the camera moves.
 - Above the crosshair, in orange, the distance from the crosshair to the target is shown, in the same format as the coordinate HUD («350 м», «1.2 км»).

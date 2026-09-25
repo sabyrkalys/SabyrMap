@@ -134,5 +134,11 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
-}
 
+  testWidgets('line 3 azimuth runs from the target start to the crosshair', (tester) async {
+    // The start is one degree south of the crosshair, so the bearing from
+    // it to the crosshair is due north.
+    await pump(tester, target: const LatLng(46.99580, 37.81465));
+    expect(find.textContaining(' 0.0°'), findsOneWidget);
+  });
+}

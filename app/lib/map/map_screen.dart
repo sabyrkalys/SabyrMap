@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -121,6 +119,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // while a target is set. Serialized like _requestSync so rapid camera
   // ticks never run overlapping add/update calls.
   Line? _targetLine;
+  // Dot at the target start, the size of the crosshair's centre dot; the
+  // crosshair itself marks the other end of the line.
+  Circle? _targetDot;
   bool _targetLineBusy = false;
   bool _targetLinePending = false;
   // Live camera centre, tracked only while a target is set so the distance
@@ -262,13 +263,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (hasTarget) _syncTargetLine();
   }
 
-  // While «Задать цель» is armed any map tap sets the target. MapLibre only
-  // reports taps once the style has loaded, so the crosshair menu is not
-  // driven from here (see _onCrosshairPointerUp).
-  void _onMapClick(Point<double> point, LatLng coordinates) {
-    ref.read(mapTargetProvider.notifier).pick(coordinates);
-  }
-
   // The crosshair watches raw pointers without taking part in gestures, so
   // drags and pinches that start on it still reach the map. A short,
   // single-finger tap that doesn't move opens or closes the card; this works
@@ -291,7 +285,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final (position, time) = down;
     if ((event.position - position).distance > kTouchSlop) return;
     if (event.timeStamp - time > _crosshairTapTimeout) return;
-    if (ref.read(mapTargetProvider) is MapTargetPicking) return;
     ref.read(crosshairMenuOpenProvider.notifier).toggle();
   }
 
@@ -299,6 +292,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _crosshairPointers.remove(event.pointer);
     if (_crosshairPointers.isEmpty) _crosshairMultiTouch = false;
   }
+
+  static const double _targetDotRadius = 3; // 6 dp, like the crosshair's centre dot
+  static const String _targetDotColorHex = '#1A1C1E';
 
   Future<void> _syncTargetLine() async {
     if (_targetLineBusy) {
@@ -315,12 +311,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         final showLine = ref.read(menuTogglesProvider)[MenuToggle.waypointsTargetLine]!;
         final center = _liveCenter ?? controller.cameraPosition?.target;
         final existing = _targetLine;
+        final existingDot = _targetDot;
         if (target == null || !showLine || center == null) {
           if (existing != null) {
             _targetLine = null;
             await controller.removeLine(existing);
           }
+          if (existingDot != null) {
+            _targetDot = null;
+            await controller.removeCircle(existingDot);
+          }
         } else {
+          final dot = CircleOptions(geometry: target, circleRadius: _targetDotRadius, circleColor: _targetDotColorHex);
+          if (existingDot == null) {
+            _targetDot = await controller.addCircle(dot);
+          } else if (existingDot.options.geometry != target) {
+            await controller.updateCircle(existingDot, dot);
+          }
           final options = LineOptions(geometry: [center, target], lineColor: targetLineColorHex, lineWidth: 3);
           if (existing == null) {
             _targetLine = await controller.addLine(options);
@@ -368,6 +375,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _iconImageCache.clear();
     _myLocationCircle = null;
     _targetLine = null;
+    _targetDot = null;
     // The symbol manager defaults to iconAllowOverlap/iconIgnorePlacement:
     // false, so symbol placement collides against every symbol on the map
     // (including the basemap style's own POI/label symbols). Without this,
@@ -681,13 +689,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onCircleTapped(Circle circle) {
-    // Annotations consume the tap before onMapClick, so picking a target on
-    // a waypoint has to be handled here.
-    final geometry = circle.options.geometry;
-    if (ref.read(mapTargetProvider) is MapTargetPicking && geometry != null) {
-      ref.read(mapTargetProvider.notifier).pick(geometry);
-      return;
-    }
     final waypointId = circle.data?['waypointId'] as String?;
     if (waypointId == null) return;
     final waypoints = ref.read(waypointsControllerProvider);
@@ -699,11 +700,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Same routing as [_onCircleTapped], for waypoints rendered as image
   /// Symbols -- tapping either kind of marker opens the same details sheet.
   void _onSymbolTapped(Symbol symbol) {
-    final geometry = symbol.options.geometry;
-    if (ref.read(mapTargetProvider) is MapTargetPicking && geometry != null) {
-      ref.read(mapTargetProvider.notifier).pick(geometry);
-      return;
-    }
     final waypointId = symbol.data?['waypointId'] as String?;
     if (waypointId == null) return;
     final waypoints = ref.read(waypointsControllerProvider);
@@ -755,11 +751,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraIdle: _onCameraIdle,
-            onMapClick: _onMapClick,
             minMaxZoomPreference: const MinMaxZoomPreference(null, mapMaxZoom),
-            // Lines (tracks, the target line) must not swallow taps: the
-            // target line always runs through the crosshair, so a consumed
-            // tap there could never reach _onMapClick to open the card.
+            // Lines never take taps (nothing in the app handles them).
             annotationConsumeTapEvents: const [AnnotationType.symbol, AnnotationType.circle, AnnotationType.fill],
             onCameraMove: _onCameraMove,
           ),
@@ -830,7 +823,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   hasTarget: target != null,
                   onSetTarget: () {
                     ref.read(crosshairMenuOpenProvider.notifier).close();
-                    ref.read(mapTargetProvider.notifier).startPicking();
+                    final center = _controller?.cameraPosition?.target ?? ref.read(mapCrosshairProvider);
+                    if (center == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Карта ещё не готова')));
+                      return;
+                    }
+                    ref.read(mapTargetProvider.notifier).setAt(center);
                   },
                   onRemoveTarget: () {
                     ref.read(crosshairMenuOpenProvider.notifier).close();

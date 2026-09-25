@@ -1,7 +1,6 @@
 import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
-import 'package:app/map/map_target.dart';
 import 'package:app/menu/menu_toggles.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
@@ -186,14 +185,5 @@ void main() {
 
     await tapNav(tester, 1);
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
-  });
-
-  testWidgets('opening a nav panel cancels an armed «Задать цель»', (tester) async {
-    await pumpShell(tester);
-    final container = ProviderScope.containerOf(tester.element(find.byType(HomeShell)));
-    container.read(mapTargetProvider.notifier).startPicking();
-
-    await tapNav(tester, 2);
-    expect(container.read(mapTargetProvider), isA<MapTargetNone>());
   });
 }

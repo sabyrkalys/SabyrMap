@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-/// The «Задать цель» measuring tool: a point the crosshair measures to.
+/// The «Задать цель» measuring tool: a start point the crosshair measures from.
 /// Memory only -- it is a tool, not an object, and is gone after a restart.
 sealed class MapTargetState {
   const MapTargetState();
@@ -11,11 +11,6 @@ sealed class MapTargetState {
 
 class MapTargetNone extends MapTargetState {
   const MapTargetNone();
-}
-
-/// Armed by «Задать цель»: the next map tap becomes the target.
-class MapTargetPicking extends MapTargetState {
-  const MapTargetPicking();
 }
 
 class MapTargetSet extends MapTargetState {
@@ -31,31 +26,21 @@ class MapTargetController extends Notifier<MapTargetState> {
   @override
   MapTargetState build() => const MapTargetNone();
 
-  void startPicking() => state = const MapTargetPicking();
-
-  void pick(LatLng point) {
-    if (state is MapTargetPicking) state = MapTargetSet(point);
-  }
-
-  void cancelPicking() {
-    if (state is MapTargetPicking) state = const MapTargetNone();
-  }
+  /// «Задать цель»: [point] (the spot under the crosshair) becomes the
+  /// start of the measurement; the crosshair is its other end.
+  void setAt(LatLng point) => state = MapTargetSet(point);
 
   void clear() => state = const MapTargetNone();
 }
 
 final mapTargetProvider = NotifierProvider<MapTargetController, MapTargetState>(MapTargetController.new);
 
-/// Whether the crosshair context card is open. Opening it cancels a pending
-/// target pick, so an armed «Задать цель» never swallows a later tap.
+/// Whether the crosshair context card is open.
 class CrosshairMenuOpen extends Notifier<bool> {
   @override
   bool build() => false;
 
-  void open() {
-    ref.read(mapTargetProvider.notifier).cancelPicking();
-    state = true;
-  }
+  void open() => state = true;
 
   void close() => state = false;
 

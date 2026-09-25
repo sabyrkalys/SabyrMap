@@ -23,7 +23,7 @@ A floating block in the top-left corner (same place as today): light semi-transp
 
 ### Line 3 — target (only while a «Задать цель» target is set)
 
-- Flag icon, then `→ 232,03 км 348.6°`: distance and azimuth from the crosshair (screen centre) to the target.
+- Flag icon, then `→ 232,03 км 348.6°`: distance, and azimuth from the target start to the crosshair (screen centre). Under 1 km the distance has one decimal (`12,3 м`).
 - Distance: from 1 km up, kilometres with a decimal comma and two decimals (`232,03 км`); under 1 km, whole metres (`350 м`). Azimuth: degrees with one decimal and a decimal point, 0–360 (`348.6°`).
 - The orange distance above the crosshair stays. «Статус цели» (`MenuToggle.waypointsTargetStatus`) shows/hides both.
 
