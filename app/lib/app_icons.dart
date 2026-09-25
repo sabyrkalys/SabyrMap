@@ -58,6 +58,8 @@ class AppIcons {
   static const String settings = '$_base/settings.svg';
   static const String sortText = '$_base/sort-text.svg';
   static const String star = '$_base/star.svg';
+  static const String sunrise = '$_base/sunrise.svg';
+  static const String sunset = '$_base/sunset.svg';
   static const String target = '$_base/target.svg';
   static const String trash = '$_base/trash.svg';
   static const String upload = '$_base/upload.svg';
@@ -119,6 +121,8 @@ class AppIcons {
     settings,
     sortText,
     star,
+    sunrise,
+    sunset,
     target,
     trash,
     upload,
