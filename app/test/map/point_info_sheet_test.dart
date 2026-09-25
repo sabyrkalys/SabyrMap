@@ -1,5 +1,6 @@
 import 'package:app/map/point_info_sheet.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -86,6 +87,22 @@ void main() {
       ),
     );
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('СК-42 coordinates stay on one line on a 411 dp phone at the default font', (tester) async {
+    // flutter test renders with a 1-em-per-glyph test font unless a real
+    // font is loaded; widths only mean something with the app's Roboto.
+    final roboto = FontLoader('Roboto')
+      ..addFont(rootBundle.load('assets/fonts/Roboto-Regular.ttf'))
+      ..addFont(rootBundle.load('assets/fonts/Roboto-Medium.ttf'));
+    await roboto.load();
+    tester.view.physicalSize = const Size(411, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pump(tester, sk42: true);
+    final coordinates = tester.getSize(find.byKey(const Key('point_info_coordinates'))).height;
+    final declination = tester.getSize(find.byKey(const Key('point_info_declination'))).height;
+    expect(coordinates, declination, reason: 'coordinates must not wrap onto a second line');
   });
 }
 

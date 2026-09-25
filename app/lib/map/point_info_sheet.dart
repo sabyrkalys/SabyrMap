@@ -77,12 +77,15 @@ class PointInfoSheet extends StatelessWidget {
     Widget row(String label, Widget value) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       // Both sides flex so a long value (СК-42) or a large system font
-      // wraps instead of overflowing a narrow screen.
+      // wraps instead of overflowing a narrow screen. The value gets 3/5 of
+      // the width, so СК-42 coordinates fit one line at the default font;
+      // the label wraps instead.
       child: Row(
         children: [
-          Expanded(child: Text(label, style: labelStyle)),
+          Expanded(flex: 2, child: Text(label, style: labelStyle)),
           const SizedBox(width: 12),
-          Flexible(
+          Expanded(
+            flex: 3,
             child: Align(alignment: Alignment.centerRight, child: value),
           ),
         ],
