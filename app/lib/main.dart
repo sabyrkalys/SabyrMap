@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'home/home_shell.dart';
+import 'licenses.dart';
 import 'system_ui.dart';
 import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await configureSystemUi();
+  registerThirdPartyLicenses();
   runApp(const ProviderScope(child: AlpineQuestApp()));
 }
 

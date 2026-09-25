@@ -3,9 +3,11 @@ import 'dart:math' as math;
 double _rad(double d) => d * math.pi / 180;
 double _deg(double r) => r * 180 / math.pi;
 
-/// Sunrise and sunset (UTC) for the calendar day of [date] at a point, by
-/// the NOAA solar calculator (zenith 90.833°). Null when the sun stays
-/// above or below the horizon all day.
+/// Sunrise and sunset (UTC) around the point's solar noon on the date of
+/// [date], by the NOAA solar calculator (zenith 90.833°); for points far
+/// from Greenwich the results can fall on the neighbouring UTC day. Null
+/// when the sun stays above or below the horizon — including, rarely, a
+/// grazing event right at the start or end of polar day/night.
 ({DateTime? sunrise, DateTime? sunset}) sunTimes(double lat, double lng, DateTime date) {
   final day = DateTime.utc(date.year, date.month, date.day);
   return (sunrise: _event(lat, lng, day, rise: true), sunset: _event(lat, lng, day, rise: false));

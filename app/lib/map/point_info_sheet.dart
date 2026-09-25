@@ -75,16 +75,20 @@ class PointInfoSheet extends StatelessWidget {
     final labelStyle = AppTextStyles.menuItemDisabled(context).copyWith(fontSize: 14);
     final valueStyle = AppTextStyles.menuItem(context);
     Widget row(String label, Widget value) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
-            children: [
-              Expanded(child: Text(label, style: labelStyle)),
-              const SizedBox(width: 12),
-              value,
-            ],
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      // Both sides flex so a long value (СК-42) or a large system font
+      // wraps instead of overflowing a narrow screen.
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: labelStyle)),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Align(alignment: Alignment.centerRight, child: value),
           ),
-        );
-    Widget text(String value, [Key? key]) => Text(value, key: key, style: valueStyle);
+        ],
+      ),
+    );
+    Widget text(String value, [Key? key]) => Text(value, key: key, style: valueStyle, textAlign: TextAlign.end);
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
@@ -94,35 +98,50 @@ class PointInfoSheet extends StatelessWidget {
           color: MenuPanel.background,
           child: SafeArea(
             top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Text('ИНФОРМАЦИЯ', style: AppTextStyles.sectionHeader(context)),
-                ),
-                row('Координаты', text(coordinates, const Key('point_info_coordinates'))),
-                row('Склонение (магнитное)', text(formatAngleEw(declination), const Key('point_info_declination'))),
-                row('Конвергенция меридианов', text(formatAngleEw(convergence), const Key('point_info_convergence'))),
-                row(
-                  'Время восхода и заката',
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AppIcon(AppIcons.sunrise, key: const Key('point_info_sunrise_icon'), size: 20, color: valueStyle.color),
-                      const SizedBox(width: 4),
-                      text(formatClock(local(sun.sunrise))),
-                      const SizedBox(width: 12),
-                      AppIcon(AppIcons.sunset, key: const Key('point_info_sunset_icon'), size: 20, color: valueStyle.color),
-                      const SizedBox(width: 4),
-                      text(formatClock(local(sun.sunset))),
-                    ],
+            // Scrolls when a landscape phone or a large font makes it taller
+            // than the screen.
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    child: Text('ИНФОРМАЦИЯ', style: AppTextStyles.sectionHeader(context)),
                   ),
-                ),
-                row('Часовой пояс', text(formatUtcOffset(offset))),
-                const SizedBox(height: 8),
-              ],
+                  row('Координаты', text(coordinates, const Key('point_info_coordinates'))),
+                  row('Склонение (магнитное)', text(formatAngleEw(declination), const Key('point_info_declination'))),
+                  row('Конвергенция меридианов', text(formatAngleEw(convergence), const Key('point_info_convergence'))),
+                  row(
+                    'Время восхода и заката',
+                    Wrap(
+                      alignment: WrapAlignment.end,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        AppIcon(
+                          AppIcons.sunrise,
+                          key: const Key('point_info_sunrise_icon'),
+                          size: 20,
+                          color: valueStyle.color,
+                        ),
+                        const SizedBox(width: 4),
+                        text(formatClock(local(sun.sunrise))),
+                        const SizedBox(width: 12),
+                        AppIcon(
+                          AppIcons.sunset,
+                          key: const Key('point_info_sunset_icon'),
+                          size: 20,
+                          color: valueStyle.color,
+                        ),
+                        const SizedBox(width: 4),
+                        text(formatClock(local(sun.sunset))),
+                      ],
+                    ),
+                  ),
+                  row('Часовой пояс', text(formatUtcOffset(offset))),
+                  const SizedBox(height: 8),
+                ],
+              ),
             ),
           ),
         ),

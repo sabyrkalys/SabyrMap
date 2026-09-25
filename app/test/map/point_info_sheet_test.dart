@@ -67,4 +67,25 @@ void main() {
     final value = tester.widget<Text>(find.byKey(const Key('point_info_declination'))).data!;
     expect(value, matches(RegExp(r'^\d+\.\d° [ВЗ]$|^0\.0°$')));
   });
+
+  testWidgets('long СК-42 coordinates fit a narrow phone with a large font', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(size: Size(320, 640), textScaler: TextScaler.linear(2)),
+          child: Scaffold(
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: PointInfoSheet(point: const LatLng(47.9958, 37.81465), sk42: true, now: DateTime(2026, 9, 25, 12)),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+  });
 }
+
