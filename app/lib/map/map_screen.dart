@@ -7,6 +7,7 @@ import '../icons/icon_image_cache.dart';
 import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
 import 'geo_utils.dart';
+import 'map_camera_store.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
@@ -97,6 +98,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Circle? _myLocationCircle;
   bool _hasCenteredCamera = false;
 
+  // The last view saved on the device. When present the map reopens there
+  // instead of centering on GPS; _savedCameraLoaded holds back any
+  // centering until the read has finished, so GPS can't win the race.
+  CameraPosition? _savedCamera;
+  bool _savedCameraLoaded = false;
+
   // Crosshair coordinate readout: refreshed whenever the camera settles
   // (not on every drag frame, to avoid rebuilding the HUD on each pixel of
   // a pan gesture).
@@ -138,7 +145,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         await ref.read(waypointIconAssignmentsControllerProvider.notifier).load();
       } catch (_) {}
     });
+    _loadSavedCamera();
     _loadMyLocation();
+  }
+
+  // A failed read is a soft failure: the map just falls back to GPS
+  // centering, same as on a first launch.
+  Future<void> _loadSavedCamera() async {
+    try {
+      _savedCamera = await ref.read(mapCameraStoreProvider).load();
+    } catch (_) {}
+    if (!mounted) return;
+    _savedCameraLoaded = true;
+    _maybeCenterCamera();
   }
 
   // Fetches the device's current position once, for centering the map and
@@ -159,10 +178,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _maybeCenterCamera() {
-    if (_hasCenteredCamera) return;
+    if (_hasCenteredCamera || !_savedCameraLoaded) return;
     final controller = _controller;
+    if (controller == null) return;
+    final saved = _savedCamera;
+    if (saved != null) {
+      _hasCenteredCamera = true;
+      controller.moveCamera(CameraUpdate.newCameraPosition(saved));
+      return;
+    }
     final location = _myLocation;
-    if (controller == null || location == null) return;
+    if (location == null) return;
     _hasCenteredCamera = true;
     controller.animateCamera(CameraUpdate.newLatLngZoom(LatLng(location.lat, location.lng), 15));
   }
@@ -200,9 +226,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onCameraIdle() {
-    final target = _controller?.cameraPosition?.target;
-    if (target == null) return;
-    setState(() => _crosshairPosition = target);
+    final position = _controller?.cameraPosition;
+    if (position == null) return;
+    setState(() => _crosshairPosition = position.target);
+    if (_savedCameraLoaded && shouldPersistCamera(position, cameraRestored: _hasCenteredCamera)) {
+      ref.read(mapCameraStoreProvider).save(position).catchError((_) {});
+    }
   }
 
   Future<void> _onStyleLoaded() async {
@@ -613,7 +642,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         children: [
           MapLibreMap(
             styleString: AppConfig.mapStyleUrl,
-            initialCameraPosition: const CameraPosition(target: LatLng(0, 0), zoom: 1),
+            initialCameraPosition: initialMapCamera,
             trackCameraPosition: true,
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,

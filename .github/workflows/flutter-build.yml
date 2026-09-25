@@ -26,6 +26,17 @@ jobs:
           channel: stable
           cache: true
 
+      # Gradle generates ~/.android/debug.keystore when it is missing, so a
+      # fresh runner signed every build with a new key and the phone refused
+      # to update over the previous install. The cached key keeps the
+      # signature stable, so a new APK installs as an update and keeps the
+      # app's local data. The key is never committed: the repo is public.
+      - name: Restore debug signing key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
       - name: Install dependencies
         run: flutter pub get
 
