@@ -117,21 +117,22 @@ class _PanelHeader extends StatelessWidget {
   }
 }
 
-/// Icon + label row. Without [onTap] it is a placeholder in the disabled style.
+/// Optional icon + label row. Without [onTap] it is a placeholder in the disabled style.
 class MenuListItem extends StatelessWidget {
-  const MenuListItem({super.key, required this.icon, required this.label, this.onTap});
+  const MenuListItem({super.key, this.icon, required this.label, this.onTap});
 
-  final String icon;
+  final String? icon;
   final String label;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final style = onTap == null ? AppTextStyles.menuItemDisabled(context) : AppTextStyles.menuItem(context);
+    final icon = this.icon;
     return InkWell(
       onTap: onTap,
       child: _MenuRow(
-        leading: AppIcon(icon, size: _iconSize, color: style.color),
+        leading: icon == null ? null : AppIcon(icon, size: _iconSize, color: style.color),
         label: Text(label, style: style),
       ),
     );
