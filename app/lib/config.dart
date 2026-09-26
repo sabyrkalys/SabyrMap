@@ -11,6 +11,10 @@ class AppConfig {
   /// that the key is missing instead of loading.
   static const String googleMapsApiKey = '';
 
+  /// Яндекс Tiles API key. Empty until one is issued: Яндекс layers then
+  /// report that the key is missing instead of loading.
+  static const String yandexMapsApiKey = '';
+
   static const String mapStyleUrl =
       'https://tiles.openfreemap.org/styles/liberty';
 }
