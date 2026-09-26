@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "providers": [
+    {
+      "id": "osm",
+      "name": "OpenStreetMap Maps",
+      "attribution": "© OpenStreetMap contributors",
+      "isolated": false,
+      "sources": [
+        {
+          "id": "ofm-liberty",
+          "name": "OpenFreeMap Liberty",
+          "format": "vector",
+          "storageMode": "onlineCache",
+          "styleUrl": "https://tiles.openfreemap.org/styles/liberty",
+          "attribution": "© OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors",
+          "minZoom": 0,
+          "maxZoom": 22,
+          "canBeOverlay": false,
+          "defaultOpacity": 1.0
+        },
+        {
+          "id": "ofm-positron",
+          "name": "OpenFreeMap Positron",
+          "format": "vector",
+          "storageMode": "onlineCache",
+          "styleUrl": "https://tiles.openfreemap.org/styles/positron",
+          "attribution": "© OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors",
+          "minZoom": 0,
+          "maxZoom": 22,
+          "canBeOverlay": false,
+          "defaultOpacity": 1.0
+        },
+        {
+          "id": "osm-standard",
+          "name": "OSM Standard Raster",
+          "format": "raster",
+          "storageMode": "onlineCache",
+          "tileUrlTemplate": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+          "attribution": "© OpenStreetMap contributors",
+          "minZoom": 0,
+          "maxZoom": 19,
+          "canBeOverlay": true,
+          "defaultOpacity": 0.7
+        }
+      ]
+    },
+    {
+      "id": "google",
+      "name": "Google Maps",
+      "attribution": "© Google",
+      "isolated": true,
+      "sources": [
+        {
+          "id": "google-roadmap",
+          "name": "Google Map",
+          "format": "raster",
+          "storageMode": "onlineOnly",
+          "attribution": "© Google",
+          "minZoom": 0,
+          "maxZoom": 22,
+          "canBeOverlay": false,
+          "defaultOpacity": 1.0,
+          "extraParams": { "mapType": "roadmap" }
+        },
+        {
+          "id": "google-satellite",
+          "name": "Google Satellite",
+          "format": "raster",
+          "storageMode": "onlineOnly",
+          "attribution": "© Google",
+          "minZoom": 0,
+          "maxZoom": 22,
+          "canBeOverlay": false,
+          "defaultOpacity": 1.0,
+          "extraParams": { "mapType": "satellite" }
+        },
+        {
+          "id": "google-terrain",
+          "name": "Google Terrain",
+          "format": "raster",
+          "storageMode": "onlineOnly",
+          "attribution": "© Google",
+          "minZoom": 0,
+          "maxZoom": 22,
+          "canBeOverlay": false,
+          "defaultOpacity": 1.0,
+          "extraParams": { "mapType": "terrain", "layerTypes": "layerRoadmap" }
+        },
+        {
+          "id": "google-hybrid",
+          "name": "Google Hybrid",
+          "format": "raster",
+          "storageMode": "onlineOnly",
+          "attribution": "© Google",
+          "minZoom": 0,
+          "maxZoom": 22,
+          "canBeOverlay": false,
+          "defaultOpacity": 1.0,
+          "extraParams": { "mapType": "satellite", "layerTypes": "layerRoadmap" }
+        }
+      ]
+    },
+    {
+      "id": "yandex",
+      "name": "Яндекс",
+      "attribution": "© Яндекс",
+      "isolated": false,
+      "sources": [
+        {
+          "id": "yandex-map",
+          "name": "Яндекс Карта",
+          "format": "raster",
+          "storageMode": "onlineOnly",
+          "tileUrlTemplate": "https://tiles.api-maps.yandex.ru/v1/tiles/?x={x}&y={y}&z={z}&lang=ru_RU&l=map&projection=web_mercator",
+          "attribution": "© Яндекс",
+          "minZoom": 0,
+          "maxZoom": 21,
+          "canBeOverlay": true,
+          "defaultOpacity": 0.75,
+          "extraParams": { "layer": "map" }
+        },
+        {
+          "id": "yandex-satellite",
+          "name": "Яндекс Спутник",
+          "format": "raster",
+          "storageMode": "onlineOnly",
+          "tileUrlTemplate": "https://tiles.api-maps.yandex.ru/v1/tiles/?x={x}&y={y}&z={z}&lang=ru_RU&l=sat&projection=web_mercator",
+          "attribution": "© Яндекс",
+          "minZoom": 0,
+          "maxZoom": 21,
+          "canBeOverlay": true,
+          "defaultOpacity": 0.75,
+          "extraParams": { "layer": "sat" }
+        },
+        {
+          "id": "yandex-hybrid",
+          "name": "Яндекс Гибрид",
+          "format": "raster",
+          "storageMode": "onlineOnly",
+          "tileUrlTemplate": "https://tiles.api-maps.yandex.ru/v1/tiles/?x={x}&y={y}&z={z}&lang=ru_RU&l=skl&projection=web_mercator",
+          "attribution": "© Яндекс",
+          "minZoom": 0,
+          "maxZoom": 21,
+          "canBeOverlay": true,
+          "defaultOpacity": 0.75,
+          "extraParams": { "layer": "skl" }
+        }
+      ]
+    }
+  ]
+}
