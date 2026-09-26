@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
+import '../../config.dart';
 import '../../mediafile/mediafile_folder_service.dart';
 import '../../mediafile/mediafile_subfolders.dart';
 import '../models/map_models.dart';
@@ -60,6 +61,7 @@ class CatalogRepository {
     AssetBundle? bundle,
     UserSourcesStore? userSources,
     FileSystem? fileSystem,
+    this.hiddenProviderIds = AppConfig.hiddenMapProviders,
   })  : _mapsFolder = mapsFolder ?? MediaFileFolderService(subfolder: kMapsSubfolder),
         _http = httpClient ?? http.Client(),
         _bundle = bundle ?? rootBundle,
@@ -74,6 +76,9 @@ class CatalogRepository {
   final AssetBundle _bundle;
   final UserSourcesStore _userSources;
   final FileSystem _fileSystem;
+
+  /// Providers left out of [load] (see AppConfig.hiddenMapProviders).
+  final Set<String> hiddenProviderIds;
 
   /// Set by a successful [refreshFromUrl]; replaces the built-in providers.
   List<MapProvider>? _remote;
@@ -104,7 +109,10 @@ class CatalogRepository {
   /// Built-in (or refreshed) providers followed by «Установленные карты»
   /// when mediafile/maps holds .mbtiles files.
   Future<List<MapProvider>> load() async {
-    final providers = _remote ?? await loadBuiltin();
+    final providers = [
+      for (final p in _remote ?? await loadBuiltin())
+        if (!hiddenProviderIds.contains(p.id)) p,
+    ];
     final local = [...await _localSources(), ...await _userSources.load()];
     return [
       ...providers,

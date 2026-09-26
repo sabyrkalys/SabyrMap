@@ -15,6 +15,10 @@ class AppConfig {
   /// report that the key is missing instead of loading.
   static const String yandexMapsApiKey = '';
 
+  /// Map providers hidden from the catalog for now (keys and terms still
+  /// to be settled); their services stay in the code.
+  static const Set<String> hiddenMapProviders = {'google', 'yandex'};
+
   static const String mapStyleUrl =
       'https://tiles.openfreemap.org/styles/liberty';
 }

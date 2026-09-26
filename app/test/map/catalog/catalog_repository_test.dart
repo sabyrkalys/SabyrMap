@@ -26,13 +26,14 @@ void main() {
   late MemoryUserSourcesStore userStore;
   setUp(() => userStore = MemoryUserSourcesStore());
 
-  CatalogRepository repo({MemoryFileSystem? fs, http.Client? client}) {
+  CatalogRepository repo({MemoryFileSystem? fs, http.Client? client, Set<String> hidden = const {}}) {
     final fileSystem = fs ?? MemoryFileSystem();
     return CatalogRepository(
       mapsFolder: MediaFileFolderService(subfolder: 'maps', fileSystem: fileSystem, baseDirectoryPath: mapsDir),
       httpClient: client ?? MockClient((_) async => http.Response('', 404)),
       userSources: userStore,
       fileSystem: fileSystem,
+      hiddenProviderIds: hidden,
     );
   }
 
@@ -182,6 +183,11 @@ void main() {
       await expectLater(repo(fs: fs).importStyleFile('/downloads/bad.json'), throwsA(isA<CatalogException>()));
       expect(fs.file('$mapsDir/bad.json').existsSync(), isFalse);
     });
+  });
+
+  test('hidden providers (Google, Яндекс for now) are left out of load()', () async {
+    final providers = await repo(hidden: const {'google', 'yandex'}).load();
+    expect(providers.map((p) => p.id), ['osm']);
   });
 }
 

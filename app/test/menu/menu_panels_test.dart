@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:app/compass/compass_screen.dart';
+import 'package:app/map/screens/available_maps_screen.dart';
+import 'package:app/map/screens/layers_panel.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/menu/menu_panels.dart';
 import 'package:app/menu/menu_toggles.dart';
@@ -274,4 +276,17 @@ void main() {
 
     expect(find.text('Could not create track'), findsOneWidget);
   });
+
+  testWidgets('КАРТЫ: «Доступные карты» and «Карты на экране» open their screens', (tester) async {
+    await pumpPanel(tester, MenuTab.maps);
+    await tester.tap(find.text('Доступные карты'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AvailableMapsScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Карты на экране'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayersPanel), findsOneWidget);
+  });
 }
+

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_icons.dart';
 import '../compass/compass_screen.dart';
+import '../map/screens/available_maps_screen.dart';
+import '../map/screens/layers_panel.dart';
 import '../tracks/track_recording_actions.dart';
 import '../tracks/track_recording_controller.dart';
 import '../waypoints/waypoint_create_action.dart';
@@ -79,11 +81,19 @@ class _MapsPanel extends StatelessWidget {
       key: const Key('maps_panel'),
       title: 'КАРТЫ',
       arrowCenterX: arrowCenterX,
-      items: const [
-        MenuListItem(icon: AppIcons.folderMap, label: 'Доступные карты'),
-        MenuListItem(icon: AppIcons.layers, label: 'Карты на экране'),
-        MenuListItem(icon: AppIcons.download, label: 'Сохранить участок карты'),
-        MenuListItem(icon: AppIcons.star, label: 'Избранные карты'),
+      items: [
+        MenuListItem(
+          icon: AppIcons.folderMap,
+          label: 'Доступные карты',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AvailableMapsScreen())),
+        ),
+        MenuListItem(
+          icon: AppIcons.layers,
+          label: 'Карты на экране',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LayersPanel())),
+        ),
+        const MenuListItem(icon: AppIcons.download, label: 'Сохранить участок карты'),
+        const MenuListItem(icon: AppIcons.star, label: 'Избранные карты'),
       ],
       sections: const [
         MenuSection(title: 'ОПЦИИ', children: [

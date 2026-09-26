@@ -7,6 +7,9 @@ import '../config.dart';
 import '../icons/icon_image_cache.dart';
 import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
+import 'attribution_bar.dart';
+import 'models/map_models.dart';
+import 'catalog/catalog_repository.dart';
 import 'crosshair_menu.dart';
 import 'info_panel.dart';
 import 'map_camera_store.dart';
@@ -15,6 +18,12 @@ import 'map_overlays.dart';
 import 'map_scale.dart';
 import 'map_target.dart';
 import 'point_info_sheet.dart';
+import 'services/google_tiles_service.dart';
+import 'services/layer_manager.dart';
+import 'services/maplibre_layer_host.dart';
+import 'services/yandex_tiles_service.dart';
+import 'state/map_layers_controller.dart';
+import 'state/map_viewport.dart';
 import '../menu/menu_toggles.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
@@ -243,6 +252,39 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _controller = controller;
     controller.onCircleTapped.add(_onCircleTapped);
     controller.onSymbolTapped.add(_onSymbolTapped);
+    ref.read(mapViewportProvider.notifier).register(() async {
+      final c = _controller;
+      if (c == null) return null;
+      return (bounds: await c.getVisibleRegion(), zoom: c.cameraPosition?.zoom ?? _cameraZoom);
+    });
+  }
+
+  // Base maps and overlays («Доступные карты», «Карты на экране»). The
+  // manager is attached once the first style has loaded (annotation layers
+  // exist then); the host is told about every later style load so a base
+  // change can wait for it.
+  MapLibreLayerHost? _layerHost;
+  bool _layersAttached = false;
+
+  Future<void> _attachLayers(MapLibreMapController controller) async {
+    final host = _layerHost = MapLibreLayerHost(controller);
+    final List<MapProvider> providers;
+    try {
+      providers = await ref.read(catalogProvider.future);
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    final manager = LayerManager(
+      host: host,
+      catalog: LayerCatalog(providers),
+      google: ref.read(googleTilesServiceProvider),
+      yandex: ref.read(yandexTilesServiceProvider),
+    );
+    final result = await ref.read(mapLayersProvider.notifier).attach(manager);
+    if (!result.ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.problems.join('\n'))));
+    }
   }
 
   // Driven by MapLibreMap.onCameraMove, not a controller listener: the
@@ -359,6 +401,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   Future<void> _onStyleLoaded() async {
+    _layerHost?.notifyStyleLoaded();
+    final controller = _controller;
+    if (!_layersAttached && controller != null) {
+      _layersAttached = true;
+      _attachLayers(controller);
+    }
     // Every style (re)load disposes and re-creates maplibre_gl's annotation
     // managers, which wipes their internal id tracking. Drop our own
     // tracking too so the next sync re-adds every circle/line from scratch
@@ -741,6 +789,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final toggles = ref.watch(menuTogglesProvider);
     final menuOpen = ref.watch(crosshairMenuOpenProvider);
     final center = _liveCenter ?? ref.watch(mapCrosshairProvider);
+    final catalogSources = {
+      for (final provider in ref.watch(catalogProvider).value ?? const <MapProvider>[])
+        for (final source in provider.sources) source.id: source,
+    };
+    final layers = ref.watch(mapLayersProvider);
+    // No base chosen yet: the map shows its initial style (OpenFreeMap Liberty).
+    final attribution = attributionText(catalogSources[layers.baseSourceId ?? 'ofm-liberty'], [
+      for (final overlay in layers.overlays)
+        if (overlay.visible && catalogSources[overlay.sourceId] != null) catalogSources[overlay.sourceId]!,
+    ]);
 
     return Scaffold(
       body: Stack(
@@ -791,6 +849,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ),
+          // Required by the map providers; left of the zoom buttons, just
+          // above the bottom nav.
+          Positioned(
+            left: 8,
+            right: 88,
+            bottom: MediaQuery.paddingOf(context).bottom + 4,
+            child: IgnorePointer(
+              child: Align(alignment: Alignment.bottomLeft, child: AttributionBar(text: attribution)),
+            ),
+          ),
           Positioned(
             right: 16,
             bottom: 16,

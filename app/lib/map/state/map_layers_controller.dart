@@ -62,6 +62,9 @@ class MapStateNotifier extends Notifier<MapState> {
     } catch (_) {}
   }
 
+  /// Raster overlay limit of the attached manager.
+  int get maxOverlays => _manager?.maxRasterOverlays ?? 3;
+
   LayerManager _requireManager() {
     final manager = _manager;
     if (manager == null) throw const LayerException('Карта ещё не готова');
