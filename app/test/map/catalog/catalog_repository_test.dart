@@ -9,16 +9,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+class MemoryUserSourcesStore implements UserSourcesStore {
+  List<MapSource> saved = [];
+
+  @override
+  Future<List<MapSource>> load() async => List.of(saved);
+
+  @override
+  Future<void> save(List<MapSource> sources) async => saved = List.of(sources);
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   const mapsDir = '/storage/maps';
+  late MemoryUserSourcesStore userStore;
+  setUp(() => userStore = MemoryUserSourcesStore());
 
   CatalogRepository repo({MemoryFileSystem? fs, http.Client? client}) {
     final fileSystem = fs ?? MemoryFileSystem();
     return CatalogRepository(
       mapsFolder: MediaFileFolderService(subfolder: 'maps', fileSystem: fileSystem, baseDirectoryPath: mapsDir),
       httpClient: client ?? MockClient((_) async => http.Response('', 404)),
+      userSources: userStore,
+      fileSystem: fileSystem,
     );
   }
 
@@ -122,6 +136,52 @@ void main() {
     expect((await container.read(catalogProvider.future)).map((p) => p.id), ['osm', 'google', 'yandex']);
     await container.read(catalogProvider.notifier).refresh(Uri.parse('https://example.org/c.json'));
     expect(container.read(catalogProvider).value!.single.sources.single.id, 'ofm-bright');
+  });
+
+  group('user maps', () {
+    test('a style URL is added to «Установленные карты» and kept', () async {
+      final r = repo();
+      final source = await r.addStyleUrl(name: 'Моя топо', url: 'https://example.org/style.json');
+      expect(source.format, TileFormat.vector);
+      expect(source.storageMode, StorageMode.onlineCache);
+      expect(source.styleUrl, 'https://example.org/style.json');
+      final local = (await r.load()).firstWhere((p) => p.id == CatalogRepository.localProviderId);
+      expect(local.sources.map((s) => s.name), ['Моя топо']);
+      expect(userStore.saved.single.id, source.id);
+
+      await r.removeUserSource(source.id);
+      expect((await r.load()).any((p) => p.id == CatalogRepository.localProviderId), isFalse);
+    });
+
+    test('a URL that is not http(s) is refused', () async {
+      await expectLater(repo().addStyleUrl(name: 'x', url: 'ftp://x'), throwsA(isA<CatalogException>()));
+      await expectLater(repo().addStyleUrl(name: 'x', url: 'not a url'), throwsA(isA<CatalogException>()));
+    });
+
+    test('a JSON style file is copied into mediafile/maps and loaded as a vector map', () async {
+      final fs = MemoryFileSystem();
+      fs.file('/downloads/topo.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{"version":8,"sources":{},"layers":[]}');
+      final r = repo(fs: fs);
+      await r.importStyleFile('/downloads/topo.json');
+
+      expect(fs.file('$mapsDir/topo.json').existsSync(), isTrue);
+      final source = (await r.load()).firstWhere((p) => p.id == CatalogRepository.localProviderId).sources.single;
+      expect(source.name, 'topo');
+      expect(source.format, TileFormat.vector);
+      expect(source.storageMode, StorageMode.offlineRegion);
+      expect(source.styleUrl, '{"version":8,"sources":{},"layers":[]}');
+    });
+
+    test('a JSON file that is not a MapLibre style is refused and not copied', () async {
+      final fs = MemoryFileSystem();
+      fs.file('/downloads/bad.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{"hello":1}');
+      await expectLater(repo(fs: fs).importStyleFile('/downloads/bad.json'), throwsA(isA<CatalogException>()));
+      expect(fs.file('$mapsDir/bad.json').existsSync(), isFalse);
+    });
   });
 }
 
