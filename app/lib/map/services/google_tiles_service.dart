@@ -41,9 +41,9 @@ class GoogleTilesService {
     this.language = 'ru-RU',
     this.region = 'RU',
     this.timeout = const Duration(seconds: 15),
-  })  : _apiKey = apiKey,
-        _http = httpClient ?? http.Client(),
-        _clock = clock ?? DateTime.now;
+  }) : _apiKey = apiKey,
+       _http = httpClient ?? http.Client(),
+       _clock = clock ?? DateTime.now;
 
   static const String userMessage = 'Google-слой недоступен, проверьте подключение';
   static const Duration renewBefore = Duration(days: 1);
@@ -95,6 +95,37 @@ class GoogleTilesService {
     final session = await sessionFor(source);
     return 'https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}'
         '?session=${Uri.encodeQueryComponent(session)}&key=${Uri.encodeQueryComponent(_apiKey)}';
+  }
+
+  final Set<String> _verified = {};
+
+  /// Fetches the zoom-0 tile once per source to catch a rejected key or
+  /// session before the layer is shown (MapLibre doesn't report per-tile
+  /// HTTP errors). A 401/403 gets one retry with a fresh session.
+  Future<void> verifyAccess(MapSource source) async {
+    if (_verified.contains(source.id)) return;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final url = Uri.parse(
+        (await tileUrlTemplate(source)).replaceAll('{z}', '0').replaceAll('{x}', '0').replaceAll('{y}', '0'),
+      );
+      final http.Response response;
+      try {
+        response = await _http.get(url).timeout(timeout);
+      } on TimeoutException {
+        throw const GoogleTilesException(userMessage, detail: 'tile request timed out');
+      } catch (e) {
+        throw GoogleTilesException(userMessage, detail: '$e');
+      }
+      if (response.statusCode == 200) {
+        _verified.add(source.id);
+        return;
+      }
+      if (response.statusCode != 401 && response.statusCode != 403) {
+        throw GoogleTilesException(userMessage, detail: 'tile HTTP ${response.statusCode}');
+      }
+      invalidate(source);
+    }
+    throw const GoogleTilesException(userMessage, detail: 'tile rejected after a fresh session');
   }
 
   Future<String> _create(String key, String mapType, List<String> layerTypes) async {

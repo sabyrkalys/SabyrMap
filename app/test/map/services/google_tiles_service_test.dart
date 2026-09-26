@@ -158,4 +158,48 @@ void main() {
     );
     await expectLater(s.sessionFor(satellite), throwsA(isA<GoogleTilesException>()));
   });
+
+  group('verifyAccess', () {
+    GoogleTilesService probing(List<int> tileStatuses) {
+      requests = [];
+      var tileCall = 0;
+      var sessionCall = 0;
+      return GoogleTilesService(
+        apiKey: 'KEY',
+        clock: () => now,
+        httpClient: MockClient((request) async {
+          requests.add(request);
+          if (request.url.path.endsWith('createSession')) {
+            sessionCall++;
+            return http.Response(jsonEncode({'session': 'S$sessionCall', 'expiry': '${twoWeeksLater(now)}'}), 200);
+          }
+          final status = tileStatuses[tileCall++ < tileStatuses.length ? tileCall - 1 : tileStatuses.length - 1];
+          return http.Response.bytes(const [1], status);
+        }),
+      );
+    }
+
+    test('fetches the zoom-0 tile with the session once and remembers success', () async {
+      final s = probing([200]);
+      await s.verifyAccess(satellite);
+      await s.verifyAccess(satellite);
+      final tiles = requests.where((r) => r.url.path.contains('2dtiles')).toList();
+      expect(tiles, hasLength(1));
+      expect(tiles.single.url.path, '/v1/2dtiles/0/0/0');
+      expect(tiles.single.url.queryParameters, {'session': 'S1', 'key': 'KEY'});
+    });
+
+    test('401/403 → a new session is tried once before giving up', () async {
+      final ok = probing([403, 200]);
+      await ok.verifyAccess(satellite);
+      expect(requests.where((r) => r.url.path.endsWith('createSession')), hasLength(2));
+
+      final bad = probing([403, 403]);
+      await expectLater(
+        bad.verifyAccess(satellite),
+        throwsA(isA<GoogleTilesException>().having((e) => e.message, 'message', GoogleTilesService.userMessage)),
+      );
+    });
+  });
 }
+
