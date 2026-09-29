@@ -1,0 +1,17 @@
+# Store text with LF and check it out with LF on every OS, so a clone
+# edited on Windows doesn't turn every file into a whole-file diff.
+* text=auto eol=lf
+
+# Windows scripts need CRLF (e.g. gradlew.bat if it is ever committed).
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary: never convert or diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.jar binary
+*.mbtiles binary
