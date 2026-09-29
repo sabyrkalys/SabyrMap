@@ -119,7 +119,7 @@ void main() {
     styleUrl: 'https://x',
   );
 
-  final catalog = LayerCatalog([
+  final catalogAll = LayerCatalog([
     MapProvider(id: 'osm', name: 'OSM', sources: const [liberty, osm, vectorOverlay]),
     const MapProvider(id: 'google', name: 'Google', isolated: true, sources: [googleSat]),
     MapProvider(id: 'yandex', name: 'Яндекс', sources: [ySat, yHybrid, yMap]),
@@ -129,11 +129,11 @@ void main() {
   late int yandexStatus;
   late String googleKey;
 
-  LayerManager manager({int maxRasterOverlays = 3}) {
+  LayerManager manager({int maxRasterOverlays = 3, LayerCatalog? catalog}) {
     host = FakeHost();
     return LayerManager(
       host: host,
-      catalog: catalog,
+      catalog: catalog ?? catalogAll,
       maxRasterOverlays: maxRasterOverlays,
       yandex: YandexTilesService(
         apiKey: 'YK',
@@ -176,6 +176,24 @@ void main() {
       expect(source['maxzoom'], 21);
       expect((style['layers'] as List).last, {'id': 'yandex-sat-layer', 'type': 'raster', 'source': 'yandex-sat'});
       expect(style['glyphs'], isNotNull, reason: 'annotation symbols may need fonts');
+    });
+
+    test('a local .mbtiles base is opened as a tileset URL with its own zoom range', () async {
+      const local = MapSource(
+        id: 'local-sat.mbtiles',
+        name: 'sat',
+        format: TileFormat.raster,
+        storageMode: StorageMode.offlineRegion,
+        tileUrlTemplate: 'mbtiles:///storage/maps/sat.mbtiles',
+        canBeOverlay: true,
+      );
+      final m = manager(catalog: LayerCatalog([const MapProvider(id: 'local', name: 'Local', sources: [local])]));
+      await m.setBaseSource(local);
+      final style = jsonDecode(host.style!) as Map<String, dynamic>;
+      final source = (style['sources'] as Map<String, dynamic>)['local-sat.mbtiles'] as Map<String, dynamic>;
+      expect(source['url'], 'mbtiles:///storage/maps/sat.mbtiles');
+      expect(source.containsKey('tiles'), isFalse);
+      expect(source.containsKey('maxzoom'), isFalse, reason: 'MapLibre reads it from the file and overzooms');
     });
 
     test('a Google base uses the session URL', () async {

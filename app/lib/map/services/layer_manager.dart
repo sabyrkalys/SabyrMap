@@ -35,6 +35,12 @@ abstract class MapLayerHost {
   String? get annotationsBottomLayerId;
 }
 
+/// Whether [url] points at a whole tileset (TileJSON-like, e.g. a local
+/// .mbtiles file) rather than a {z}/{x}/{y} template. MapLibre only opens
+/// mbtiles:// through a source's `url`, and then takes the zoom range from
+/// the file's metadata so it can overzoom past the file's last level.
+bool isTilesetUrl(String url) => url.startsWith('mbtiles://');
+
 /// Rule violations and unreachable sources, with a message for the user.
 class LayerException implements Exception {
   const LayerException(this.message);
@@ -287,10 +293,14 @@ class LayerManager {
         'sources': {
           source.id: {
             'type': 'raster',
-            'tiles': [tileUrl],
+            if (isTilesetUrl(tileUrl))
+              'url': tileUrl
+            else ...{
+              'tiles': [tileUrl],
+              'minzoom': source.minZoom,
+              'maxzoom': source.maxZoom,
+            },
             'tileSize': tileSize,
-            'minzoom': source.minZoom,
-            'maxzoom': source.maxZoom,
             if (source.attribution != null) 'attribution': source.attribution,
           },
         },

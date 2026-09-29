@@ -44,13 +44,15 @@ class MapLibreLayerHost implements MapLayerHost {
   }) {
     return _controller.addSource(
       sourceId,
-      RasterSourceProperties(
-        tiles: [tileUrl],
-        tileSize: tileSize.toDouble(),
-        minzoom: minZoom.toDouble(),
-        maxzoom: maxZoom.toDouble(),
-        attribution: attribution,
-      ),
+      isTilesetUrl(tileUrl)
+          ? RasterSourceProperties(url: tileUrl, tileSize: tileSize.toDouble(), attribution: attribution)
+          : RasterSourceProperties(
+              tiles: [tileUrl],
+              tileSize: tileSize.toDouble(),
+              minzoom: minZoom.toDouble(),
+              maxzoom: maxZoom.toDouble(),
+              attribution: attribution,
+            ),
     );
   }
 
