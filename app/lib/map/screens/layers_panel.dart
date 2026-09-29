@@ -99,10 +99,9 @@ class _LayersPanelState extends ConsumerState<LayersPanel> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             buildDefaultDragHandles: false,
-            onReorder: (oldIndex, newIndex) {
+            onReorderItem: (oldIndex, newIndex) {
               final order = shown.map((l) => l.sourceId).toList();
-              final moved = order.removeAt(oldIndex);
-              order.insert(newIndex > oldIndex ? newIndex - 1 : newIndex, moved);
+              order.insert(newIndex, order.removeAt(oldIndex));
               _run(() => notifier.reorderOverlays(order.reversed.toList()));
             },
             children: [

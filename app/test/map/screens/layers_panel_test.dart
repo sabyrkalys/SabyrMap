@@ -151,7 +151,16 @@ void main() {
     await pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
     final list = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
     // Shown top → bottom: OSM (z20) first, Hybrid (z10) second. Move Hybrid to the top.
-    list.onReorder(1, 0);
+    list.onReorderItem!(1, 0);
+    await tester.pumpAndSettle();
+    expect(container.read(mapLayersProvider).overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
+  });
+
+  testWidgets('moving a layer down the list puts it right below its new neighbour', (tester) async {
+    await pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    final list = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
+    // OSM is shown first; move it to the bottom.
+    list.onReorderItem!(0, 1);
     await tester.pumpAndSettle();
     expect(container.read(mapLayersProvider).overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
   });
