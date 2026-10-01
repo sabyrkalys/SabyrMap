@@ -2,3 +2,4 @@ planetiler.jar
 data/
 *.pmtiles
 *.osm.pbf
+__pycache__/
