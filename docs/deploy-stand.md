@@ -107,22 +107,19 @@ sudo chown -R "$USER" /srv/regions /srv/backups
 ## 6. Стили под адрес стенда
 
 Стили в `v1` собраны под адрес разработки `http://localhost:3000`. На стенде
-с ними карта будет пустой. Их нужно перепубликовать под адрес стенда:
+с ними карта будет пустой. Их нужно перепубликовать под адрес стенда. Это
+делается **после** шагов 7 и 8: нужны заполненный `.env` и образ api.
+Интернет не нужен.
 
 ```sh
-# на стенде (нужен интернет для сборки образа сборки) …
-cd /opt/sabyrmap && TILES_DIR=/srv/tiles tools/build/build.sh v1 --steps styles --tiles-base https://<IP-стенда>/tiles
+cd /opt/sabyrmap
+infra/stand-styles.sh ../fonts        # папка fonts из комплекта поставки
+docker compose restart martin
 ```
 
-Если на стенде нет интернета, стили собирают у разработчика в отдельную
-папку и копируют вместе с картами:
-
-```sh
-TILES_DIR=/tmp/stand-tiles tools/build/build.sh v1 --steps styles --tiles-base https://<IP-стенда>/tiles
-rsync -a /tmp/stand-tiles/v1/{styles,fonts,sprites} <user>@<стенд>:/srv/tiles/v1/
-```
-
-`<IP-стенда>` должен совпадать с `PUBLIC_HOST` на шаге 7.
+Скрипт кладёт в `$TILES_DIR/v1/` папки `styles/`, `fonts/` и `sprites/`.
+Адрес в стилях берётся из `PUBLIC_HOST`. Если `PUBLIC_HOST` поменялся,
+скрипт нужно запустить снова.
 
 ## 7. `.env` и сертификат
 
