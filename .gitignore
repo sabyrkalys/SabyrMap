@@ -4,3 +4,7 @@ __pycache__/
 .env
 *.egg-info/
 .pytest_cache/
+
+# TLS-сертификаты (генерируются локально, в git не хранятся)
+infra/tls/*.crt
+infra/tls/*.key

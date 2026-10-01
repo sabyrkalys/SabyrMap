@@ -1,33 +1,65 @@
+# Продакшн-топология сервера карт. Наружу открыт только nginx (443/80).
+# Все секреты и параметры — в .env (env_file), в этом файле их нет.
+# Локальная разработка (открытые порты 8500/5433 на 127.0.0.1) — в
+# docker-compose.override.yml, который compose подхватывает автоматически.
+
 services:
   db:
     image: postgis/postgis:15-3.4
-    environment:
-      POSTGRES_USER: alpinequest
-      POSTGRES_PASSWORD: alpinequest
-      POSTGRES_DB: alpinequest
-    ports:
-      - "5433:5432"
+    env_file: .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U alpinequest"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   api:
     build: ./api
+    env_file: .env
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      DATABASE_URL: postgresql://alpinequest:alpinequest@db:5432/alpinequest
-      JWT_SECRET_KEY: dev-secret-change-me
-      AUTH_DISABLED: "true"
-    ports:
-      - "8500:8000"
     volumes:
       - ./api:/app
+      - ${REGIONS_DIR}:/srv/regions:ro
+
+  worker:
+    build: ./api
+    command: ["python", "-m", "app.worker"]
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+      - ${TILES_DIR}:/srv/tiles:ro
+      - ${REGIONS_DIR}:/srv/regions
+
+  martin:
+    image: ghcr.io/maplibre/martin:v0.17.0
+    command: ["--config", "/config/martin.yaml"]
+    volumes:
+      - ./infra/martin/martin.yaml:/config/martin.yaml:ro
+      - ${TILES_DIR}:/srv/tiles:ro
+
+  nginx:
+    image: nginx:1.27-alpine
+    entrypoint: ["/bin/sh", "/etc/nginx/entrypoint.sh"]
+    env_file: .env
+    depends_on:
+      - api
+      - martin
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx/nginx.conf.template:/etc/nginx/templates/nginx.conf.template:ro
+      - ./infra/nginx/cache.conf:/etc/nginx/conf.d/00-cache.conf:ro
+      - ./infra/nginx/entrypoint.sh:/etc/nginx/entrypoint.sh:ro
+      - ./infra/tls:/etc/nginx/tls:ro
+      - ${REGIONS_DIR}:/srv/regions:ro
 
 volumes:
   postgres_data:

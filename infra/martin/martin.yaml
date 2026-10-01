@@ -1,0 +1,24 @@
+# Martin tile server. Раздаёт PMTiles из /srv/tiles (том только на чтение).
+# Явные источники со стабильными id — не зависят от имени файла и версии папки.
+# Стили, шрифты и спрайты кладёт tools/build/publish_styles.sh.
+listen_addresses: "0.0.0.0:3000"
+
+pmtiles:
+  sources:
+    satellite: /srv/tiles/v1/satellite.pmtiles
+    osm: /srv/tiles/v1/osm.pmtiles
+    overview: /srv/tiles/v1/overview.pmtiles
+
+# /font/{fontstack}/{range} — "Noto Sans Regular|Bold|Italic"
+fonts:
+  - /srv/tiles/v1/fonts
+
+# /sprite/sabyr(.json|.png|@2x...)
+sprites:
+  sources:
+    sabyr: /srv/tiles/v1/sprites/sabyr
+
+# /style/{hybrid,vector}-{day,night}
+styles:
+  paths:
+    - /srv/tiles/v1/styles
