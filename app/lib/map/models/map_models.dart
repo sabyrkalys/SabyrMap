@@ -42,6 +42,8 @@ class MapSource {
     this.thumbnailAsset,
     this.defaultOpacity = 1.0,
     this.extraParams,
+    this.downloadable = false,
+    this.version,
   });
 
   /// Unique; also the MapLibre source id.
@@ -70,6 +72,12 @@ class MapSource {
   /// Provider-specific settings (Google mapType/layerTypes, Яндекс layer).
   final Map<String, String>? extraParams;
 
+  /// Our server can cut this map into an offline region (POST /regions).
+  final bool downloadable;
+
+  /// The server's map data version (e.g. "v1"); a new one means new tiles.
+  final String? version;
+
   factory MapSource.fromJson(Map<String, dynamic> json) => MapSource(
         id: json['id'] as String,
         name: json['name'] as String,
@@ -84,6 +92,8 @@ class MapSource {
         thumbnailAsset: json['thumbnailAsset'] as String?,
         defaultOpacity: (json['defaultOpacity'] as num?)?.toDouble() ?? 1.0,
         extraParams: (json['extraParams'] as Map<String, dynamic>?)?.map((k, v) => MapEntry(k, v as String)),
+        downloadable: json['downloadable'] as bool? ?? false,
+        version: json['version'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -100,6 +110,8 @@ class MapSource {
         if (thumbnailAsset != null) 'thumbnailAsset': thumbnailAsset,
         'defaultOpacity': defaultOpacity,
         if (extraParams != null) 'extraParams': extraParams,
+        if (downloadable) 'downloadable': downloadable,
+        if (version != null) 'version': version,
       };
 
   @override
@@ -117,7 +129,9 @@ class MapSource {
       other.canBeOverlay == canBeOverlay &&
       other.thumbnailAsset == thumbnailAsset &&
       other.defaultOpacity == defaultOpacity &&
-      _mapEquality.equals(other.extraParams, extraParams);
+      _mapEquality.equals(other.extraParams, extraParams) &&
+      other.downloadable == downloadable &&
+      other.version == version;
 
   @override
   int get hashCode => Object.hash(id, name, styleUrl, tileUrlTemplate, format, storageMode, minZoom, maxZoom);

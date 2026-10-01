@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:file/file.dart';
@@ -62,6 +63,7 @@ class CatalogRepository {
     UserSourcesStore? userSources,
     FileSystem? fileSystem,
     String? mapServerBaseUrl,
+    this.catalogUrl,
     this.hiddenProviderIds = AppConfig.hiddenMapProviders,
   })  : _mapsFolder = mapsFolder ?? MediaFileFolderService(subfolder: kMapsSubfolder),
         _http = httpClient ?? http.Client(),
@@ -73,11 +75,12 @@ class CatalogRepository {
   static const String builtinAsset = 'assets/maps/builtin_catalog.json';
   static const String localProviderId = 'local';
   static const String serverProviderId = 'server';
-  static const String serverSatelliteSourceId = 'server-sat-ukraine';
-  static const String serverHybridSourceId = 'server-hybrid-ukraine';
+  static const String serverHybridSourceId = 'server-hybrid-day';
+  static const String serverSatelliteSourceId = 'server-satellite';
 
-  /// Base map shown when the user has not chosen one yet.
-  static const String defaultBaseSourceId = serverSatelliteSourceId;
+  /// Base map shown when the user has not chosen one yet (or the saved one
+  /// is gone from the catalog).
+  static const String defaultBaseSourceId = serverHybridSourceId;
 
   final MediaFileFolderService _mapsFolder;
   final http.Client _http;
@@ -86,10 +89,15 @@ class CatalogRepository {
   final FileSystem _fileSystem;
   final String _mapServerBaseUrl;
 
+  /// Our server's catalog (GET /maps), fetched in the background when the
+  /// catalog is first loaded; null = no automatic refresh (tests).
+  final Uri? catalogUrl;
+
   /// Providers left out of [load] (see AppConfig.hiddenMapProviders).
   final Set<String> hiddenProviderIds;
 
-  /// Set by a successful [refreshFromUrl]; replaces the built-in providers.
+  /// Set by a successful [refreshFromUrl]; replaces the built-in providers
+  /// with the same ids.
   List<MapProvider>? _remote;
 
   static List<MapProvider> parse(String json) {
@@ -115,121 +123,54 @@ class CatalogRepository {
 
   Future<List<MapProvider>> loadBuiltin() async => parse(await _bundle.loadString(builtinAsset));
 
-  /// Our own tile server («Сервер карт»). Used as a fallback when no remote
-  /// catalog is loaded: once [refreshFromUrl] succeeds the server supplies
-  /// its own maps in that catalog, so this built-in copy is dropped.
+  /// Our own tile server («Сервер карт») as the app knows it without the
+  /// server's catalog: same ids as GET /maps, so a saved choice still works
+  /// offline or before the catalog arrives. Styles are published by the
+  /// server (tools/build/publish_styles.sh) and served by Martin.
   MapProvider _serverProvider() {
-    const satAttribution = 'Esri, Maxar, Earthstar Geographics, and the GIS Community';
-    const hybridAttribution = '$satAttribution · © OpenStreetMap contributors';
+    final base = _mapServerBaseUrl;
+    MapSource style(String id, String name, String style) => MapSource(
+          id: id,
+          name: name,
+          styleUrl: '$base/style/$style',
+          format: TileFormat.vector,
+          storageMode: StorageMode.onlineCache,
+          minZoom: 0,
+          maxZoom: 20,
+          downloadable: true,
+        );
     return MapProvider(
       id: serverProviderId,
       name: 'Сервер карт',
-      attribution: satAttribution,
       sources: [
-        MapSource(
-          id: serverHybridSourceId,
-          name: 'Украина · спутник + дороги',
-          // Vector style: satellite raster + OSM vector (roads, buildings,
-          // labels) drawn on top. MapLibre accepts the style JSON inline.
-          styleUrl: _hybridStyle(hybridAttribution),
-          format: TileFormat.vector,
-          storageMode: StorageMode.onlineOnly,
-          attribution: hybridAttribution,
-          minZoom: 0,
-          maxZoom: 22,
-        ),
+        style(serverHybridSourceId, 'Спутник + дороги', 'hybrid-day'),
+        style('server-hybrid-night', 'Ночь', 'hybrid-night'),
+        style('server-vector-day', 'Только дороги', 'vector-day'),
+        style('server-vector-night', 'Только дороги (ночь)', 'vector-night'),
         MapSource(
           id: serverSatelliteSourceId,
-          name: 'Украина · спутник',
-          tileUrlTemplate: '$_mapServerBaseUrl/satellite/{z}/{x}/{y}',
+          name: 'Спутник',
+          tileUrlTemplate: '$base/satellite/{z}/{x}/{y}',
           format: TileFormat.raster,
-          storageMode: StorageMode.onlineOnly,
-          attribution: satAttribution,
+          storageMode: StorageMode.onlineCache,
           minZoom: 0,
           maxZoom: 16,
+          canBeOverlay: true,
+          downloadable: true,
         ),
       ],
     );
   }
 
-  /// MapLibre style (as a JSON string) for the hybrid base: our satellite
-  /// raster with the OSM vector layer (roads, buildings, place labels) on top.
-  /// Vector tiles come from Martin's `osm` source; glyphs from OpenFreeMap for
-  /// now (served by our server once fonts are published).
-  String _hybridStyle(String attribution) => jsonEncode({
-        'version': 8,
-        'glyphs': 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
-        'sources': {
-          'sat': {
-            'type': 'raster',
-            'tiles': ['$_mapServerBaseUrl/satellite/{z}/{x}/{y}'],
-            'tileSize': 256,
-            'minzoom': 0,
-            'maxzoom': 16,
-            'attribution': attribution,
-          },
-          'osm': {
-            'type': 'vector',
-            'tiles': ['$_mapServerBaseUrl/osm/{z}/{x}/{y}'],
-            'minzoom': 0,
-            'maxzoom': 14,
-          },
-        },
-        'layers': [
-          {
-            'id': 'background',
-            'type': 'background',
-            'paint': {'background-color': '#e5e3df'},
-          },
-          {'id': 'sat', 'type': 'raster', 'source': 'sat'},
-          {
-            'id': 'buildings',
-            'type': 'fill',
-            'source': 'osm',
-            'source-layer': 'building',
-            'minzoom': 14,
-            'paint': {
-              'fill-color': 'rgba(0,0,0,0.25)',
-              'fill-outline-color': 'rgba(255,255,255,0.45)',
-            },
-          },
-          {
-            'id': 'roads',
-            'type': 'line',
-            'source': 'osm',
-            'source-layer': 'transportation',
-            'paint': {
-              'line-color': 'rgba(255,255,255,0.75)',
-              'line-width': [
-                'interpolate', ['linear'], ['zoom'], 6, 0.4, 12, 1.5, 16, 3.0,
-              ],
-            },
-          },
-          {
-            'id': 'labels',
-            'type': 'symbol',
-            'source': 'osm',
-            'source-layer': 'place',
-            'layout': {
-              'text-field': ['get', 'name'],
-              'text-font': ['Noto Sans Regular'],
-              'text-size': 13,
-            },
-            'paint': {
-              'text-color': '#ffffff',
-              'text-halo-color': '#000000',
-              'text-halo-width': 1.3,
-            },
-          },
-        ],
-      });
-
-  /// «Сервер карт» (built-in fallback only), then the built-in (or refreshed)
-  /// providers, then «Установленные карты» when mediafile/maps has files.
+  /// The server's providers (or the built-in «Сервер карт» until its
+  /// catalog arrived), the other built-in providers, then «Установленные
+  /// карты» when mediafile/maps has files.
   Future<List<MapProvider>> load() async {
+    final remote = _remote ?? const <MapProvider>[];
+    final remoteIds = {for (final p in remote) p.id};
     final providers = [
-      if (_remote == null) _serverProvider(),
-      for (final p in _remote ?? await loadBuiltin())
+      if (!remoteIds.contains(serverProviderId)) _serverProvider(),
+      for (final p in [...remote, ...(await loadBuiltin()).where((p) => !remoteIds.contains(p.id))])
         if (!hiddenProviderIds.contains(p.id)) p,
     ];
     final local = [...await _localSources(), ...await _userSources.load()];
@@ -239,9 +180,9 @@ class CatalogRepository {
     ];
   }
 
-  /// Fetches a catalog JSON from [url]. On success it replaces the built-in
-  /// providers for later [load]s; on any failure the current catalog stays
-  /// and a [CatalogException] is thrown.
+  /// Fetches a catalog JSON from [url]. On success its providers replace the
+  /// built-in ones with the same ids for later [load]s; on any failure the
+  /// current catalog stays and a [CatalogException] is thrown.
   Future<List<MapProvider>> refreshFromUrl(Uri url) async {
     final http.Response response;
     try {
@@ -325,12 +266,27 @@ class CatalogRepository {
   }
 }
 
-final catalogRepositoryProvider = Provider<CatalogRepository>((ref) => CatalogRepository());
+final catalogRepositoryProvider =
+    Provider<CatalogRepository>((ref) => CatalogRepository(catalogUrl: Uri.parse(AppConfig.mapsCatalogUrl)));
 
 /// The current catalog; [refresh] pulls a newer one from a URL.
 class CatalogNotifier extends AsyncNotifier<List<MapProvider>> {
   @override
-  Future<List<MapProvider>> build() => ref.read(catalogRepositoryProvider).load();
+  Future<List<MapProvider>> build() async {
+    final repository = ref.read(catalogRepositoryProvider);
+    final providers = await repository.load();
+    final url = repository.catalogUrl;
+    if (url != null) unawaited(_refreshQuietly(url));
+    return providers;
+  }
+
+  /// The server's catalog at start-up. Without a connection the built-in
+  /// catalog simply stays.
+  Future<void> _refreshQuietly(Uri url) async {
+    try {
+      await refresh(url);
+    } catch (_) {}
+  }
 
   Future<void> refresh(Uri url) async {
     final repository = ref.read(catalogRepositoryProvider);

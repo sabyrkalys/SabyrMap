@@ -1,0 +1,76 @@
+{
+ "providers": [
+  {
+   "id": "server",
+   "name": "Сервер карт",
+   "isolated": false,
+   "sources": [
+    {
+     "id": "server-hybrid-day",
+     "name": "Украина · спутник + дороги",
+     "format": "vector",
+     "storageMode": "onlineCache",
+     "attribution": "© OpenMapTiles © OpenStreetMap contributors · Esri, Maxar, Earthstar Geographics, and the GIS Community",
+     "minZoom": 0,
+     "maxZoom": 20,
+     "canBeOverlay": false,
+     "downloadable": true,
+     "version": "v1",
+     "styleUrl": "http://localhost:3000/style/hybrid-day"
+    },
+    {
+     "id": "server-hybrid-night",
+     "name": "Украина · ночь",
+     "format": "vector",
+     "storageMode": "onlineCache",
+     "attribution": "© OpenMapTiles © OpenStreetMap contributors · Esri, Maxar, Earthstar Geographics, and the GIS Community",
+     "minZoom": 0,
+     "maxZoom": 20,
+     "canBeOverlay": false,
+     "downloadable": true,
+     "version": "v1",
+     "styleUrl": "http://localhost:3000/style/hybrid-night"
+    },
+    {
+     "id": "server-vector-day",
+     "name": "Украина · только дороги",
+     "format": "vector",
+     "storageMode": "onlineCache",
+     "attribution": "© OpenMapTiles © OpenStreetMap contributors",
+     "minZoom": 0,
+     "maxZoom": 20,
+     "canBeOverlay": false,
+     "downloadable": true,
+     "version": "v1",
+     "styleUrl": "http://localhost:3000/style/vector-day"
+    },
+    {
+     "id": "server-vector-night",
+     "name": "Украина · только дороги (ночь)",
+     "format": "vector",
+     "storageMode": "onlineCache",
+     "attribution": "© OpenMapTiles © OpenStreetMap contributors",
+     "minZoom": 0,
+     "maxZoom": 20,
+     "canBeOverlay": false,
+     "downloadable": true,
+     "version": "v1",
+     "styleUrl": "http://localhost:3000/style/vector-night"
+    },
+    {
+     "id": "server-satellite",
+     "name": "Украина · спутник",
+     "format": "raster",
+     "storageMode": "onlineCache",
+     "attribution": "Esri, Maxar, Earthstar Geographics, and the GIS Community",
+     "minZoom": 0,
+     "maxZoom": 16,
+     "canBeOverlay": true,
+     "downloadable": true,
+     "version": "v1",
+     "tileUrlTemplate": "http://localhost:3000/satellite/{z}/{x}/{y}"
+    }
+   ]
+  }
+ ]
+}

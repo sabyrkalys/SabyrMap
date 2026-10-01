@@ -6,6 +6,10 @@ class AppConfig {
     defaultValue: 'http://10.0.2.2:8500',
   );
 
+  /// Our server's map catalog (GET /maps): the maps it serves and which of
+  /// them can be saved as offline regions.
+  static String get mapsCatalogUrl => '$apiBaseUrl/maps';
+
   /// Explicit base URL of our map tile server (Martin). Usually left empty:
   /// [mapServerBaseUrl] then derives it from [apiBaseUrl]. Override with
   /// --dart-define=MAP_SERVER_URL=http://host:3000 when the tiles live

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' as io;
 
 import 'package:app/map/catalog/catalog_repository.dart';
 import 'package:app/map/models/map_models.dart';
@@ -63,32 +64,54 @@ void main() {
     }
   });
 
-  test('«Сервер карт» is present by default with the satellite and hybrid sources', () async {
-    final r = CatalogRepository(
-      mapsFolder: MediaFileFolderService(
-          subfolder: 'maps', fileSystem: MemoryFileSystem(), baseDirectoryPath: mapsDir),
-      httpClient: MockClient((_) async => http.Response('', 404)),
-      userSources: userStore,
-      fileSystem: MemoryFileSystem(),
-      mapServerBaseUrl: 'http://tiles.test',
-    );
-    final providers = await r.load();
+  CatalogRepository serverRepo({http.Client? client, Uri? catalogUrl}) => CatalogRepository(
+        mapsFolder: MediaFileFolderService(
+            subfolder: 'maps', fileSystem: MemoryFileSystem(), baseDirectoryPath: mapsDir),
+        httpClient: client ?? MockClient((_) async => http.Response('', 404)),
+        userSources: userStore,
+        fileSystem: MemoryFileSystem(),
+        mapServerBaseUrl: 'http://tiles.test',
+        catalogUrl: catalogUrl,
+      );
+
+  test('«Сервер карт» is present by default with the same maps as the server catalog', () async {
+    final providers = await serverRepo().load();
     expect(providers.first.id, CatalogRepository.serverProviderId);
 
     final sources = {for (final s in providers.first.sources) s.id: s};
-    expect(sources.keys,
-        containsAll([CatalogRepository.serverHybridSourceId, CatalogRepository.serverSatelliteSourceId]));
-
-    final sat = sources[CatalogRepository.serverSatelliteSourceId]!;
-    expect(sat.format, TileFormat.raster);
-    expect(sat.storageMode, StorageMode.onlineOnly);
-    expect(sat.tileUrlTemplate, 'http://tiles.test/satellite/{z}/{x}/{y}');
-    expect(sat.maxZoom, 16);
+    expect(sources.keys, [
+      'server-hybrid-day', 'server-hybrid-night', 'server-vector-day', 'server-vector-night', 'server-satellite',
+    ]);
+    expect(sources.keys, contains(CatalogRepository.defaultBaseSourceId));
 
     final hybrid = sources[CatalogRepository.serverHybridSourceId]!;
     expect(hybrid.format, TileFormat.vector);
-    expect(hybrid.styleUrl, contains('http://tiles.test/satellite/{z}/{x}/{y}'));
-    expect(hybrid.styleUrl, contains('http://tiles.test/osm/{z}/{x}/{y}'));
+    expect(hybrid.styleUrl, 'http://tiles.test/style/hybrid-day');
+    expect(hybrid.downloadable, isTrue);
+
+    final sat = sources[CatalogRepository.serverSatelliteSourceId]!;
+    expect(sat.format, TileFormat.raster);
+    expect(sat.tileUrlTemplate, 'http://tiles.test/satellite/{z}/{x}/{y}');
+    expect(sat.maxZoom, 16);
+    expect(sat.canBeOverlay, isTrue);
+  });
+
+  test('the server catalog replaces the built-in «Сервер карт» and keeps the other providers', () async {
+    final body = await io.File('test/map/catalog/fixtures/server_catalog.json').readAsString();
+    final r = serverRepo(client: MockClient((_) async => http.Response.bytes(utf8.encode(body), 200)));
+
+    await r.refreshFromUrl(Uri.parse('http://api.test/maps'));
+    final providers = await r.load();
+
+    expect(providers.map((p) => p.id), ['server', 'osm']);
+    final hybrid = providers.first.sources.first;
+    expect(hybrid.id, 'server-hybrid-day');
+    expect(hybrid.name, 'Украина · спутник + дороги');
+    expect(hybrid.styleUrl, 'http://localhost:3000/style/hybrid-day');
+    expect(hybrid.storageMode, StorageMode.onlineCache);
+    expect(hybrid.downloadable, isTrue);
+    expect(hybrid.version, 'v1');
+    expect(hybrid.attribution, contains('OpenStreetMap'));
   });
 
   test('source ids are unique across the built-in catalog', () async {
@@ -117,7 +140,7 @@ void main() {
     expect(providers.any((p) => p.id == CatalogRepository.localProviderId), isFalse);
   });
 
-  test('refreshFromUrl replaces the built-in providers with the remote catalog', () async {
+  test('refreshFromUrl replaces built-in providers with the same id', () async {
     final remote = jsonEncode({
       'version': 2,
       'providers': [
@@ -137,7 +160,9 @@ void main() {
 
     final providers = await r.refreshFromUrl(Uri.parse('https://example.org/catalog.json'));
     expect(providers.single.sources.single.id, 'ofm-bright');
-    expect((await r.load()).first.sources.single.id, 'ofm-bright', reason: 'later loads use the refreshed catalog');
+    final loaded = await r.load();
+    expect(loaded.map((p) => p.id), ['server', 'osm', 'google', 'yandex'], reason: 'others stay');
+    expect(loaded[1].sources.single.id, 'ofm-bright', reason: 'later loads use the refreshed provider');
   });
 
   test('a failed or broken refresh keeps the current catalog and reports the error', () async {
@@ -149,7 +174,7 @@ void main() {
     await expectLater(down.refreshFromUrl(Uri.parse('https://example.org/c.json')), throwsA(isA<CatalogException>()));
   });
 
-  test('catalogProvider loads the catalog and refresh() swaps in the remote one', () async {
+  test('catalogProvider loads the catalog and refresh() swaps in the remote providers', () async {
     final remote = jsonEncode({
       'providers': [
         {'id': 'osm', 'name': 'OSM', 'sources': [{'id': 'ofm-bright', 'name': 'Bright', 'format': 'vector', 'storageMode': 'onlineCache'}]},
@@ -164,7 +189,46 @@ void main() {
 
     expect((await container.read(catalogProvider.future)).map((p) => p.id), ['server', 'osm', 'google', 'yandex']);
     await container.read(catalogProvider.notifier).refresh(Uri.parse('https://example.org/c.json'));
-    expect(container.read(catalogProvider).value!.single.sources.single.id, 'ofm-bright');
+    expect(container.read(catalogProvider).value![1].sources.single.id, 'ofm-bright');
+  });
+
+  test('catalogProvider fetches the server catalog in the background at start', () async {
+    final body = await io.File('test/map/catalog/fixtures/server_catalog.json').readAsString();
+    final requested = <Uri>[];
+    final container = ProviderContainer(
+      overrides: [
+        catalogRepositoryProvider.overrideWithValue(serverRepo(
+          catalogUrl: Uri.parse('http://api.test/maps'),
+          client: MockClient((request) async {
+            requested.add(request.url);
+            return http.Response.bytes(utf8.encode(body), 200);
+          }),
+        )),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final first = await container.read(catalogProvider.future);
+    expect(first.first.sources.first.name, 'Спутник + дороги', reason: 'built-in until the server answers');
+    await pumpEventQueue();
+    expect(requested, [Uri.parse('http://api.test/maps')]);
+    expect(container.read(catalogProvider).value!.first.sources.first.name, 'Украина · спутник + дороги');
+  });
+
+  test('without a connection the start-up refresh keeps the built-in catalog', () async {
+    final container = ProviderContainer(
+      overrides: [
+        catalogRepositoryProvider.overrideWithValue(serverRepo(
+          catalogUrl: Uri.parse('http://api.test/maps'),
+          client: MockClient((_) async => throw const io.SocketException('offline')),
+        )),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(catalogProvider.future);
+    await pumpEventQueue();
+    expect(container.read(catalogProvider).value!.first.sources.first.name, 'Спутник + дороги');
   });
 
   group('user maps', () {

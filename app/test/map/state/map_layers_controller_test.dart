@@ -51,15 +51,15 @@ void main() {
     canBeOverlay: true,
     defaultOpacity: 0.75,
   );
-  const serverSat = MapSource(
-    id: CatalogRepository.serverSatelliteSourceId,
-    name: 'Украина · спутник',
+  const serverDefault = MapSource(
+    id: CatalogRepository.defaultBaseSourceId,
+    name: 'Спутник + дороги',
     format: TileFormat.raster,
     storageMode: StorageMode.onlineOnly,
     tileUrlTemplate: 'http://tiles.test/satellite/{z}/{x}/{y}',
   );
   final providers = [
-    const MapProvider(id: 'server', name: 'Сервер карт', sources: [serverSat]),
+    const MapProvider(id: 'server', name: 'Сервер карт', sources: [serverDefault]),
     const MapProvider(id: 'osm', name: 'OSM', sources: [liberty, osm]),
     const MapProvider(id: 'yandex', name: 'Яндекс', sources: [ySat]),
   ];
@@ -118,8 +118,24 @@ void main() {
   test('attach with nothing saved applies the default server base', () async {
     final c = container(MemoryMapStateStore());
     await c.read(mapLayersProvider.notifier).attach(manager());
-    expect(host.style, contains(CatalogRepository.serverSatelliteSourceId));
-    expect(c.read(mapLayersProvider).baseSourceId, CatalogRepository.serverSatelliteSourceId);
+    expect(host.style, contains(CatalogRepository.defaultBaseSourceId));
+    expect(c.read(mapLayersProvider).baseSourceId, CatalogRepository.defaultBaseSourceId);
+  });
+
+  test('attach falls back to the default base when the saved one left the catalog', () async {
+    final store = MemoryMapStateStore(const MapState(
+      baseSourceId: 'server-sat-ukraine',
+      overlays: [],
+      favoriteIds: [],
+      presets: [],
+    ));
+    final c = container(store);
+
+    final result = await c.read(mapLayersProvider.notifier).attach(manager());
+
+    expect(result.ok, isTrue);
+    expect(host.style, contains(CatalogRepository.defaultBaseSourceId));
+    expect(c.read(mapLayersProvider).baseSourceId, CatalogRepository.defaultBaseSourceId);
   });
 
   test('changes go through the manager, update the state and are saved', () async {

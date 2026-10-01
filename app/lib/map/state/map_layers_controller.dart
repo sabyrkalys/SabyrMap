@@ -93,11 +93,20 @@ class MapStateNotifier extends Notifier<MapState> {
     _manager = manager;
     await _loaded;
     final saved = state;
-    // No base chosen yet → start on the default (our map server).
-    final baseId = saved.baseSourceId ?? CatalogRepository.defaultBaseSourceId;
+    // No base chosen yet, or the saved one left the catalog (renamed server
+    // maps, a deleted local file) → start on the default (our map server).
+    var baseId = saved.baseSourceId ?? CatalogRepository.defaultBaseSourceId;
     try {
-      await manager.setBaseSource(await _source(baseId));
-      if (saved.baseSourceId == null) state = state.copyWith(baseSourceId: baseId);
+      MapSource base;
+      try {
+        base = await _source(baseId);
+      } on LayerException {
+        if (baseId == CatalogRepository.defaultBaseSourceId) rethrow;
+        baseId = CatalogRepository.defaultBaseSourceId;
+        base = await _source(baseId);
+      }
+      await manager.setBaseSource(base);
+      if (saved.baseSourceId != baseId) state = state.copyWith(baseSourceId: baseId);
     } on LayerException catch (e) {
       return LayerChangeResult([e.message]);
     }
