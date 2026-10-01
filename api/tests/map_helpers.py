@@ -79,10 +79,8 @@ def map_server(tmp_path, monkeypatch):
         pmtiles_header(max_zoom=5, bounds=(-180, -85.0511, 180, 85.0511), tile_data_length=1_000_000,
                        addressed_tiles=1365)
     )
-    for kind in ("hybrid", "vector"):
-        for theme in ("day", "night"):
-            name = f"{kind}-{theme}"
-            (v1 / "styles" / f"{name}.json").write_text(json.dumps(style(name, hybrid=kind == "hybrid")))
+    for name in ("hybrid-day", "hybrid-day-nobuildings", "hybrid-night", "vector-day", "vector-night"):
+        (v1 / "styles" / f"{name}.json").write_text(json.dumps(style(name, hybrid=name.startswith("hybrid"))))
     regions = tmp_path / "regions"
     regions.mkdir()
     monkeypatch.setattr(settings, "TILES_PATH", str(tiles))

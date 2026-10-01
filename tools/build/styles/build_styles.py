@@ -250,7 +250,7 @@ def label_layers(p, hybrid):
     ]
 
 
-def style(name, theme, hybrid, tiles_base):
+def style(name, theme, hybrid, tiles_base, buildings=True):
     p = PALETTES[theme]
     night = theme == "night"
     sources = {
@@ -291,8 +291,9 @@ def style(name, theme, hybrid, tiles_base):
                        "source": "satellite", "minzoom": 5.5,
                        "paint": {"raster-opacity": zoom(5.5, 0, 6.5, 1),
                                  "raster-fade-duration": 250, **dim}})
-        layers.append(fill("building", "building", None, "rgba(255,255,255,0.12)",
-                           minzoom=14, outline="rgba(255,255,255,0.45)"))
+        if buildings:
+            layers.append(fill("building", "building", None, "rgba(255,255,255,0.12)",
+                               minzoom=14, outline="rgba(255,255,255,0.45)"))
     else:
         layers += ground_layers(p)
     layers += road_layers(p, hybrid)
@@ -317,14 +318,16 @@ def main():
     args = ap.parse_args()
     base = args.tiles_base.rstrip("/")
     args.out.mkdir(parents=True, exist_ok=True)
-    for kind in ("hybrid", "vector"):
-        for theme in ("day", "night"):
-            name = f"{kind}-{theme}"
-            data = style(name, theme, kind == "hybrid", base)
-            path = args.out / f"{name}.json"
-            path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
-                            encoding="utf-8")
-            print(f"{path}  ({len(data['layers'])} слоёв)")
+    variants = [(f"{kind}-{theme}", theme, kind == "hybrid", True)
+                for kind in ("hybrid", "vector") for theme in ("day", "night")]
+    # Satellite + roads and labels only: the houses are on the photo anyway.
+    variants.append(("hybrid-day-nobuildings", "day", True, False))
+    for name, theme, hybrid, buildings in variants:
+        data = style(name, theme, hybrid, base, buildings=buildings)
+        path = args.out / f"{name}.json"
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
+                        encoding="utf-8")
+        print(f"{path}  ({len(data['layers'])} слоёв)")
 
 
 if __name__ == "__main__":

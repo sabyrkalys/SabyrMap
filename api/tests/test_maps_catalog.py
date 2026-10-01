@@ -21,8 +21,8 @@ def test_catalog_is_public_and_lists_server_maps(client, seeded):
     assert [p["id"] for p in providers] == ["server"]
     assert providers[0]["name"] == "Сервер карт"
     ids = [s["id"] for s in providers[0]["sources"]]
-    assert ids == ["server-hybrid-day", "server-hybrid-night", "server-vector-day", "server-vector-night",
-                   "server-satellite"]
+    assert ids == ["server-hybrid-day", "server-hybrid-day-nobuildings", "server-hybrid-night", "server-vector-day",
+                   "server-vector-night", "server-satellite"]
 
 
 def test_catalog_matches_the_client_format(client, seeded):
@@ -66,7 +66,7 @@ def test_seed_names_maps_after_the_region_and_is_idempotent(seeded):
     seed(seeded, version="v1", region="Казахстан")
 
     entries = seeded.query(MapCatalogEntry).all()
-    assert len(entries) == 5
+    assert len(entries) == 6
     hybrid = seeded.get(MapCatalogEntry, "server-hybrid-day")
     assert hybrid.name == "Казахстан · спутник + дороги"
     assert hybrid.version == "v1"
