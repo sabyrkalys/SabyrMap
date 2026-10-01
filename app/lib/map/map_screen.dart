@@ -794,8 +794,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         for (final source in provider.sources) source.id: source,
     };
     final layers = ref.watch(mapLayersProvider);
-    // No base chosen yet: the map shows its initial style (OpenFreeMap Liberty).
-    final attribution = attributionText(catalogSources[layers.baseSourceId ?? 'ofm-liberty'], [
+    // No base chosen yet: the map defaults to the server source.
+    final attribution = attributionText(catalogSources[layers.baseSourceId ?? CatalogRepository.defaultBaseSourceId], [
       for (final overlay in layers.overlays)
         if (overlay.visible && catalogSources[overlay.sourceId] != null) catalogSources[overlay.sourceId]!,
     ]);

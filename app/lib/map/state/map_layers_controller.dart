@@ -93,15 +93,11 @@ class MapStateNotifier extends Notifier<MapState> {
     _manager = manager;
     await _loaded;
     final saved = state;
-    final baseId = saved.baseSourceId;
-    if (baseId == null) {
-      if (saved.overlays.isEmpty) return const LayerChangeResult();
-      final result = await manager.restoreOverlays(saved.overlays);
-      _syncOverlays();
-      return result;
-    }
+    // No base chosen yet → start on the default (our map server).
+    final baseId = saved.baseSourceId ?? CatalogRepository.defaultBaseSourceId;
     try {
       await manager.setBaseSource(await _source(baseId));
+      if (saved.baseSourceId == null) state = state.copyWith(baseSourceId: baseId);
     } on LayerException catch (e) {
       return LayerChangeResult([e.message]);
     }

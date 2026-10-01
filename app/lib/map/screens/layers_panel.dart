@@ -14,8 +14,8 @@ import 'available_maps_screen.dart';
 class LayersPanel extends ConsumerStatefulWidget {
   const LayersPanel({super.key});
 
-  /// Shown when no base was chosen yet: the map starts with this style.
-  static const String defaultBaseId = 'ofm-liberty';
+  /// Shown when no base was chosen yet: the map starts with this source.
+  static const String defaultBaseId = CatalogRepository.defaultBaseSourceId;
 
   @override
   ConsumerState<LayersPanel> createState() => _LayersPanelState();

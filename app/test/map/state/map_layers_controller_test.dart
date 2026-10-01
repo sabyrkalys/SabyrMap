@@ -51,7 +51,15 @@ void main() {
     canBeOverlay: true,
     defaultOpacity: 0.75,
   );
+  const serverSat = MapSource(
+    id: CatalogRepository.serverSatelliteSourceId,
+    name: 'Украина · спутник',
+    format: TileFormat.raster,
+    storageMode: StorageMode.onlineOnly,
+    tileUrlTemplate: 'http://tiles.test/satellite/{z}/{x}/{y}',
+  );
   final providers = [
+    const MapProvider(id: 'server', name: 'Сервер карт', sources: [serverSat]),
     const MapProvider(id: 'osm', name: 'OSM', sources: [liberty, osm]),
     const MapProvider(id: 'yandex', name: 'Яндекс', sources: [ySat]),
   ];
@@ -107,11 +115,11 @@ void main() {
     expect(c.read(mapLayersProvider).overlays.single.opacity, 0.5);
   });
 
-  test('attach with nothing saved leaves the current map alone', () async {
+  test('attach with nothing saved applies the default server base', () async {
     final c = container(MemoryMapStateStore());
     await c.read(mapLayersProvider.notifier).attach(manager());
-    expect(host.calls, isEmpty);
-    expect(c.read(mapLayersProvider).baseSourceId, isNull);
+    expect(host.style, contains(CatalogRepository.serverSatelliteSourceId));
+    expect(c.read(mapLayersProvider).baseSourceId, CatalogRepository.serverSatelliteSourceId);
   });
 
   test('changes go through the manager, update the state and are saved', () async {

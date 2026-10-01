@@ -61,21 +61,30 @@ class CatalogRepository {
     AssetBundle? bundle,
     UserSourcesStore? userSources,
     FileSystem? fileSystem,
+    String? mapServerBaseUrl,
     this.hiddenProviderIds = AppConfig.hiddenMapProviders,
   })  : _mapsFolder = mapsFolder ?? MediaFileFolderService(subfolder: kMapsSubfolder),
         _http = httpClient ?? http.Client(),
         _bundle = bundle ?? rootBundle,
         _userSources = userSources ?? SecureUserSourcesStore(),
-        _fileSystem = fileSystem ?? const LocalFileSystem();
+        _fileSystem = fileSystem ?? const LocalFileSystem(),
+        _mapServerBaseUrl = mapServerBaseUrl ?? AppConfig.mapServerBaseUrl;
 
   static const String builtinAsset = 'assets/maps/builtin_catalog.json';
   static const String localProviderId = 'local';
+  static const String serverProviderId = 'server';
+  static const String serverSatelliteSourceId = 'server-sat-ukraine';
+  static const String serverHybridSourceId = 'server-hybrid-ukraine';
+
+  /// Base map shown when the user has not chosen one yet.
+  static const String defaultBaseSourceId = serverSatelliteSourceId;
 
   final MediaFileFolderService _mapsFolder;
   final http.Client _http;
   final AssetBundle _bundle;
   final UserSourcesStore _userSources;
   final FileSystem _fileSystem;
+  final String _mapServerBaseUrl;
 
   /// Providers left out of [load] (see AppConfig.hiddenMapProviders).
   final Set<String> hiddenProviderIds;
@@ -106,10 +115,120 @@ class CatalogRepository {
 
   Future<List<MapProvider>> loadBuiltin() async => parse(await _bundle.loadString(builtinAsset));
 
-  /// Built-in (or refreshed) providers followed by «Установленные карты»
-  /// when mediafile/maps holds .mbtiles files.
+  /// Our own tile server («Сервер карт»). Used as a fallback when no remote
+  /// catalog is loaded: once [refreshFromUrl] succeeds the server supplies
+  /// its own maps in that catalog, so this built-in copy is dropped.
+  MapProvider _serverProvider() {
+    const satAttribution = 'Esri, Maxar, Earthstar Geographics, and the GIS Community';
+    const hybridAttribution = '$satAttribution · © OpenStreetMap contributors';
+    return MapProvider(
+      id: serverProviderId,
+      name: 'Сервер карт',
+      attribution: satAttribution,
+      sources: [
+        MapSource(
+          id: serverHybridSourceId,
+          name: 'Украина · спутник + дороги',
+          // Vector style: satellite raster + OSM vector (roads, buildings,
+          // labels) drawn on top. MapLibre accepts the style JSON inline.
+          styleUrl: _hybridStyle(hybridAttribution),
+          format: TileFormat.vector,
+          storageMode: StorageMode.onlineOnly,
+          attribution: hybridAttribution,
+          minZoom: 0,
+          maxZoom: 22,
+        ),
+        MapSource(
+          id: serverSatelliteSourceId,
+          name: 'Украина · спутник',
+          tileUrlTemplate: '$_mapServerBaseUrl/satellite/{z}/{x}/{y}',
+          format: TileFormat.raster,
+          storageMode: StorageMode.onlineOnly,
+          attribution: satAttribution,
+          minZoom: 0,
+          maxZoom: 16,
+        ),
+      ],
+    );
+  }
+
+  /// MapLibre style (as a JSON string) for the hybrid base: our satellite
+  /// raster with the OSM vector layer (roads, buildings, place labels) on top.
+  /// Vector tiles come from Martin's `osm` source; glyphs from OpenFreeMap for
+  /// now (served by our server once fonts are published).
+  String _hybridStyle(String attribution) => jsonEncode({
+        'version': 8,
+        'glyphs': 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+        'sources': {
+          'sat': {
+            'type': 'raster',
+            'tiles': ['$_mapServerBaseUrl/satellite/{z}/{x}/{y}'],
+            'tileSize': 256,
+            'minzoom': 0,
+            'maxzoom': 16,
+            'attribution': attribution,
+          },
+          'osm': {
+            'type': 'vector',
+            'tiles': ['$_mapServerBaseUrl/osm/{z}/{x}/{y}'],
+            'minzoom': 0,
+            'maxzoom': 14,
+          },
+        },
+        'layers': [
+          {
+            'id': 'background',
+            'type': 'background',
+            'paint': {'background-color': '#e5e3df'},
+          },
+          {'id': 'sat', 'type': 'raster', 'source': 'sat'},
+          {
+            'id': 'buildings',
+            'type': 'fill',
+            'source': 'osm',
+            'source-layer': 'building',
+            'minzoom': 14,
+            'paint': {
+              'fill-color': 'rgba(0,0,0,0.25)',
+              'fill-outline-color': 'rgba(255,255,255,0.45)',
+            },
+          },
+          {
+            'id': 'roads',
+            'type': 'line',
+            'source': 'osm',
+            'source-layer': 'transportation',
+            'paint': {
+              'line-color': 'rgba(255,255,255,0.75)',
+              'line-width': [
+                'interpolate', ['linear'], ['zoom'], 6, 0.4, 12, 1.5, 16, 3.0,
+              ],
+            },
+          },
+          {
+            'id': 'labels',
+            'type': 'symbol',
+            'source': 'osm',
+            'source-layer': 'place',
+            'layout': {
+              'text-field': ['get', 'name'],
+              'text-font': ['Noto Sans Regular'],
+              'text-size': 13,
+            },
+            'paint': {
+              'text-color': '#ffffff',
+              'text-halo-color': '#000000',
+              'text-halo-width': 1.3,
+            },
+          },
+        ],
+      });
+
+  /// «Сервер карт» (built-in fallback only), then the built-in (or refreshed)
+  /// providers, then «Установленные карты» when mediafile/maps has files.
   Future<List<MapProvider>> load() async {
     final providers = [
+      if (_remote == null) _serverProvider(),
       for (final p in _remote ?? await loadBuiltin())
         if (!hiddenProviderIds.contains(p.id)) p,
     ];

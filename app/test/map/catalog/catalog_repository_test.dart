@@ -63,6 +63,34 @@ void main() {
     }
   });
 
+  test('«Сервер карт» is present by default with the satellite and hybrid sources', () async {
+    final r = CatalogRepository(
+      mapsFolder: MediaFileFolderService(
+          subfolder: 'maps', fileSystem: MemoryFileSystem(), baseDirectoryPath: mapsDir),
+      httpClient: MockClient((_) async => http.Response('', 404)),
+      userSources: userStore,
+      fileSystem: MemoryFileSystem(),
+      mapServerBaseUrl: 'http://tiles.test',
+    );
+    final providers = await r.load();
+    expect(providers.first.id, CatalogRepository.serverProviderId);
+
+    final sources = {for (final s in providers.first.sources) s.id: s};
+    expect(sources.keys,
+        containsAll([CatalogRepository.serverHybridSourceId, CatalogRepository.serverSatelliteSourceId]));
+
+    final sat = sources[CatalogRepository.serverSatelliteSourceId]!;
+    expect(sat.format, TileFormat.raster);
+    expect(sat.storageMode, StorageMode.onlineOnly);
+    expect(sat.tileUrlTemplate, 'http://tiles.test/satellite/{z}/{x}/{y}');
+    expect(sat.maxZoom, 16);
+
+    final hybrid = sources[CatalogRepository.serverHybridSourceId]!;
+    expect(hybrid.format, TileFormat.vector);
+    expect(hybrid.styleUrl, contains('http://tiles.test/satellite/{z}/{x}/{y}'));
+    expect(hybrid.styleUrl, contains('http://tiles.test/osm/{z}/{x}/{y}'));
+  });
+
   test('source ids are unique across the built-in catalog', () async {
     final ids = [for (final p in await repo().loadBuiltin()) ...p.sources.map((s) => s.id)];
     expect(ids.toSet().length, ids.length);
@@ -115,7 +143,7 @@ void main() {
   test('a failed or broken refresh keeps the current catalog and reports the error', () async {
     final r = repo(client: MockClient((_) async => http.Response('not json', 200)));
     await expectLater(r.refreshFromUrl(Uri.parse('https://example.org/c.json')), throwsA(isA<CatalogException>()));
-    expect((await r.load()).map((p) => p.id), ['osm', 'google', 'yandex']);
+    expect((await r.load()).map((p) => p.id), ['server', 'osm', 'google', 'yandex']);
 
     final down = repo(client: MockClient((_) async => http.Response('', 503)));
     await expectLater(down.refreshFromUrl(Uri.parse('https://example.org/c.json')), throwsA(isA<CatalogException>()));
@@ -134,7 +162,7 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    expect((await container.read(catalogProvider.future)).map((p) => p.id), ['osm', 'google', 'yandex']);
+    expect((await container.read(catalogProvider.future)).map((p) => p.id), ['server', 'osm', 'google', 'yandex']);
     await container.read(catalogProvider.notifier).refresh(Uri.parse('https://example.org/c.json'));
     expect(container.read(catalogProvider).value!.single.sources.single.id, 'ofm-bright');
   });
@@ -187,7 +215,7 @@ void main() {
 
   test('hidden providers (Google, Яндекс for now) are left out of load()', () async {
     final providers = await repo(hidden: const {'google', 'yandex'}).load();
-    expect(providers.map((p) => p.id), ['osm']);
+    expect(providers.map((p) => p.id), ['server', 'osm']);
   });
 }
 
