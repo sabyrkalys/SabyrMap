@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- Просмотр стилей сервера карт (план, фаза 2, «Проверка»).
+     Открыть: tools/build/preview.html?base=http://localhost:3000#11/48.16/24.5
+     base — адрес Martin (по умолчанию http://localhost:3000). -->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>SabyrMap — стили</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.css">
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5/dist/maplibre-gl.js"></script>
+<style>
+  html, body, #map { margin: 0; height: 100%; }
+  #pick { position: absolute; top: 10px; left: 10px; z-index: 1; font: 14px sans-serif; padding: 4px; }
+</style>
+</head>
+<body>
+<select id="pick">
+  <option>hybrid-day</option><option>hybrid-night</option>
+  <option>vector-day</option><option>vector-night</option>
+</select>
+<div id="map"></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const base = (q.get('base') || 'http://localhost:3000').replace(/\/$/, '');
+  const pick = document.getElementById('pick');
+  pick.value = q.get('style') || 'hybrid-day';
+  const map = new maplibregl.Map({
+    container: 'map', style: `${base}/style/${pick.value}`,
+    center: [24.5, 48.16], zoom: 11, hash: true,
+  });
+  map.addControl(new maplibregl.NavigationControl());
+  pick.onchange = () => map.setStyle(`${base}/style/${pick.value}`);
+  map.on('error', (e) => console.error('map error', e.error && e.error.message));
+</script>
+</body>
+</html>
