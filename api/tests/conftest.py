@@ -34,6 +34,14 @@ def _test_db_url():
     return f"{base}/{TEST_DB_NAME}"
 
 
+@pytest.fixture(autouse=True)
+def default_settings(monkeypatch):
+    """Tests expect the code defaults, whatever .env the server runs with
+    (the stand runs single-user, the app talks to the API without nginx)."""
+    monkeypatch.setattr(settings, "AUTH_DISABLED", False)
+    monkeypatch.setattr(settings, "REGION_FILES_VIA_NGINX", True)
+
+
 @pytest.fixture(scope="session")
 def db_engine():
     admin_conn = psycopg2.connect(_admin_url())

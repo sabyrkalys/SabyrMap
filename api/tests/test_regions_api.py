@@ -197,3 +197,18 @@ def test_delete_removes_only_own_region(client, seeded):
     assert client.delete(f"/regions/{job_id}", headers=bob).status_code == 404
     assert client.delete(f"/regions/{job_id}", headers=alice).status_code == 204
     assert client.get(f"/regions/{job_id}", headers=alice).status_code == 404
+
+
+def test_without_nginx_the_api_sends_the_file_itself(client, seeded, monkeypatch, map_server):
+    monkeypatch.setattr(settings, "REGION_FILES_VIA_NGINX", False)
+    headers = _register(client, "dl-direct@example.test")
+    job = _make_ready(seeded, _create(client, headers).json()["id"])
+    folder = map_server / "regions" / job.storage_dir
+    folder.mkdir()
+    (folder / "satellite.mbtiles").write_bytes(b"tiles!")
+
+    response = client.get(f"/regions/{job.id}/download/satellite.mbtiles", headers=headers)
+
+    assert response.status_code == 200
+    assert response.content == b"tiles!"
+    assert "x-accel-redirect" not in response.headers

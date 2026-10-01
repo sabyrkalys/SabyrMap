@@ -5,6 +5,7 @@ import secrets
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from geoalchemy2.shape import from_shape, to_shape
 from shapely.geometry import box
@@ -205,6 +206,10 @@ def file_entry(job: RegionJob, file_name: str) -> dict:
         if f["name"] == file_name:
             return f
     raise RegionError(404, "Файл не найден")
+
+
+def file_path(job: RegionJob, file_name: str) -> Path:
+    return Path(settings.REGIONS_PATH) / job.storage_dir / file_name
 
 
 def accel_redirect_path(job: RegionJob, file_name: str) -> str:

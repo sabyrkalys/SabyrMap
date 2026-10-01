@@ -10,6 +10,9 @@ services:
       # Каталог /maps отдаёт адреса тайлов Martin напрямую (как в стилях,
       # опубликованных publish_styles.sh v1 http://localhost:3000).
       TILES_PUBLIC_URL: http://localhost:3000
+      # Приложение в деве ходит в API напрямую (:8500), без nginx — файлы
+      # регионов API отдаёт сам.
+      REGION_FILES_VIA_NGINX: "false"
 
   worker:
     environment:

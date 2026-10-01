@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -120,6 +121,9 @@ def download_region_file(
         entry = regions.file_entry(job, file_name)
     except RegionError as e:
         raise _http(e)
+    if not settings.REGION_FILES_VIA_NGINX:
+        return FileResponse(regions.file_path(job, entry["name"]), filename=entry["name"],
+                            media_type="application/octet-stream")
     return Response(
         status_code=status.HTTP_200_OK,
         media_type="application/octet-stream",

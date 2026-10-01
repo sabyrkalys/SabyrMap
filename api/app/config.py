@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     TILES_PATH: str = "/srv/tiles"
     REGIONS_PATH: str = "/srv/regions"
 
+    # Region files are sent by nginx (X-Accel-Redirect). Without nginx in
+    # front (dev: the app talks to the API on :8500) the API sends them itself.
+    REGION_FILES_VIA_NGINX: bool = True
+
     # Offline region limits.
     REGION_MAX_BYTES: int = 500 * 1024 * 1024
     REGION_MAX_ZOOM: int = 17
