@@ -23,6 +23,8 @@ services:
         condition: service_healthy
     volumes:
       - ./api:/app
+      # Тайлы — только для оценки размера региона (заголовки PMTiles).
+      - ${TILES_DIR}:/srv/tiles:ro
       - ${REGIONS_DIR}:/srv/regions:ro
 
   worker:

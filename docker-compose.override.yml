@@ -6,6 +6,14 @@ services:
   api:
     ports:
       - "127.0.0.1:8500:8000"
+    environment:
+      # Каталог /maps отдаёт адреса тайлов Martin напрямую (как в стилях,
+      # опубликованных publish_styles.sh v1 http://localhost:3000).
+      TILES_PUBLIC_URL: http://localhost:3000
+
+  worker:
+    environment:
+      TILES_PUBLIC_URL: http://localhost:3000
 
   db:
     ports:

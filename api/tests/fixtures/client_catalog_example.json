@@ -1,0 +1,48 @@
+{
+ "providers": [
+  {
+   "id": "osm",
+   "name": "OpenStreetMap Maps",
+   "attribution": "© OpenStreetMap contributors",
+   "isolated": false,
+   "sources": [
+    {
+     "id": "ofm-liberty",
+     "name": "OpenFreeMap Liberty",
+     "format": "vector",
+     "storageMode": "onlineCache",
+     "styleUrl": "https://tiles.openfreemap.org/styles/liberty",
+     "attribution": "© OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors",
+     "minZoom": 0,
+     "maxZoom": 22,
+     "canBeOverlay": false,
+     "defaultOpacity": 1.0
+    },
+    {
+     "id": "ofm-positron",
+     "name": "OpenFreeMap Positron",
+     "format": "vector",
+     "storageMode": "onlineCache",
+     "styleUrl": "https://tiles.openfreemap.org/styles/positron",
+     "attribution": "© OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors",
+     "minZoom": 0,
+     "maxZoom": 22,
+     "canBeOverlay": false,
+     "defaultOpacity": 1.0
+    },
+    {
+     "id": "osm-standard",
+     "name": "OSM Standard Raster",
+     "format": "raster",
+     "storageMode": "onlineCache",
+     "tileUrlTemplate": "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+     "attribution": "© OpenStreetMap contributors",
+     "minZoom": 0,
+     "maxZoom": 19,
+     "canBeOverlay": true,
+     "defaultOpacity": 0.7
+    }
+   ]
+  }
+ ]
+}

@@ -59,7 +59,9 @@ def db_engine():
 def db_session(db_engine):
     connection = db_engine.connect()
     transaction = connection.begin()
-    Session = sessionmaker(bind=connection)
+    # Code under test may commit or roll back (the region worker does); with
+    # savepoints that stays inside this test's outer transaction.
+    Session = sessionmaker(bind=connection, join_transaction_mode="create_savepoint")
     session = Session()
 
     yield session
