@@ -11,7 +11,7 @@ enum MenuToggle {
   settingsNightMode(false),
   settingsCenterCoordinates(true),
   mapsCacheOnly(false),
-  mapsLoadingIndicators(false),
+  mapsLoadingIndicators(true),
   mapsMapName(false),
   mapsMapScale(true),
   mapsScaleBar(true),

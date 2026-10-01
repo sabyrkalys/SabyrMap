@@ -152,4 +152,21 @@ void main() {
     await service.deleteRegion(a.id);
     expect(backend.calls.sublist(1), ['pause ${a.id}', 'resume ${a.id}', 'delete ${a.id}']);
   });
+
+  test('neighbour prefetch regions are not listed as saved areas', () async {
+    final backend = FakeOfflineBackend();
+    final definition = OfflineRegionDefinition(
+      bounds: LatLngBounds(southwest: const LatLng(1, 1), northeast: const LatLng(2, 2)),
+      mapStyleUrl: 'http://x',
+      minZoom: 1,
+      maxZoom: 2,
+    );
+    await backend.download(definition, metadata: {'prefetch': true});
+    final saved = await backend.download(definition, metadata: {'name': 'Мой участок'});
+    backend.statuses[saved.id] = status(bytes: 10, progress: 100, complete: true);
+
+    final regions = await OfflineService(backend: backend).listRegions();
+
+    expect(regions.map((r) => r.name), ['Мой участок']);
+  });
 }

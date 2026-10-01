@@ -137,17 +137,19 @@ class OfflineService {
     final regions = await _backend.list();
     return [
       for (final region in regions)
-        await () async {
-          final status = await _backend.status(region.id);
-          return OfflineRegionInfo(
-            id: region.id,
-            name: region.metadata['name'] as String? ?? 'Участок ${region.id}',
-            sourceId: region.metadata['sourceId'] as String?,
-            sizeBytes: status.completedResourceSize,
-            progress: status.downloadProgress,
-            isComplete: status.isComplete,
-          );
-        }(),
+        // Short-lived neighbour prefetch regions are not the user's areas.
+        if (region.metadata['prefetch'] != true)
+          await () async {
+            final status = await _backend.status(region.id);
+            return OfflineRegionInfo(
+              id: region.id,
+              name: region.metadata['name'] as String? ?? 'Участок ${region.id}',
+              sourceId: region.metadata['sourceId'] as String?,
+              sizeBytes: status.completedResourceSize,
+              progress: status.downloadProgress,
+              isComplete: status.isComplete,
+            );
+          }(),
     ];
   }
 

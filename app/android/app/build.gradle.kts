@@ -50,3 +50,11 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // MainActivity sets MapView.prefetchZoomDelta on the maps maplibre_gl
+    // creates. The plugin brings the SDK at run time; this only makes its
+    // classes visible to the compiler. Keep the version equal to the one in
+    // maplibre_gl's android/build.gradle.
+    compileOnly("org.maplibre.gl:android-sdk-opengl:13.3.0")
+}

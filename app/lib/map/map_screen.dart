@@ -1,5 +1,6 @@
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
@@ -18,6 +19,7 @@ import 'map_overlays.dart';
 import 'map_scale.dart';
 import 'map_target.dart';
 import 'point_info_sheet.dart';
+import 'prefetch/neighbor_prefetcher.dart';
 import 'services/google_tiles_service.dart';
 import 'services/layer_manager.dart';
 import 'services/maplibre_layer_host.dart';
@@ -68,6 +70,12 @@ class MapScreen extends ConsumerStatefulWidget {
 
 class _MapScreenState extends ConsumerState<MapScreen> {
   MapLibreMapController? _controller;
+
+  // Loading bar: on from a camera move or style load until MapLibre reports
+  // the map idle (everything visible is drawn).
+  bool _mapBusy = false;
+  bool _prefetchConfigured = false;
+  static const _mapChannel = MethodChannel('sabyrmap/map');
   final Map<String, Circle> _circlesByWaypointId = {};
   final Map<String, Line> _linesByTrackId = {};
   // Caches a cheap "did this actually change" key per circle/line id so
@@ -294,6 +302,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // The zoom feeds the info panel's scale readout during a pinch; to avoid a
   // rebuild on every frame it is only applied once it moved by 0.1 or more.
   void _onCameraMove(CameraPosition position) {
+    if (!_mapBusy) {
+      if (mounted) setState(() => _mapBusy = true);
+      ref.read(neighborPrefetcherProvider).cancel();
+    }
     final zoomChanged = (position.zoom - _cameraZoom).abs() >= 0.1;
     final hasTarget = ref.read(mapTargetProvider).point != null;
     if (!zoomChanged && !hasTarget) return;
@@ -387,9 +399,53 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  void _onMapIdle() {
+    if (_mapBusy && mounted) setState(() => _mapBusy = false);
+  }
+
+  /// Loads the neighbourhood of what is on screen into the tile cache.
+  Future<void> _prefetchAround(double zoom) async {
+    final controller = _controller;
+    if (controller == null) return;
+    final LatLngBounds visible;
+    try {
+      visible = await controller.getVisibleRegion();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    final baseId = ref.read(mapLayersProvider).baseSourceId ?? CatalogRepository.defaultBaseSourceId;
+    MapSource? base;
+    for (final provider in ref.read(catalogProvider).value ?? const <MapProvider>[]) {
+      for (final source in provider.sources) {
+        if (source.id == baseId) base = source;
+      }
+    }
+    await ref.read(neighborPrefetcherProvider).onIdle(
+          source: base,
+          visible: visible,
+          zoom: zoom,
+          recording: ref.read(trackRecordingControllerProvider) is TrackRecordingActive,
+        );
+  }
+
+  /// Tiles 4 zooms below the current one load first, so a zoom-out or a
+  /// fast pan shows a coarse map instead of blank squares.
+  Future<void> _configurePrefetch() async {
+    if (_prefetchConfigured) return;
+    _prefetchConfigured = true;
+    try {
+      await _mapChannel.invokeMethod<int>('setPrefetchZoomDelta', {'delta': 4});
+    } catch (_) {
+      // Not on Android (tests, other platforms): MapLibre's default stays.
+    }
+    await ref.read(neighborPrefetcherProvider).cleanUpLeftovers();
+  }
+
   void _onCameraIdle() {
     final position = _controller?.cameraPosition;
     if (position == null) return;
+    _prefetchAround(position.zoom);
     setState(() {
       _crosshairPosition = position.target;
       _cameraZoom = position.zoom;
@@ -402,6 +458,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   Future<void> _onStyleLoaded() async {
     _layerHost?.notifyStyleLoaded();
+    if (mounted && !_mapBusy) setState(() => _mapBusy = true);
+    _configurePrefetch();
     final controller = _controller;
     if (!_layersAttached && controller != null) {
       _layersAttached = true;
@@ -810,11 +868,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             onMapCreated: _onMapCreated,
             onStyleLoadedCallback: _onStyleLoaded,
             onCameraIdle: _onCameraIdle,
+            onMapIdle: _onMapIdle,
             minMaxZoomPreference: const MinMaxZoomPreference(null, mapMaxZoom),
             // Lines never take taps (nothing in the app handles them).
             annotationConsumeTapEvents: const [AnnotationType.symbol, AnnotationType.circle, AnnotationType.fill],
             onCameraMove: _onCameraMove,
           ),
+          if (_mapBusy && toggles[MenuToggle.mapsLoadingIndicators]!)
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: LinearProgressIndicator(key: Key('map_loading_bar'), minHeight: 2),
+              ),
+            ),
           if (_crosshairPosition != null)
             Positioned(
               top: 0,
