@@ -92,7 +92,12 @@ class _MapsPanel extends StatelessWidget {
           label: 'Карты на экране',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LayersPanel())),
         ),
-        const MenuListItem(icon: AppIcons.download, label: 'Сохранить участок карты'),
+        MenuListItem(
+          icon: AppIcons.download,
+          label: 'Сохранить участок карты',
+          onTap: () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const AvailableMapsScreen(saveBaseRegion: true))),
+        ),
         const MenuListItem(icon: AppIcons.star, label: 'Избранные карты'),
       ],
       sections: const [

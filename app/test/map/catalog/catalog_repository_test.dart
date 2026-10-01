@@ -231,6 +231,53 @@ void main() {
     expect(container.read(catalogProvider).value!.first.sources.first.name, 'Спутник + дороги');
   });
 
+  group('offline region folders', () {
+    test('a folder with style.json is one vector map, one with only MBTiles a raster map', () async {
+      final fs = MemoryFileSystem();
+      fs.file('$mapsDir/Говерла/style.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{"version": 8, "sources": {}, "layers": []}');
+      fs.file('$mapsDir/Говерла/osm.mbtiles').createSync();
+      fs.file('$mapsDir/Говерла/manifest.json').writeAsStringSync('{"attribution": "© OpenStreetMap contributors"}');
+      fs.file('$mapsDir/Киев/satellite.mbtiles').createSync(recursive: true);
+
+      final local = (await repo(fs: fs).load()).firstWhere((p) => p.id == CatalogRepository.localProviderId);
+      final byName = {for (final s in local.sources) s.name: s};
+
+      final hoverla = byName['Говерла']!;
+      expect(hoverla.id, 'local-dir-Говерла');
+      expect(hoverla.format, TileFormat.vector);
+      expect(hoverla.storageMode, StorageMode.offlineRegion);
+      expect(hoverla.styleUrl, contains('"version": 8'));
+      expect(hoverla.attribution, '© OpenStreetMap contributors');
+
+      final kyiv = byName['Киев']!;
+      expect(kyiv.format, TileFormat.raster);
+      expect(kyiv.tileUrlTemplate, 'mbtiles://$mapsDir/Киев/satellite.mbtiles');
+    });
+
+    test('a region still downloading is not shown yet', () async {
+      final fs = MemoryFileSystem();
+      fs.file('$mapsDir/Говерла/osm.mbtiles').createSync(recursive: true);
+      fs.file('$mapsDir/Говерла/style.zip.part').createSync();
+
+      final providers = await repo(fs: fs).load();
+      expect(providers.any((p) => p.id == CatalogRepository.localProviderId), isFalse);
+    });
+
+    test('deleteLocalRegion removes the folder', () async {
+      final fs = MemoryFileSystem();
+      fs.file('$mapsDir/Говерла/style.json')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('{}');
+      final r = repo(fs: fs);
+
+      await r.deleteLocalRegion('local-dir-Говерла');
+
+      expect(fs.directory('$mapsDir/Говерла').existsSync(), isFalse);
+    });
+  });
+
   group('user maps', () {
     test('a style URL is added to «Установленные карты» and kept', () async {
       final r = repo();

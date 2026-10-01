@@ -2,23 +2,22 @@ import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show LatLngBounds;
 
 import '../../app_icons.dart';
+import '../../format_bytes.dart';
 import '../../widgets/app_icon.dart';
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
+import '../regions/region_downloads.dart';
+import '../regions/server_region_dialog.dart';
+import '../regions/server_region_service.dart';
 import '../services/layer_manager.dart';
 import '../services/offline_service.dart';
 import '../state/map_layers_controller.dart';
 import '../state/map_viewport.dart';
 
-/// «1.5 МБ», «820 КБ», «0 Б».
-String formatBytes(int bytes) {
-  if (bytes < 1024) return '$bytes Б';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} КБ';
-  if (bytes < 1024 * 1024 * 1024) return '${(bytes / 1024 / 1024).toStringAsFixed(1)} МБ';
-  return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(2)} ГБ';
-}
+export '../../format_bytes.dart' show formatBytes;
 
 /// 🌐 online only / 💾 cache / 📦 offline file.
 String storageModeLabel(StorageMode mode) => switch (mode) {
@@ -28,11 +27,14 @@ String storageModeLabel(StorageMode mode) => switch (mode) {
     };
 
 /// Map catalog: online maps by provider, installed maps and saved areas.
-/// With [pickOverlay] it only picks a source to lay over the map.
+/// With [pickOverlay] it only picks a source to lay over the map; with
+/// [saveBaseRegion] it opens «Сохранить участок карты» for the map on screen
+/// (the maps menu item).
 class AvailableMapsScreen extends ConsumerStatefulWidget {
-  const AvailableMapsScreen({super.key, this.pickOverlay = false});
+  const AvailableMapsScreen({super.key, this.pickOverlay = false, this.saveBaseRegion = false});
 
   final bool pickOverlay;
+  final bool saveBaseRegion;
 
   @override
   ConsumerState<AvailableMapsScreen> createState() => _AvailableMapsScreenState();
@@ -45,6 +47,19 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
   void initState() {
     super.initState();
     _reloadRegions();
+    if (widget.saveBaseRegion) WidgetsBinding.instance.addPostFrameCallback((_) => _saveBaseRegion());
+  }
+
+  Future<void> _saveBaseRegion() async {
+    final baseId = ref.read(mapLayersProvider).baseSourceId;
+    final providers = await ref.read(catalogProvider.future);
+    final base = providers.expand((p) => p.sources).firstWhereOrNull((s) => s.id == baseId);
+    if (!mounted) return;
+    if (base == null || !(ServerRegionService.canDownload(base) || OfflineService.canSaveRegion(base))) {
+      _message('Для карты на экране сохранение участка недоступно — выберите карту «Сервер карт»');
+      return;
+    }
+    await _saveRegion(base);
   }
 
   Future<void> _reloadRegions() async {
@@ -104,6 +119,10 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
       _message('Карта ещё не готова');
       return;
     }
+    if (ServerRegionService.canDownload(source)) {
+      await _saveServerRegion(source, viewport.bounds);
+      return;
+    }
     final request = await showDialog<_SaveRegionRequest>(
       context: context,
       builder: (_) => _SaveRegionDialog(source: source, currentZoom: viewport.zoom),
@@ -123,6 +142,33 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     });
   }
 
+  /// Our server cuts the area; it is downloaded in the background and
+  /// shows up under «Установленные карты».
+  Future<void> _saveServerRegion(MapSource source, LatLngBounds bounds) async {
+    final request = await showDialog<ServerRegionRequest>(
+      context: context,
+      builder: (_) => ServerRegionDialog(source: source, bounds: bounds),
+    );
+    if (request == null) return;
+    ref.read(regionDownloadsProvider.notifier).start(
+          source: source,
+          bounds: bounds,
+          maxZoom: request.maxZoom,
+          name: request.name,
+          wifiOnly: request.wifiOnly,
+        );
+    _message('Участок «${request.name}» скачивается — ход загрузки в «Установленные карты»');
+  }
+
+  Future<void> _deleteLocalRegion(MapSource source) => _run(() async {
+        if (ref.read(mapLayersProvider).baseSourceId == source.id) {
+          _message('Эта карта сейчас на экране — сначала выберите другую');
+          return;
+        }
+        await ref.read(catalogRepositoryProvider).deleteLocalRegion(source.id);
+        await ref.read(catalogProvider.notifier).reload();
+      });
+
   Future<void> _addMap() async {
     final added = await showDialog<bool>(context: context, builder: (_) => const _AddMapDialog());
     if (added == true) await ref.read(catalogProvider.notifier).reload();
@@ -132,6 +178,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
   Widget build(BuildContext context) {
     final catalog = ref.watch(catalogProvider);
     final mapState = ref.watch(mapLayersProvider);
+    final downloads = ref.watch(regionDownloadsProvider);
     final providers = catalog.value ?? const <MapProvider>[];
     final online = providers.where((p) => p.id != CatalogRepository.localProviderId).toList();
     final installed = providers.firstWhereOrNull((p) => p.id == CatalogRepository.localProviderId);
@@ -170,6 +217,9 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
                   onFavorite: () => ref.read(mapLayersProvider.notifier).toggleFavorite(source.id),
                   onClearCache: () => _clearCache(source, regions),
                   onSaveRegion: () => _saveRegion(source),
+                  onDelete: source.id.startsWith(CatalogRepository.localRegionPrefix)
+                      ? () => _deleteLocalRegion(source)
+                      : null,
                 );
             return Column(
               children: [
@@ -192,6 +242,12 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
                       ),
                       ListView(
                         children: [
+                          for (final download in downloads)
+                            _RegionDownloadTile(
+                              download: download,
+                              onCancel: () => ref.read(regionDownloadsProvider.notifier).cancel(download.key),
+                              onDismiss: () => ref.read(regionDownloadsProvider.notifier).dismiss(download.key),
+                            ),
                           for (final source in installed?.sources ?? const <MapSource>[]) tile(source),
                           for (final region in regions)
                             ListTile(
@@ -256,7 +312,7 @@ class _CacheIndicator extends StatelessWidget {
   }
 }
 
-enum _SourceAction { show, overlay, favorite, details, clearCache, saveRegion }
+enum _SourceAction { show, overlay, favorite, details, clearCache, saveRegion, delete }
 
 class _SourceTile extends StatelessWidget {
   const _SourceTile({
@@ -271,6 +327,7 @@ class _SourceTile extends StatelessWidget {
     required this.onFavorite,
     required this.onClearCache,
     required this.onSaveRegion,
+    this.onDelete,
   });
 
   final MapSource source;
@@ -284,6 +341,9 @@ class _SourceTile extends StatelessWidget {
   final VoidCallback onFavorite;
   final VoidCallback onClearCache;
   final VoidCallback onSaveRegion;
+
+  /// Deletes an installed offline region (null for other maps).
+  final VoidCallback? onDelete;
 
   bool get _canOverlay => source.canBeOverlay && source.format == TileFormat.raster && !isolated && !baseIsolated;
 
@@ -318,6 +378,7 @@ class _SourceTile extends StatelessWidget {
                 _SourceAction.details => showDialog<void>(context: context, builder: (_) => _DetailsDialog(source: source)),
                 _SourceAction.clearCache => onClearCache(),
                 _SourceAction.saveRegion => onSaveRegion(),
+                _SourceAction.delete => onDelete?.call(),
               },
               itemBuilder: (_) => [
                 const PopupMenuItem(value: _SourceAction.show, child: Text('Показать')),
@@ -326,10 +387,52 @@ class _SourceTile extends StatelessWidget {
                 const PopupMenuItem(value: _SourceAction.details, child: Text('Детали')),
                 if (source.storageMode != StorageMode.onlineOnly)
                   const PopupMenuItem(value: _SourceAction.clearCache, child: Text('Очистить кэш')),
-                if (OfflineService.canSaveRegion(source))
+                if (OfflineService.canSaveRegion(source) || ServerRegionService.canDownload(source))
                   const PopupMenuItem(value: _SourceAction.saveRegion, child: Text('Сохранить участок карты')),
+                if (onDelete != null) const PopupMenuItem(value: _SourceAction.delete, child: Text('Удалить')),
               ],
             ),
+    );
+  }
+}
+
+/// A server region on its way: stage, progress, cancel / dismiss.
+class _RegionDownloadTile extends StatelessWidget {
+  const _RegionDownloadTile({required this.download, required this.onCancel, required this.onDismiss});
+
+  final RegionDownload download;
+  final VoidCallback onCancel;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final running = download.state == RegionDownloadState.running;
+    final fraction = download.fraction;
+    return ListTile(
+      key: Key('region_download_${download.key}'),
+      leading: const AppIcon(AppIcons.download),
+      title: Text(download.name),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text([
+            download.label,
+            if (running && fraction != null) '${(fraction * 100).toStringAsFixed(0)}%',
+          ].join(' · ')),
+          if (download.error != null)
+            Text(download.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          if (running) ...[
+            const SizedBox(height: 4),
+            LinearProgressIndicator(value: fraction?.clamp(0.0, 1.0)),
+          ],
+        ],
+      ),
+      trailing: IconButton(
+        key: Key('region_download_action_${download.key}'),
+        tooltip: running ? 'Отменить' : 'Убрать из списка',
+        icon: Icon(running ? Icons.close : Icons.check),
+        onPressed: running ? onCancel : onDismiss,
+      ),
     );
   }
 }

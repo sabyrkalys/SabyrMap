@@ -238,9 +238,57 @@ class CatalogRepository {
     await _mapsFolder.importFile(path);
   }
 
+  static const String localRegionPrefix = 'local-dir-';
+
+  /// Deletes an offline region folder (a [localRegionPrefix] source).
+  Future<void> deleteLocalRegion(String sourceId) async {
+    if (!sourceId.startsWith(localRegionPrefix)) return;
+    await _mapsFolder.deleteDirectory(sourceId.substring(localRegionPrefix.length));
+  }
+
+  /// An offline region folder (downloaded from our server): style.json +
+  /// MBTiles is one vector map; MBTiles alone is a raster map. Folders still
+  /// downloading (no style yet, only .part files) are skipped.
+  Future<MapSource?> _regionSource(Directory dir) async {
+    final name = dir.basename;
+    String? attribution;
+    final manifest = dir.childFile('manifest.json');
+    if (manifest.existsSync()) {
+      try {
+        attribution = (jsonDecode(manifest.readAsStringSync()) as Map<String, dynamic>)['attribution'] as String?;
+      } catch (_) {}
+    }
+    final style = dir.childFile('style.json');
+    if (style.existsSync()) {
+      return MapSource(
+        id: '$localRegionPrefix$name',
+        name: name,
+        styleUrl: await style.readAsString(),
+        format: TileFormat.vector,
+        storageMode: StorageMode.offlineRegion,
+        attribution: attribution,
+      );
+    }
+    if (dir.childFile('style.zip').existsSync() || dir.childFile('style.zip.part').existsSync()) return null;
+    final tiles = dir.listSync().whereType<File>().where((f) => f.path.toLowerCase().endsWith('.mbtiles')).toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+    if (tiles.isEmpty) return null;
+    return MapSource(
+      id: '$localRegionPrefix$name',
+      name: name,
+      tileUrlTemplate: 'mbtiles://${tiles.first.path}',
+      format: TileFormat.raster,
+      storageMode: StorageMode.offlineRegion,
+      attribution: attribution,
+      canBeOverlay: true,
+    );
+  }
+
   Future<List<MapSource>> _localSources() async {
     final entries = await _mapsFolder.list();
     return [
+      for (final dir in await _mapsFolder.listDirectories())
+        if (await _regionSource(dir) case final source?) source,
       for (final entry in entries)
         if (entry.fileName.toLowerCase().endsWith('.json'))
           MapSource(

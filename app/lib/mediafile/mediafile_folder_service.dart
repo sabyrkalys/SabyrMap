@@ -32,6 +32,25 @@ class MediaFileFolderService {
     return _fileSystem.directory('${base.path}/mediafile/$subfolder');
   }
 
+  /// The folder itself (created if missing).
+  Future<Directory> directory() async {
+    final dir = await _resolveDirectory();
+    if (!dir.existsSync()) dir.createSync(recursive: true);
+    return dir;
+  }
+
+  /// Subfolders (e.g. offline regions under mediafile/maps), sorted by name.
+  Future<List<Directory>> listDirectories() async {
+    final dir = await directory();
+    return dir.listSync().whereType<Directory>().toList()..sort((a, b) => a.basename.compareTo(b.basename));
+  }
+
+  /// Deletes the subfolder [name] with everything in it.
+  Future<void> deleteDirectory(String name) async {
+    final target = (await directory()).childDirectory(name);
+    if (target.existsSync()) await target.delete(recursive: true);
+  }
+
   Future<List<MediaFileEntry>> list() async {
     final dir = await _resolveDirectory();
     if (!dir.existsSync()) {
