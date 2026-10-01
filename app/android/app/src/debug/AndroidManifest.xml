@@ -4,9 +4,7 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- Cleartext HTTP to the dev API/tiles and trust in the stand's
-         self-signed certificate: res/xml/network_security_config.xml. Scoped
-         to debug builds only so release builds never get either. -->
-    <application android:networkSecurityConfig="@xml/network_security_config">
-    </application>
+    <!-- Cleartext HTTP to the dev API/tiles and user-installed CAs: the
+         generated network_security_config.xml allows both in debug builds
+         only (android/app/build.gradle.kts, ServerCaResources). -->
 </manifest>

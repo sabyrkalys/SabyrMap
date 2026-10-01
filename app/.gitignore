@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Сертификаты серверов кладутся при сборке под конкретный стенд (certs/README.md).
+/certs/*.pem
+/certs/*.crt

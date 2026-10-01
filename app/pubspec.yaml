@@ -75,6 +75,8 @@ flutter:
   assets:
     - assets/icons/
     - assets/maps/
+    # Сертификаты своих серверов (стенд, внутренний УЦ) — см. certs/README.md.
+    - certs/
 
   fonts:
     - family: Roboto
