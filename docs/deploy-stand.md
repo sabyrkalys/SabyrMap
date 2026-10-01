@@ -126,35 +126,18 @@ rsync -a /tmp/stand-tiles/v1/{styles,fonts,sprites} <user>@<стенд>:/srv/til
 
 ## 7. `.env` и сертификат
 
+Все настройки стенда собраны в одном файле **`stand.env`** в корне репозитория.
+Это анкета для администратора и готовый `.env` с пояснением к каждому
+значению. Администратор заполняет `<ЗНАЧЕНИЯ_В_СКОБКАХ>` (IP, подсеть Wi-Fi,
+путь к картам, пароли) и сохраняет файл как `.env`:
+
 ```sh
 cd /opt/sabyrmap
-cp .env.example .env
-openssl rand -hex 24      # → POSTGRES_PASSWORD (и в DATABASE_URL)
-openssl rand -hex 32      # → JWT_SECRET_KEY
+cp stand.env .env && nano .env
 ```
 
-Что поменять в `.env`:
-
-```ini
-# На стенде — только боевой compose, без docker-compose.override.yml.
-COMPOSE_FILE=docker-compose.yml
-
-POSTGRES_PASSWORD=<сгенерированный>
-DATABASE_URL=postgresql://alpinequest:<тот же>@db:5432/alpinequest
-JWT_SECRET_KEY=<сгенерированный>
-AUTH_DISABLED=true
-
-TILES_DIR=/srv/tiles
-REGIONS_DIR=/srv/regions
-
-NGINX_BIND_IP=<IP-стенда>
-PUBLIC_HOST=<IP-стенда>                 # или имя, если в сети есть DNS
-ALLOWED_CIDRS=127.0.0.1/32,<подсеть Wi-Fi телефонов, напр. 192.168.1.0/24>
-```
-
-`ALLOWED_CIDRS`: только подсети, из которых реально ходят телефоны и
-разработчики. Подсети docker (`172.16.0.0/12`) и `10.0.0.0/8` целиком
-добавлять не нужно.
+Пароль базы задаётся один раз: `DATABASE_URL` собирается из него сам.
+`COMPOSE_FILE=docker-compose.yml` отключает файл разработчика.
 
 Сертификат (самоподписанный, на 825 дней):
 
@@ -164,6 +147,14 @@ CN=<IP-стенда> infra/tls/make-dev-cert.sh
 
 Когда `CN` — это IP, скрипт записывает его в сертификат как IP-адрес, иначе
 Android не примет сертификат.
+
+Проверка перед запуском. Она ничего не меняет и перечисляет, что не так:
+незаполненные значения, IP не с этого сервера, нет карт, нет папок, сертификат
+не на тот адрес.
+
+```sh
+infra/stand-check.sh
+```
 
 ## 8. Запуск
 
