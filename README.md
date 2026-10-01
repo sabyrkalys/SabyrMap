@@ -1,4 +1,4 @@
-# AlpineQuest SaaS
+# SabyrMap SaaS
 
 Multi-tenant offline-map platform (waypoints, tracks, sharing, plugins).
 Forked infra from Drone Ops; fresh schema. See `docs/` in project-main for

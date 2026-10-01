@@ -20,7 +20,7 @@ void main() {
           tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
           compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
         ],
-        child: const AlpineQuestApp(),
+        child: const SabyrMapApp(),
       ),
     );
     await tester.pumpAndSettle();

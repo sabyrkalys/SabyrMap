@@ -10,16 +10,16 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await configureSystemUi();
   registerThirdPartyLicenses();
-  runApp(const ProviderScope(child: AlpineQuestApp()));
+  runApp(const ProviderScope(child: SabyrMapApp()));
 }
 
-class AlpineQuestApp extends StatelessWidget {
-  const AlpineQuestApp({super.key});
+class SabyrMapApp extends StatelessWidget {
+  const SabyrMapApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'AlpineQuest',
+      title: 'SabyrMap',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
