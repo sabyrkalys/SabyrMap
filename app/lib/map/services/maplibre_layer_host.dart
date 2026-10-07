@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import 'hybrid_road_style.dart';
 import 'layer_manager.dart';
 
 /// [MapLayerHost] over the real MapLibre controller.
@@ -75,6 +76,20 @@ class MapLibreLayerHost implements MapLayerHost {
   @override
   Future<void> setRasterOpacity(String layerId, double opacity) =>
       _controller.setLayerProperties(layerId, RasterLayerProperties(rasterOpacity: opacity));
+
+  /// Every property not given here is reset to MapLibre's default, so the
+  /// layout of our styles' lines (round cap and join) is repeated.
+  @override
+  Future<void> setLinePaint(String layerId, LinePaint paint) => _controller.setLayerProperties(
+        layerId,
+        LineLayerProperties(
+          lineWidth: paint.width,
+          lineColor: paint.color,
+          lineOpacity: paint.opacity,
+          lineCap: 'round',
+          lineJoin: 'round',
+        ),
+      );
 
   /// Track lines are the lowest annotation layer (MapLibreMap's default
   /// annotation order is line, symbol, circle, fill).

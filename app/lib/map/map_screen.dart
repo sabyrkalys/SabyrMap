@@ -1,3 +1,5 @@
+import 'dart:math' show Point;
+
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show MethodChannel;
@@ -145,6 +147,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // Live camera centre, tracked only while a target is set so the distance
   // label follows a drag without rebuilding on every frame otherwise.
   LatLng? _liveCenter;
+  // Crosshair position for the info panel's X/Y, every camera frame. A
+  // notifier, so only the panel rebuilds while the map moves.
+  final ValueNotifier<LatLng?> _panelCenter = ValueNotifier(null);
 
   // Serializes _syncCircles/_syncLines runs together: at most one combined
   // sync runs at a time, and any state change that arrives while a run is
@@ -253,6 +258,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _recordingController.stop();
       } catch (_) {}
     });
+    _panelCenter.dispose();
     super.dispose();
   }
 
@@ -302,6 +308,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // The zoom feeds the info panel's scale readout during a pinch; to avoid a
   // rebuild on every frame it is only applied once it moved by 0.1 or more.
   void _onCameraMove(CameraPosition position) {
+    _panelCenter.value = position.target;
     if (!_mapBusy) {
       if (mounted) setState(() => _mapBusy = true);
       ref.read(neighborPrefetcherProvider).cancel();
@@ -446,6 +453,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final position = _controller?.cameraPosition;
     if (position == null) return;
     _prefetchAround(position.zoom);
+    _panelCenter.value = position.target;
     setState(() {
       _crosshairPosition = position.target;
       _cameraZoom = position.zoom;
@@ -846,7 +854,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final target = ref.watch(mapTargetProvider).point;
     final toggles = ref.watch(menuTogglesProvider);
     final menuOpen = ref.watch(crosshairMenuOpenProvider);
-    final center = _liveCenter ?? ref.watch(mapCrosshairProvider);
     final catalogSources = {
       for (final provider in ref.watch(catalogProvider).value ?? const <MapProvider>[])
         for (final source in provider.sources) source.id: source,
@@ -857,6 +864,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       for (final overlay in layers.overlays)
         if (overlay.visible && catalogSources[overlay.sourceId] != null) catalogSources[overlay.sourceId]!,
     ]);
+    final center = _liveCenter ?? ref.watch(mapCrosshairProvider);
 
     return Scaffold(
       body: Stack(
@@ -873,6 +881,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             // Lines never take taps (nothing in the app handles them).
             annotationConsumeTapEvents: const [AnnotationType.symbol, AnnotationType.circle, AnnotationType.fill],
             onCameraMove: _onCameraMove,
+            // MapLibre's own (i) can't be switched off and opens empty (it
+            // lists only attributions written as links): pushed off screen,
+            // AttributionButton replaces it.
+            attributionButtonPosition: AttributionButtonPosition.bottomRight,
+            attributionButtonMargins: const Point(-200, -200),
           ),
           if (_mapBusy && toggles[MenuToggle.mapsLoadingIndicators]!)
             const Positioned(
@@ -898,12 +911,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   padding: const EdgeInsets.only(top: 12),
                   child: Align(
                     alignment: Alignment.topLeft,
-                    child: InfoPanel(
-                      center: infoPanelCenter(target: target, liveCenter: _liveCenter, settled: _crosshairPosition!),
-                      zoom: _cameraZoom,
-                      target: target,
-                      recording: ref.watch(trackRecordingControllerProvider) is TrackRecordingActive,
-                      toggles: toggles,
+                    child: ValueListenableBuilder<LatLng?>(
+                      valueListenable: _panelCenter,
+                      builder: (context, panelCenter, _) => InfoPanel(
+                        center: panelCenter ?? _crosshairPosition!,
+                        zoom: _cameraZoom,
+                        target: target,
+                        recording: ref.watch(trackRecordingControllerProvider) is TrackRecordingActive,
+                        toggles: toggles,
+                      ),
                     ),
                   ),
                 ),
@@ -918,15 +934,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ),
-          // Required by the map providers; left of the zoom buttons, just
-          // above the bottom nav.
+          // Required by the map providers. At the right screen edge, level
+          // with the bottom nav: under extendBody the bottom padding is the
+          // nav panel (60 dp) plus the system bar.
           Positioned(
-            left: 8,
-            right: 88,
-            bottom: MediaQuery.paddingOf(context).bottom + 4,
-            child: IgnorePointer(
-              child: Align(alignment: Alignment.bottomLeft, child: AttributionBar(text: attribution)),
-            ),
+            right: MediaQuery.paddingOf(context).right + 5,
+            bottom: MediaQuery.paddingOf(context).bottom - (60 + AttributionButton.size) / 2,
+            child: AttributionButton(text: attribution),
           ),
           Positioned(
             right: 16,
@@ -1005,25 +1019,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: SizedBox(
                   width: 48,
                   height: 48,
+                  // Just a bright white dot, no ring around it.
                   child: Center(
                     child: Container(
                       key: const Key('map_crosshair'),
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
-                      ),
-                      child: Center(
-                        child: Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
                     ),
                   ),
                 ),

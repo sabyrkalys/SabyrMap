@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:app/map/models/map_models.dart';
 import 'package:app/map/services/google_tiles_service.dart';
+import 'package:app/map/services/hybrid_road_style.dart';
 import 'package:app/map/services/layer_manager.dart';
 import 'package:app/map/services/yandex_tiles_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,6 +67,14 @@ class FakeHost implements MapLayerHost {
   Future<void> setRasterOpacity(String layerId, double opacity) async {
     calls.add('opacity $layerId $opacity');
     opacities[layerId] = opacity;
+  }
+
+  final linePaints = <String, LinePaint>{};
+
+  @override
+  Future<void> setLinePaint(String layerId, LinePaint paint) async {
+    calls.add('linePaint $layerId');
+    linePaints[layerId] = paint;
   }
 }
 
@@ -163,6 +172,24 @@ void main() {
       expect(result.ok, isTrue);
       expect(host.style, liberty.styleUrl);
       expect(m.base, liberty);
+    });
+
+    test('our hybrid base gets the phone-side road look; other vector bases keep theirs', () async {
+      const hybrid = MapSource(
+        id: 'server-hybrid-day',
+        name: 'Спутник + дороги',
+        format: TileFormat.vector,
+        storageMode: StorageMode.onlineCache,
+        styleUrl: 'https://192.168.1.120/tiles/style/hybrid-day',
+      );
+      final m = manager(catalog: LayerCatalog([const MapProvider(id: 'server', name: 'Сервер', sources: [hybrid, liberty])]));
+      await m.setBaseSource(hybrid);
+      expect(host.linePaints, hybridRoadPaint(hybrid.styleUrl!));
+      expect(host.calls.indexOf('setStyle'), lessThan(host.calls.indexOf('linePaint road-major')));
+
+      host.linePaints.clear();
+      await m.setBaseSource(liberty);
+      expect(host.linePaints, isEmpty);
     });
 
     test('a raster base becomes a one-source style with the keyed URL', () async {

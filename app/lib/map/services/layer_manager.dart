@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import '../models/map_models.dart';
 import 'google_tiles_service.dart';
+import 'hybrid_road_style.dart';
 import 'yandex_tiles_service.dart';
 
 /// What the layer manager needs from the map; implemented over
@@ -28,6 +29,9 @@ abstract class MapLayerHost {
   Future<void> removeSource(String sourceId);
 
   Future<void> setRasterOpacity(String layerId, double opacity);
+
+  /// Changes the paint of a line layer that came with the style.
+  Future<void> setLinePaint(String layerId, LinePaint paint);
 
   /// Lowest layer of the app's own annotations (tracks, waypoints, target):
   /// overlays go below it so the app's data stays on top. Null before the
@@ -144,12 +148,23 @@ class LayerManager {
         final snapshot = List.of(_overlays);
         await _host.setStyleAndWait(style);
         _base = source;
+        await _tweakRoads(style);
         _overlays.clear();
         if (_catalog.isIsolated(source.id)) {
           return LayerChangeResult(snapshot.isEmpty ? const [] : ['$isolatedMessage — наложенные слои убраны']);
         }
         return _restore(snapshot);
       });
+
+  /// Our look of the hybrid styles' roads ([hybridRoadPaint]). Cosmetic:
+  /// a layer that can't be changed keeps the server's look.
+  Future<void> _tweakRoads(String style) async {
+    for (final entry in (hybridRoadPaint(style) ?? const <String, LinePaint>{}).entries) {
+      try {
+        await _host.setLinePaint(entry.key, entry.value);
+      } catch (_) {}
+    }
+  }
 
   /// Re-adds [snapshot]'s overlays (e.g. after the style was replaced);
   /// ones that fail are reported and skipped.

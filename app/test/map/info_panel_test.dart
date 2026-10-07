@@ -104,14 +104,6 @@ void main() {
     expect(decoration.boxShadow, isNotEmpty);
   });
 
-  test('panel centre ignores a stale live centre once there is no target', () {
-    const settled = LatLng(10, 20);
-    const stale = LatLng(1, 2);
-    expect(infoPanelCenter(target: null, liveCenter: stale, settled: settled), settled);
-    expect(infoPanelCenter(target: const LatLng(3, 4), liveCenter: stale, settled: settled), stale);
-    expect(infoPanelCenter(target: const LatLng(3, 4), liveCenter: null, settled: settled), settled);
-  });
-
   testWidgets('telemetry wraps instead of overflowing with a large system font on a narrow phone', (tester) async {
     tester.view.physicalSize = const Size(360, 640);
     tester.view.devicePixelRatio = 1;

@@ -8,12 +8,6 @@ import 'geo_utils.dart';
 import 'map_scale.dart';
 import 'sk42.dart';
 
-/// Which centre the panel shows: the live camera centre only while a
-/// target exists (it is refreshed per frame then); otherwise the centre
-/// the camera last settled on, so a leftover live centre can't freeze it.
-LatLng infoPanelCenter({LatLng? target, LatLng? liveCenter, required LatLng settled}) =>
-    target != null ? (liveCenter ?? settled) : settled;
-
 /// Top-left overlay: centre coordinates, telemetry (recording icon, scale,
 /// zoom, scale bar) and, with a «Задать цель» target, its distance and
 /// azimuth. Each part follows its menu toggle; nothing shown → no block.
