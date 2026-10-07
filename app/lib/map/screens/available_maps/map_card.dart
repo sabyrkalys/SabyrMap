@@ -4,8 +4,8 @@ import '../../../app_icons.dart';
 import '../../../widgets/app_icon.dart';
 import 'available_maps_models.dart';
 
-/// A map as a 96 px preview strip: preview image (or a placeholder tinted by
-/// [kind]), dark gradient towards the right, name and caption on the right,
+/// A map as a 96 px preview strip: [thumbnail] (or a placeholder tinted by
+/// [kind] until it is there), dark gradient towards the right, name and caption on the right,
 /// [menu] top-right. [selected] outlines the map on screen; a card that is
 /// not [enabled] is dimmed and ignores taps.
 class MapCard extends StatelessWidget {
@@ -14,7 +14,7 @@ class MapCard extends StatelessWidget {
     required this.name,
     required this.caption,
     required this.kind,
-    this.thumbnailAsset,
+    this.thumbnail,
     this.favorite = false,
     this.selected = false,
     this.enabled = true,
@@ -25,7 +25,7 @@ class MapCard extends StatelessWidget {
   final String name;
   final String caption;
   final MapKind kind;
-  final String? thumbnailAsset;
+  final ImageProvider? thumbnail;
   final bool favorite;
   final bool selected;
   final bool enabled;
@@ -34,7 +34,7 @@ class MapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumbnail = thumbnailAsset;
+    final thumbnail = this.thumbnail;
     final radius = BorderRadius.circular(8);
     return Opacity(
       opacity: enabled ? 1 : 0.4,
@@ -52,9 +52,12 @@ class MapCard extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: thumbnail != null
-                    ? Image.asset(
-                        thumbnail,
+                    ? Image(
+                        image: thumbnail,
                         fit: BoxFit.cover,
+                        frameBuilder: (_, child, frame, sync) => sync || frame != null
+                            ? child
+                            : _PreviewPlaceholder(kind: kind),
                         errorBuilder: (_, _, _) => _PreviewPlaceholder(kind: kind),
                       )
                     : _PreviewPlaceholder(kind: kind),
@@ -110,7 +113,7 @@ class MapCard extends StatelessWidget {
   }
 }
 
-/// Shown when the map has no bundled preview.
+/// Shown while the map has no preview.
 class _PreviewPlaceholder extends StatelessWidget {
   const _PreviewPlaceholder({required this.kind});
 

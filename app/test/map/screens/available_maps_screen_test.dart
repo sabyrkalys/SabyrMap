@@ -10,10 +10,14 @@ import 'package:app/map/screens/available_maps/maps_app_bar.dart';
 import 'package:app/map/screens/available_maps_screen.dart';
 import 'package:app/map/services/google_tiles_service.dart';
 import 'package:app/map/services/layer_manager.dart';
+import 'package:app/map/services/map_previews.dart';
 import 'package:app/map/services/offline_service.dart';
 import 'package:app/map/services/tile_cache_stats.dart';
 import 'package:app/map/services/yandex_tiles_service.dart';
 import 'package:app/map/state/map_layers_controller.dart';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -82,6 +86,7 @@ void main() {
     Map<String, LocalMapInfo> localInfo = const {},
     TileCacheReader cache = const _Cache({}),
     StorageUsage? storage = const StorageUsage(path: '/sd/maps', usedBytes: 238 * _gib, totalBytes: 487 * _gib),
+    Map<String, File> previews = const {},
   }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 1;
@@ -96,6 +101,7 @@ void main() {
         localMapInfoProvider.overrideWith((ref) async => localInfo),
         deviceStorageProvider.overrideWith((ref) async => storage),
         tileCacheReaderProvider.overrideWithValue(cache),
+        mapPreviewProvider.overrideWith((ref, source) async => previews[source.id]),
       ],
     );
     addTearDown(container.dispose);
@@ -165,6 +171,28 @@ void main() {
     expect(find.text('Кэш: 0 Б'), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('cache_indicator')), matching: find.text('238 ГБ / 487 ГБ')),
         findsOneWidget);
+  });
+
+  testWidgets('a card shows the map\'s preview once it is drawn', (tester) async {
+    await pump(tester, previews: {'google-satellite': File('/previews/google.jpg')});
+
+    final image = tester.widget<Image>(
+      find.descendant(of: find.byKey(const Key('source_google-satellite')), matching: find.byType(Image)),
+    );
+    expect((image.image as FileImage).file.path, '/previews/google.jpg');
+  });
+
+  testWidgets('MapCard: a placeholder until the preview is there', (tester) async {
+    Widget card(ImageProvider? thumbnail) => MaterialApp(
+          home: Scaffold(
+            body: MapCard(name: 'Спутник', caption: 'Нет', kind: MapKind.satellite, thumbnail: thumbnail),
+          ),
+        );
+    await tester.pumpWidget(card(null));
+    expect(find.byType(Image), findsNothing);
+
+    await tester.pumpWidget(card(MemoryImage(_png)));
+    expect(find.byType(Image), findsOneWidget);
   });
 
   testWidgets('the storage bar shows no numbers while the volume size is unknown', (tester) async {
@@ -519,3 +547,12 @@ class _Cache implements TileCacheReader {
   @override
   Future<String?> resource(String url) async => resources[url];
 }
+
+/// A 1×1 transparent PNG.
+final _png = Uint8List.fromList(const [
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, //
+  0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, //
+  0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, //
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, //
+  0x42, 0x60, 0x82,
+]);

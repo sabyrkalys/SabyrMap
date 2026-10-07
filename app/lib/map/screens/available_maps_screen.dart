@@ -13,6 +13,7 @@ import '../regions/region_downloads.dart';
 import '../regions/server_region_dialog.dart';
 import '../regions/server_region_service.dart';
 import '../services/layer_manager.dart';
+import '../services/map_previews.dart';
 import '../services/offline_service.dart';
 import '../services/tile_cache_stats.dart';
 import '../state/map_layers_controller.dart';
@@ -582,7 +583,7 @@ class _SectionLabel extends StatelessWidget {
 
 /// A catalog map as a [MapCard]: tap shows it (or adds it as a layer when
 /// picking an overlay), ⋮ opens [onMenu].
-class _SourceCard extends StatelessWidget {
+class _SourceCard extends ConsumerWidget {
   const _SourceCard({
     required this.source,
     required this.sizeBytes,
@@ -611,13 +612,15 @@ class _SourceCard extends StatelessWidget {
   final VoidCallback onMenu;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final preview = ref.watch(mapPreviewProvider(source)).value;
+    final asset = source.thumbnailAsset;
     return MapCard(
       key: Key('source_${source.id}'),
       name: source.name,
       caption: sizeBytes <= 0 ? 'Нет' : (cached ? '≈ ${formatBytes(sizeBytes)} в кэше' : formatBytes(sizeBytes)),
       kind: kind,
-      thumbnailAsset: source.thumbnailAsset,
+      thumbnail: preview != null ? FileImage(preview) : (asset != null ? AssetImage(asset) : null),
       favorite: favorite,
       selected: selected,
       enabled: !pickOverlay || canOverlay,

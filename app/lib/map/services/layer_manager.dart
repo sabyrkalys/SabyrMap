@@ -103,8 +103,7 @@ class LayerManager {
     this.maxRasterOverlays = 3,
   })  : _host = host,
         _catalog = catalog,
-        _google = google,
-        _yandex = yandex;
+        _styles = MapStyleResolver(catalog: catalog, google: google, yandex: yandex);
 
   static const int zStep = 10;
   static const int tileSize = 256;
@@ -113,8 +112,7 @@ class LayerManager {
 
   final MapLayerHost _host;
   final LayerCatalog _catalog;
-  final GoogleTilesService _google;
-  final YandexTilesService _yandex;
+  final MapStyleResolver _styles;
   final int maxRasterOverlays;
 
   MapSource? _base;
@@ -137,14 +135,7 @@ class LayerManager {
   /// Replaces the base map; overlays are snapshotted and put back on the new
   /// style. If [source] can't be reached, the current map stays as it is.
   Future<LayerChangeResult> setBaseSource(MapSource source) => _serial(() async {
-        final String style;
-        if (source.format == TileFormat.vector) {
-          final url = source.styleUrl;
-          if (url == null || url.isEmpty) throw LayerException('У карты «${source.name}» нет адреса стиля');
-          style = url;
-        } else {
-          style = jsonEncode(_rasterStyle(source, await _tileUrl(source)));
-        }
+        final style = await _styles.styleOf(source);
         final snapshot = List.of(_overlays);
         await _host.setStyleAndWait(style);
         _base = source;
@@ -256,7 +247,7 @@ class LayerManager {
       throw LayerException('Можно наложить не больше $maxRasterOverlays слоёв');
     }
 
-    final url = await _tileUrl(source);
+    final url = await _styles.tileUrl(source);
     final z = zIndex ?? (_overlays.isEmpty ? zStep : _overlays.last.zIndex + zStep);
     final above = _overlays.where((l) => l.zIndex > z).toList();
     final below = above.isEmpty ? _host.annotationsBottomLayerId : layerIdOf(above.first.sourceId);
@@ -277,10 +268,36 @@ class LayerManager {
       ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
     return layer;
   }
+}
+
+/// The style MapLibre gets for a base map: a vector map's own style (URL or
+/// JSON), or a one-layer style around a raster map's tiles. Shared by the
+/// map ([LayerManager]) and the map previews.
+class MapStyleResolver {
+  MapStyleResolver({
+    required LayerCatalog catalog,
+    required GoogleTilesService google,
+    required YandexTilesService yandex,
+  })  : _catalog = catalog,
+        _google = google,
+        _yandex = yandex;
+
+  final LayerCatalog _catalog;
+  final GoogleTilesService _google;
+  final YandexTilesService _yandex;
+
+  Future<String> styleOf(MapSource source) async {
+    if (source.format == TileFormat.vector) {
+      final url = source.styleUrl;
+      if (url == null || url.isEmpty) throw LayerException('У карты «${source.name}» нет адреса стиля');
+      return url;
+    }
+    return jsonEncode(_rasterStyle(source, await tileUrl(source)));
+  }
 
   /// The raster tile URL, with the key/session and access check for Google
   /// and Яндекс.
-  Future<String> _tileUrl(MapSource source) async {
+  Future<String> tileUrl(MapSource source) async {
     try {
       switch (_catalog.providerIdOf(source.id)) {
         case 'google':
@@ -304,7 +321,7 @@ class LayerManager {
 
   Map<String, dynamic> _rasterStyle(MapSource source, String tileUrl) => {
         'version': 8,
-        'glyphs': glyphsUrl,
+        'glyphs': LayerManager.glyphsUrl,
         'sources': {
           source.id: {
             'type': 'raster',
@@ -315,7 +332,7 @@ class LayerManager {
               'minzoom': source.minZoom,
               'maxzoom': source.maxZoom,
             },
-            'tileSize': tileSize,
+            'tileSize': LayerManager.tileSize,
             if (source.attribution != null) 'attribution': source.attribution,
           },
         },
@@ -325,7 +342,7 @@ class LayerManager {
             'type': 'background',
             'paint': {'background-color': '#e5e3df'},
           },
-          {'id': layerIdOf(source.id), 'type': 'raster', 'source': source.id},
+          {'id': LayerManager.layerIdOf(source.id), 'type': 'raster', 'source': source.id},
         ],
       };
 }
