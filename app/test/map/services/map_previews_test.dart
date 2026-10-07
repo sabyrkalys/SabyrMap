@@ -49,31 +49,18 @@ void main() {
 
   List<String> files() => [for (final f in dir.listSync()) f.uri.pathSegments.last];
 
-  test('draws a map once per area and reuses the picture', () async {
-    final first = await previews.previewOf(_source, 'style-a', const LatLng(42.87, 74.59));
-    final again = await previews.previewOf(_source, 'style-a', const LatLng(42.88, 74.58));
+  test('draws a map once and never again, wherever the map moves or whatever its style', () async {
+    expect(await previews.saved(_source), isNull);
+    final first = await previews.draw(_source, 'style-a', const LatLng(42.87, 74.59));
+    final moved = await previews.draw(_source, 'style-b', const LatLng(50.45, 30.52));
 
-    expect(first, isNotNull);
     expect(first!.readAsBytesSync(), [1, 2, 3]);
-    expect(again!.path, first.path);
+    expect(moved!.path, first.path);
+    expect((await previews.saved(_source))!.path, first.path);
     expect(renderer.calls, hasLength(1));
     expect(renderer.calls.single.style, 'style-a');
+    expect(renderer.calls.single.center, const LatLng(42.87, 74.59));
     expect(renderer.calls.single.zoom, MapPreviews.zoom);
-  });
-
-  test('redraws in another area and drops the old picture', () async {
-    await previews.previewOf(_source, 'style-a', const LatLng(42.87, 74.59));
-    final moved = await previews.previewOf(_source, 'style-a', const LatLng(41.0, 75.0));
-
-    expect(renderer.calls, hasLength(2));
-    expect(files(), [moved!.uri.pathSegments.last]);
-  });
-
-  test('redraws when the style changed', () async {
-    await previews.previewOf(_source, 'style-a', const LatLng(42.87, 74.59));
-    await previews.previewOf(_source, 'style-b', const LatLng(42.87, 74.59));
-
-    expect(renderer.calls.map((c) => c.style), ['style-a', 'style-b']);
     expect(files(), hasLength(1));
   });
 
@@ -85,27 +72,27 @@ void main() {
       storageMode: StorageMode.onlineCache,
       maxZoom: 8,
     );
-    await previews.previewOf(lowZoomMap, 'style', const LatLng(42.87, 74.59));
+    await previews.draw(lowZoomMap, 'style', const LatLng(42.87, 74.59));
 
     expect(renderer.calls.single.zoom, 8);
   });
 
   test('a map that could not be drawn has no preview and is tried again later', () async {
     renderer.answer = () => null;
-    expect(await previews.previewOf(_source, 'style-a', const LatLng(42.87, 74.59)), isNull);
+    expect(await previews.draw(_source, 'style-a', const LatLng(42.87, 74.59)), isNull);
     expect(files(), isEmpty);
 
     renderer.answer = () => Uint8List.fromList([7]);
-    expect(await previews.previewOf(_source, 'style-a', const LatLng(42.87, 74.59)), isNotNull);
+    expect(await previews.draw(_source, 'style-a', const LatLng(42.87, 74.59)), isNotNull);
     expect(renderer.calls, hasLength(2));
   });
 
   test('draws one map at a time and does not draw the same one twice', () async {
     renderer.gate = Completer<void>();
     const other = MapSource(id: 'other', name: 'Другая', format: TileFormat.vector, storageMode: StorageMode.onlineCache);
-    final a = previews.previewOf(_source, 'style-a', const LatLng(42.87, 74.59));
-    final b = previews.previewOf(other, 'style-o', const LatLng(42.87, 74.59));
-    final aAgain = previews.previewOf(_source, 'style-a', const LatLng(42.87, 74.59));
+    final a = previews.draw(_source, 'style-a', const LatLng(42.87, 74.59));
+    final b = previews.draw(other, 'style-o', const LatLng(42.87, 74.59));
+    final aAgain = previews.draw(_source, 'style-a', const LatLng(42.87, 74.59));
     await pumpEventQueue();
 
     expect(renderer.calls, hasLength(1));

@@ -59,17 +59,15 @@ class PlatformMapPreviewRenderer implements MapPreviewRenderer {
   }
 }
 
-/// Card pictures of maps around the map's current center, kept as files so
-/// each map is drawn once per area: a preview is redrawn when the map moved
-/// to another [gridDegrees] cell or the map's style changed. Drawn one at a
-/// time, as every snapshot is a whole off-screen map.
+/// Card pictures of maps, kept as files: each map is drawn once, around
+/// wherever the map was then, and its picture is never redrawn. Drawn one
+/// at a time, as every snapshot is a whole off-screen map.
 class MapPreviews {
   MapPreviews({required MapPreviewRenderer renderer, required Future<Directory> Function() directory})
       : _renderer = renderer,
         _directory = directory;
 
   static const double zoom = 12;
-  static const double gridDegrees = 0.05;
 
   /// Logical size; the card is 96 px high and as wide as the screen.
   static const int width = 480;
@@ -79,33 +77,33 @@ class MapPreviews {
   final Future<Directory> Function() _directory;
   Future<void> _tail = Future.value();
 
-  /// The preview of [source] drawn with [style] around [center], drawn now
-  /// if there is none yet for that area. Null when it can't be drawn.
-  Future<File?> previewOf(MapSource source, String style, LatLng center) async {
-    final dir = await _directory();
-    String hash(String text) => sha1.convert(utf8.encode(text)).toString().substring(0, 16);
-    final prefix = hash(source.id);
-    final cellLat = (center.latitude / gridDegrees).floor();
-    final cellLng = (center.longitude / gridDegrees).floor();
-    final file = File('${dir.path}/${prefix}_${hash(style)}_${cellLat}_$cellLng.jpg');
+  Future<File> _fileOf(MapSource source) async {
+    final name = sha1.convert(utf8.encode(source.id)).toString().substring(0, 16);
+    return File('${(await _directory()).path}/$name.jpg');
+  }
+
+  /// The picture of [source] drawn before, or null.
+  Future<File?> saved(MapSource source) async {
+    final file = await _fileOf(source);
+    return file.existsSync() ? file : null;
+  }
+
+  /// [saved], or [source] drawn now with [style] around [center]. Null when
+  /// it can't be drawn; it is tried again next time.
+  Future<File?> draw(MapSource source, String style, LatLng center) async {
+    final file = await _fileOf(source);
     if (file.existsSync()) return file;
     return _serial(() async {
       if (file.existsSync()) return file;
-      final zoomed = zoom.clamp(source.minZoom.toDouble(), source.maxZoom.toDouble());
-      final cellCenter = LatLng((cellLat + 0.5) * gridDegrees, (cellLng + 0.5) * gridDegrees);
       final bytes = await _renderer.render(
         style: style,
-        center: cellCenter,
-        zoom: zoomed,
+        center: center,
+        zoom: zoom.clamp(source.minZoom.toDouble(), source.maxZoom.toDouble()),
         width: width,
         height: height,
       );
       if (bytes == null || bytes.isEmpty) return null;
-      await dir.create(recursive: true);
-      // Older pictures of this map (another area or style) are dropped.
-      for (final old in dir.listSync().whereType<File>()) {
-        if (old.uri.pathSegments.last.startsWith('${prefix}_')) old.deleteSync();
-      }
+      await file.parent.create(recursive: true);
       await file.writeAsBytes(bytes, flush: true);
       return file;
     });
@@ -120,28 +118,31 @@ class MapPreviews {
 
 final mapPreviewsProvider = Provider<MapPreviews>((ref) => MapPreviews(
       renderer: const PlatformMapPreviewRenderer(),
-      directory: () async => Directory('${(await getApplicationCacheDirectory()).path}/map_previews'),
+      directory: () async => Directory('${(await getApplicationSupportDirectory()).path}/map_previews'),
     ));
 
-/// The card picture of [source] around the map's current center; null
-/// while the map isn't open or the style can't be drawn.
+/// The card picture of [source]: the saved one, or drawn now around the
+/// map's current center; null while there is none and the map isn't open
+/// or the style can't be drawn.
 final mapPreviewProvider = FutureProvider.autoDispose.family<File?, MapSource>((ref, source) async {
-  final viewport = await ref.read(mapViewportProvider.notifier).read();
-  if (viewport == null) return null;
-  final bounds = viewport.bounds;
-  final center = LatLng(
-    (bounds.southwest.latitude + bounds.northeast.latitude) / 2,
-    (bounds.southwest.longitude + bounds.northeast.longitude) / 2,
-  );
-  final providers = await ref.watch(catalogProvider.future);
-  final styles = MapStyleResolver(
-    catalog: LayerCatalog(providers),
-    google: ref.read(googleTilesServiceProvider),
-    yandex: ref.read(yandexTilesServiceProvider),
-  );
+  final previews = ref.read(mapPreviewsProvider);
   try {
-    final style = await styles.styleOf(source);
-    return await ref.read(mapPreviewsProvider).previewOf(source, style, center);
+    final saved = await previews.saved(source);
+    if (saved != null) return saved;
+    final viewport = await ref.read(mapViewportProvider.notifier).read();
+    if (viewport == null) return null;
+    final bounds = viewport.bounds;
+    final center = LatLng(
+      (bounds.southwest.latitude + bounds.northeast.latitude) / 2,
+      (bounds.southwest.longitude + bounds.northeast.longitude) / 2,
+    );
+    final providers = await ref.watch(catalogProvider.future);
+    final styles = MapStyleResolver(
+      catalog: LayerCatalog(providers),
+      google: ref.read(googleTilesServiceProvider),
+      yandex: ref.read(yandexTilesServiceProvider),
+    );
+    return await previews.draw(source, await styles.styleOf(source), center);
   } on LayerException {
     return null;
   } on FileSystemException {
