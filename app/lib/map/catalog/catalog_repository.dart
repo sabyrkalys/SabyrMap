@@ -13,6 +13,22 @@ import '../../mediafile/mediafile_folder_service.dart';
 import '../../mediafile/mediafile_subfolders.dart';
 import '../models/map_models.dart';
 
+/// Disk size of an installed map and, for a region downloaded from our
+/// server, the catalog map it was cut from (manifest.json `map_id`).
+class LocalMapInfo {
+  const LocalMapInfo({required this.sizeBytes, this.originSourceId, this.createdAt, this.bbox, this.maxZoom});
+
+  final int sizeBytes;
+  final String? originSourceId;
+
+  /// From the region's manifest.json; null for plain files.
+  final DateTime? createdAt;
+
+  /// [west, south, east, north].
+  final List<double>? bbox;
+  final int? maxZoom;
+}
+
 class CatalogException implements Exception {
   const CatalogException(this.message);
 
@@ -284,6 +300,37 @@ class CatalogRepository {
     );
   }
 
+  /// [LocalMapInfo] of each file and region folder in mediafile/maps, by
+  /// the id its [MapSource] gets in [load].
+  Future<Map<String, LocalMapInfo>> localMapInfo() async {
+    final info = <String, LocalMapInfo>{};
+    for (final dir in await _mapsFolder.listDirectories()) {
+      var size = 0;
+      for (final entity in dir.listSync(recursive: true)) {
+        if (entity is File) size += entity.lengthSync();
+      }
+      Map<String, dynamic> manifest = const {};
+      final manifestFile = dir.childFile('manifest.json');
+      if (manifestFile.existsSync()) {
+        try {
+          manifest = jsonDecode(manifestFile.readAsStringSync()) as Map<String, dynamic>;
+        } catch (_) {}
+      }
+      final bbox = manifest['bbox'];
+      info['$localRegionPrefix${dir.basename}'] = LocalMapInfo(
+        sizeBytes: size,
+        originSourceId: manifest['map_id'] as String?,
+        createdAt: DateTime.tryParse('${manifest['created_at']}'),
+        bbox: bbox is List && bbox.length == 4 ? [for (final v in bbox) (v as num).toDouble()] : null,
+        maxZoom: (manifest['max_zoom'] as num?)?.toInt(),
+      );
+    }
+    for (final entry in await _mapsFolder.list()) {
+      info['local-${entry.fileName}'] = LocalMapInfo(sizeBytes: entry.sizeBytes);
+    }
+    return info;
+  }
+
   Future<List<MapSource>> _localSources() async {
     final entries = await _mapsFolder.list();
     return [
@@ -347,3 +394,14 @@ class CatalogNotifier extends AsyncNotifier<List<MapProvider>> {
 }
 
 final catalogProvider = AsyncNotifierProvider<CatalogNotifier, List<MapProvider>>(CatalogNotifier.new);
+
+/// [CatalogRepository.localMapInfo], re-read whenever the catalog changes
+/// (a region installed or deleted). Empty when the folder can't be read.
+final localMapInfoProvider = FutureProvider<Map<String, LocalMapInfo>>((ref) async {
+  await ref.watch(catalogProvider.future);
+  try {
+    return await ref.read(catalogRepositoryProvider).localMapInfo();
+  } catch (_) {
+    return const {};
+  }
+});

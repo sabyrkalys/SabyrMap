@@ -282,7 +282,7 @@ void main() {
     await tester.tap(find.text('Доступные карты'));
     await tester.pumpAndSettle();
     expect(find.byType(AvailableMapsScreen), findsOneWidget);
-    await tester.pageBack();
+    await tester.tap(find.byKey(const Key('maps_close_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Карты на экране'));
     await tester.pumpAndSettle();

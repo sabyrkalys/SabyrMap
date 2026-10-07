@@ -34,6 +34,9 @@ class ConnectivityNetworkInfo implements NetworkInfo {
 abstract class StorageInfo {
   /// Null when unknown.
   Future<int?> freeBytes(String path);
+
+  /// Size of the volume holding [path]; null when unknown.
+  Future<int?> totalBytes(String path);
 }
 
 /// Android StatFs through MainActivity's `sabyrmap/storage` channel.
@@ -43,9 +46,14 @@ class PlatformStorageInfo implements StorageInfo {
   static const _channel = MethodChannel('sabyrmap/storage');
 
   @override
-  Future<int?> freeBytes(String path) async {
+  Future<int?> freeBytes(String path) => _stat('freeBytes', path);
+
+  @override
+  Future<int?> totalBytes(String path) => _stat('totalBytes', path);
+
+  Future<int?> _stat(String method, String path) async {
     try {
-      return await _channel.invokeMethod<int>('freeBytes', {'path': path});
+      return await _channel.invokeMethod<int>(method, {'path': path});
     } on PlatformException {
       return null;
     } on MissingPluginException {

@@ -15,6 +15,7 @@ class RegionDownload {
     required this.key,
     required this.name,
     required this.state,
+    this.sourceId,
     this.label = 'Ожидание сервера',
     this.fraction,
     this.error,
@@ -23,6 +24,9 @@ class RegionDownload {
   final int key;
   final String name;
   final RegionDownloadState state;
+
+  /// The catalog map the region is cut from.
+  final String? sourceId;
 
   /// What is happening now: «Сервер готовит участок», «Скачивание», …
   final String label;
@@ -36,6 +40,7 @@ class RegionDownload {
         key: key,
         name: name,
         state: state ?? this.state,
+        sourceId: sourceId,
         label: label ?? this.label,
         fraction: fraction ?? this.fraction,
         error: error ?? this.error,
@@ -75,7 +80,7 @@ class RegionDownloadsNotifier extends Notifier<List<RegionDownload>> {
   }) {
     final key = _next++;
     final cancel = _tokens[key] = CancelToken();
-    state = [...state, RegionDownload(key: key, name: name, state: RegionDownloadState.running)];
+    state = [...state, RegionDownload(key: key, name: name, state: RegionDownloadState.running, sourceId: source.id)];
     Future<void>(() async {
       final service = ref.read(serverRegionServiceProvider);
       try {

@@ -14,8 +14,20 @@ import '../regions/server_region_dialog.dart';
 import '../regions/server_region_service.dart';
 import '../services/layer_manager.dart';
 import '../services/offline_service.dart';
+import '../services/tile_cache_stats.dart';
 import '../state/map_layers_controller.dart';
 import '../state/map_viewport.dart';
+
+import 'available_maps/available_maps_models.dart';
+import 'available_maps/device_storage.dart';
+import 'available_maps/dropdown_menu.dart';
+import 'available_maps/map_card.dart';
+import 'available_maps/map_card_menu.dart';
+import 'available_maps/map_source_accordion.dart';
+import 'available_maps/maps_app_bar.dart';
+import 'available_maps/maps_dialogs.dart';
+import 'available_maps/side_drawer.dart';
+import 'available_maps/storage_bar.dart';
 
 export '../../format_bytes.dart' show formatBytes;
 
@@ -26,8 +38,9 @@ String storageModeLabel(StorageMode mode) => switch (mode) {
       StorageMode.offlineRegion => '📦 Офлайн',
     };
 
-/// Map catalog: online maps by provider, installed maps and saved areas.
-/// With [pickOverlay] it only picks a source to lay over the map; with
+/// Map catalog as groups of map cards: OpenStreetMap, our server's maps
+/// (under «GOOGLE MAPS» for now), installed maps and saved areas. With
+/// [pickOverlay] it only picks a source to lay over the map; with
 /// [saveBaseRegion] it opens «Сохранить участок карты» for the map on screen
 /// (the maps menu item).
 class AvailableMapsScreen extends ConsumerStatefulWidget {
@@ -42,6 +55,11 @@ class AvailableMapsScreen extends ConsumerStatefulWidget {
 
 class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
   List<OfflineRegionInfo> _regions = const [];
+  Map<String, bool> _openGroups = const {'google': true};
+  bool _isDrawerOpen = false;
+  bool _isDropdownOpen = false;
+  MapsSection _section = MapsSection.available;
+  MapsFilter _filter = const MapsFilter();
 
   @override
   void initState() {
@@ -174,223 +192,442 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     if (added == true) await ref.read(catalogProvider.notifier).reload();
   }
 
+  void _toggleGroup(String id) => setState(() => _openGroups = {..._openGroups, id: !(_openGroups[id] ?? false)});
+
+  void _toggleDrawer() => setState(() {
+    _isDrawerOpen = !_isDrawerOpen;
+    _isDropdownOpen = false;
+  });
+
+  void _toggleDropdown() => setState(() {
+    _isDropdownOpen = !_isDropdownOpen;
+    _isDrawerOpen = false;
+  });
+
+  void _selectSection(MapsSection section) => setState(() {
+    _section = section;
+    _isDrawerOpen = false;
+  });
+
+  Future<void> _onMenuAction(MapsMenuAction action) async {
+    setState(() => _isDropdownOpen = false);
+    switch (action) {
+      case MapsMenuAction.filter:
+        final filter = await showDialog<MapsFilter>(
+          context: context,
+          builder: (_) => MapsFilterDialog(initial: _filter),
+        );
+        if (filter != null && mounted) setState(() => _filter = filter);
+      case MapsMenuAction.settings:
+        await showDialog<void>(context: context, builder: (_) => const MapsSettingsDialog());
+      case MapsMenuAction.help:
+        await showDialog<void>(context: context, builder: (_) => const MapsHelpDialog());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showAdd = !widget.pickOverlay && _section == MapsSection.available;
+    return Scaffold(
+      floatingActionButton: showAdd
+          ? FloatingActionButton(key: const Key('add_map_button'), onPressed: _addMap, child: const Icon(Icons.add))
+          : null,
+      body: Column(
+        children: [
+          MapsAppBar(
+            title: widget.pickOverlay ? 'Добавить слой' : 'Онлайн-карты',
+            subtitle: _section.label,
+            onMenu: _toggleDrawer,
+            onClose: () => Navigator.of(context).maybePop(),
+            onMore: _toggleDropdown,
+          ),
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _section == MapsSection.available
+                      ? _mapList(bottomInset: MediaQuery.viewPaddingOf(context).bottom + (showAdd ? 88 : 16))
+                      : const Center(
+                          child: Card(
+                            child: Padding(padding: EdgeInsets.all(24), child: Text('Раздел в разработке')),
+                          ),
+                        ),
+                ),
+                Positioned.fill(
+                  child: SideDrawer(
+                    isOpen: _isDrawerOpen,
+                    activeSection: _section,
+                    storage: ref.watch(deviceStorageProvider).value,
+                    folders: mockDeviceFolders,
+                    onSectionSelected: _selectSection,
+                    onClose: () => setState(() => _isDrawerOpen = false),
+                  ),
+                ),
+                Positioned.fill(
+                  child: MapsDropdownMenu(
+                    isOpen: _isDropdownOpen,
+                    onSelected: _onMenuAction,
+                    onDismiss: () => setState(() => _isDropdownOpen = false),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openCardMenu(
+    MapSource source, {
+    required bool active,
+    required bool favorite,
+    required bool canOverlay,
+    required bool canClearCache,
+    required int sizeBytes,
+    required int cachedBytes,
+    required String sourceName,
+    LocalMapInfo? local,
+  }) async {
+    final action = await showMapCardMenu(
+      context,
+      mapName: source.name,
+      active: active,
+      favorite: favorite,
+      canOverlay: canOverlay,
+      canClearCache: canClearCache,
+    );
+    if (action == null || !mounted) return;
+    switch (action) {
+      case MapCardAction.remove:
+        await _remove(source);
+      case MapCardAction.show:
+        await _show(source);
+      case MapCardAction.addOverlay:
+        await _addOverlay(source);
+      case MapCardAction.favorite:
+        await ref.read(mapLayersProvider.notifier).toggleFavorite(source.id);
+        _message(favorite ? '«${source.name}» убрана из избранных' : '«${source.name}» сохранена в избранные');
+      case MapCardAction.details:
+        await showDialog<void>(
+          context: context,
+          builder: (_) => _DetailsDialog(
+            source: source,
+            sourceName: sourceName,
+            sizeBytes: sizeBytes,
+            cachedBytes: cachedBytes,
+            local: local,
+          ),
+        );
+      case MapCardAction.clearCache:
+        await _confirmClearCache(source, sizeBytes);
+    }
+  }
+
+  /// «Убрать»: takes an overlay off the map. The base map stays until
+  /// another one is shown, so the screen is never left without a map.
+  Future<void> _remove(MapSource source) => _run(() async {
+        if (ref.read(mapLayersProvider).baseSourceId == source.id) {
+          _message('Это основная карта на экране — сначала покажите другую');
+          return;
+        }
+        await ref.read(mapLayersProvider.notifier).removeOverlay(source.id);
+        _message('«${source.name}» убрана с экрана');
+      });
+
+  /// «Очистить кэш»: deletes a downloaded region, or the saved areas of an
+  /// online map, after a confirmation.
+  Future<void> _confirmClearCache(MapSource source, int sizeBytes) async {
+    final downloaded = source.id.startsWith(CatalogRepository.localRegionPrefix);
+    if (downloaded && ref.read(mapLayersProvider).baseSourceId == source.id) {
+      _message('Эта карта сейчас на экране — сначала выберите другую');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Очистить кэш'),
+        content: Text(
+          downloaded
+              ? 'Удалить скачанную карту «${source.name}» (${formatBytes(sizeBytes)}) с телефона?'
+              : 'Удалить сохранённые участки карты «${source.name}» (${formatBytes(sizeBytes)})?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
+          TextButton(
+            key: const Key('clear_cache_confirm'),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Очистить'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    if (downloaded) {
+      await _deleteLocalRegion(source);
+    } else {
+      await _clearCache(source, _regions);
+    }
+    _message('Кэш очищен');
+  }
+
+  Widget _mapList({required double bottomInset}) {
     final catalog = ref.watch(catalogProvider);
     final mapState = ref.watch(mapLayersProvider);
     final downloads = ref.watch(regionDownloadsProvider);
+    final localInfo = ref.watch(localMapInfoProvider).value ?? const <String, LocalMapInfo>{};
     final providers = catalog.value ?? const <MapProvider>[];
-    final online = providers.where((p) => p.id != CatalogRepository.localProviderId).toList();
     final installed = providers.firstWhereOrNull((p) => p.id == CatalogRepository.localProviderId);
+    final sourcesById = {for (final p in providers) ...{for (final s in p.sources) s.id: s}};
     final isolatedIds = {
       for (final p in providers)
         if (p.isolated) ...p.sources.map((s) => s.id),
     };
     final baseIsolated = isolatedIds.contains(mapState.baseSourceId);
+    final regions = _regions;
+    final tileCache = ref.watch(tileCacheStatsProvider).value ?? TileCacheStats.empty;
+    int cacheOf(MapSource source) =>
+        regions.where((r) => r.sourceId == source.id).fold(0, (sum, r) => sum + r.sizeBytes);
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.pickOverlay ? 'Добавить слой' : 'Доступные карты'),
-          bottom: const TabBar(tabs: [Tab(text: 'Онлайн-карты'), Tab(text: 'Установленные карты')]),
+    // Online maps by group, then everything installed goes to the group of
+    // the map it came from (or «Свои карты» when that is unknown).
+    final online = groupProviders(providers);
+    final groupOfSource = {
+      for (final g in online)
+        for (final s in g.sources) s.id: g.id,
+    };
+    String groupFor(String? sourceId) => groupOfSource[sourceId] ?? ownGroupId;
+    final titles = {for (final g in online) g.id: g.title, ownGroupId: ownGroupTitle};
+
+    /// [sizeBytes]: disk size of an installed map; online maps show what
+    /// MapLibre's tile cache holds for them.
+    Widget card(MapSource source, {int? sizeBytes, MapSource? origin}) {
+      final cached = sizeBytes == null ? tileCache.bytesOf([source.id]) : 0;
+      final canOverlay = source.canBeOverlay &&
+          source.format == TileFormat.raster &&
+          !isolatedIds.contains(source.id) &&
+          !baseIsolated;
+      final favorite = mapState.favoriteIds.contains(source.id);
+      return _SourceCard(
+        source: source,
+        sizeBytes: sizeBytes ?? cached,
+        cached: sizeBytes == null,
+        kind: mapKindOf(origin ?? source),
+        canOverlay: canOverlay,
+        favorite: favorite,
+        selected: mapState.baseSourceId == source.id,
+        pickOverlay: widget.pickOverlay,
+        onTap: widget.pickOverlay ? () => _addOverlay(source) : () => _show(source),
+        onMenu: () => _openCardMenu(
+          source,
+          active: mapState.baseSourceId == source.id || mapState.overlays.any((o) => o.sourceId == source.id),
+          favorite: favorite,
+          canOverlay: canOverlay,
+          // Downloaded regions and saved areas; never the user's own files.
+          canClearCache: source.id.startsWith(CatalogRepository.localRegionPrefix) ||
+              (!source.id.startsWith('local-') && cacheOf(source) > 0),
+          sizeBytes: sizeBytes ?? cacheOf(source),
+          cachedBytes: cached,
+          sourceName: titles[groupFor((origin ?? source).id)]!,
+          local: localInfo[source.id],
         ),
-        floatingActionButton: widget.pickOverlay
-            ? null
-            : FloatingActionButton(
-                key: const Key('add_map_button'),
-                onPressed: _addMap,
-                child: const Icon(Icons.add),
-              ),
-        body: Builder(
-          builder: (context) {
-            final regions = _regions;
-            Widget tile(MapSource source) => _SourceTile(
-                  source: source,
-                  cacheBytes: regions.where((r) => r.sourceId == source.id).fold(0, (sum, r) => sum + r.sizeBytes),
-                  isolated: isolatedIds.contains(source.id),
-                  baseIsolated: baseIsolated,
-                  favorite: mapState.favoriteIds.contains(source.id),
-                  pickOverlay: widget.pickOverlay,
-                  onShow: () => _show(source),
-                  onAddOverlay: () => _addOverlay(source),
-                  onFavorite: () => ref.read(mapLayersProvider.notifier).toggleFavorite(source.id),
-                  onClearCache: () => _clearCache(source, regions),
-                  onSaveRegion: () => _saveRegion(source),
-                  onDelete: source.id.startsWith(CatalogRepository.localRegionPrefix)
-                      ? () => _deleteLocalRegion(source)
-                      : null,
-                );
-            return Column(
-              children: [
-                _CacheIndicator(regions: regions),
-                Expanded(
-                  child: TabBarView(
-                    children: [
-                      ListView(
-                        children: [
-                          for (final provider in online)
-                            ExpansionTile(
-                              key: Key('provider_${provider.id}'),
-                              title: Text(provider.name),
-                              subtitle: provider.sources.every((s) => s.storageMode == StorageMode.onlineOnly)
-                                  ? const Text('Только онлайн')
-                                  : null,
-                              children: [for (final source in provider.sources) tile(source)],
-                            ),
-                        ],
-                      ),
-                      ListView(
-                        children: [
-                          for (final download in downloads)
-                            _RegionDownloadTile(
-                              download: download,
-                              onCancel: () => ref.read(regionDownloadsProvider.notifier).cancel(download.key),
-                              onDismiss: () => ref.read(regionDownloadsProvider.notifier).dismiss(download.key),
-                            ),
-                          for (final source in installed?.sources ?? const <MapSource>[]) tile(source),
-                          for (final region in regions)
-                            ListTile(
-                              key: Key('region_${region.id}'),
-                              leading: const AppIcon(AppIcons.download),
-                              title: Text(region.name),
-                              subtitle: Text(
-                                region.isComplete
-                                    ? formatBytes(region.sizeBytes)
-                                    : '${formatBytes(region.sizeBytes)} · ${region.progress.toStringAsFixed(0)}%',
-                              ),
-                              trailing: IconButton(
-                                key: Key('region_delete_${region.id}'),
-                                icon: const AppIcon(AppIcons.trash),
-                                onPressed: () => _run(() async {
-                                  await ref.read(offlineServiceProvider).deleteRegion(region.id);
-                                  await _reloadRegions();
-                                }),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+      );
+    }
+
+    Widget regionTile(OfflineRegionInfo region) => ListTile(
+          key: Key('region_${region.id}'),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          leading: const AppIcon(AppIcons.download),
+          title: Text(region.name),
+          subtitle: Text(
+            region.isComplete
+                ? formatBytes(region.sizeBytes)
+                : '${formatBytes(region.sizeBytes)} · ${region.progress.toStringAsFixed(0)}%',
+          ),
+          trailing: IconButton(
+            key: Key('region_delete_${region.id}'),
+            icon: const AppIcon(AppIcons.trash),
+            onPressed: () => _run(() async {
+              await ref.read(offlineServiceProvider).deleteRegion(region.id);
+              await _reloadRegions();
+            }),
+          ),
+        );
+
+    final onlineCards = <String, List<Widget>>{};
+    for (final g in online) {
+      for (final s in g.sources) {
+        if (_filter.accepts(s, cacheOf(s))) (onlineCards[g.id] ??= []).add(card(s));
+      }
+    }
+    final downloaded = <String, List<Widget>>{};
+    final downloadedBytes = <String, int>{};
+    void addDownloaded(String groupId, Widget child, int bytes) {
+      (downloaded[groupId] ??= []).add(child);
+      downloadedBytes[groupId] = (downloadedBytes[groupId] ?? 0) + bytes;
+    }
+
+    if (!widget.pickOverlay) {
+      for (final download in downloads) {
+        addDownloaded(
+          groupFor(download.sourceId),
+          _RegionDownloadTile(
+            download: download,
+            onCancel: () => ref.read(regionDownloadsProvider.notifier).cancel(download.key),
+            onDismiss: () => ref.read(regionDownloadsProvider.notifier).dismiss(download.key),
+          ),
+          0,
+        );
+      }
+    }
+    for (final source in installed?.sources ?? const <MapSource>[]) {
+      final info = localInfo[source.id];
+      final origin = sourcesById[info?.originSourceId];
+      if (!_filter.accepts(origin ?? source, 1)) continue;
+      final bytes = info?.sizeBytes ?? 0;
+      addDownloaded(groupFor(origin?.id), card(source, sizeBytes: bytes, origin: origin), bytes);
+    }
+    if (!widget.pickOverlay) {
+      for (final region in regions) {
+        final source = sourcesById[region.sourceId];
+        if (_filter.onlySatellite && (source == null || !_filter.accepts(source, 1))) continue;
+        addDownloaded(groupFor(region.sourceId), regionTile(region), region.sizeBytes);
+      }
+    }
+
+    final groupIds = [...online.map((g) => g.id), ownGroupId];
+    final groups = [
+      for (final id in groupIds)
+        if ((onlineCards[id] ?? const []).isNotEmpty || (downloaded[id] ?? const []).isNotEmpty)
+          MapSourceAccordion(
+            key: Key('group_$id'),
+            id: id,
+            title: titles[id]!,
+            subtitle: [
+              if (tileCache.bytesOf([...?online.firstWhereOrNull((g) => g.id == id)?.sources.map((s) => s.id)])
+                  case final bytes when bytes > 0)
+                'кэш ≈ ${formatBytes(bytes)}',
+              if ((downloadedBytes[id] ?? 0) > 0) 'скачано ${formatBytes(downloadedBytes[id]!)}',
+              for (final g in online.where((g) => g.id == id))
+                for (final p in g.providers)
+                  if (p.attribution case final attribution?) attribution,
+              if (downloaded[id] == null &&
+                  online.where((g) => g.id == id).expand((g) => g.sources).every(
+                        (s) => s.storageMode == StorageMode.onlineOnly,
+                      ))
+                'Только онлайн',
+            ].join(' · '),
+            isOpen: _openGroups[id] ?? false,
+            onToggle: () => _toggleGroup(id),
+            children: [
+              ...?onlineCards[id],
+              if (downloaded[id] case final items?) ...[
+                _SectionLabel(key: Key('downloaded_label_$id'), text: 'Скачанные'),
+                ...items,
               ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
+            ],
+          ),
+    ];
 
-/// Total size of saved areas, with a bar while some are still downloading.
-class _CacheIndicator extends StatelessWidget {
-  const _CacheIndicator({required this.regions});
-
-  final List<OfflineRegionInfo> regions;
-
-  @override
-  Widget build(BuildContext context) {
-    final total = regions.fold(0, (sum, r) => sum + r.sizeBytes);
+    final cacheTotal = tileCache.bytesByTemplate.values.fold(0, (sum, b) => sum + b);
+    final total = cacheTotal > 0 ? cacheTotal : regions.fold(0, (sum, r) => sum + r.sizeBytes);
     final downloading = regions.where((r) => !r.isComplete).toList();
     final progress = downloading.isEmpty
         ? null
         : downloading.fold(0.0, (sum, r) => sum + r.progress) / downloading.length / 100;
+
+    return Column(
+      children: [
+        StorageBar(
+          key: const Key('cache_indicator'),
+          usage: ref.watch(deviceStorageProvider).value,
+          caption: 'Кэш: ${formatBytes(total)}',
+          onSettings: () => _onMenuAction(MapsMenuAction.settings),
+        ),
+        if (progress != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: LinearProgressIndicator(value: progress.clamp(0.0, 1.0)),
+          ),
+        const Divider(height: 1),
+        Expanded(
+          child: groups.isEmpty && _filter.isActive
+              ? const Center(child: Text('Нет карт, подходящих под фильтр'))
+              : ListView(padding: EdgeInsets.only(bottom: bottomInset), children: groups),
+        ),
+      ],
+    );
+  }
+}
+
+/// «Скачанные» above a group's installed maps.
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({super.key, required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      key: const Key('cache_indicator'),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Кэш: ${formatBytes(total)}'),
-          if (progress != null) ...[
-            const SizedBox(height: 6),
-            LinearProgressIndicator(value: progress.clamp(0.0, 1.0)),
-          ],
-        ],
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+      child: Text(
+        text.toUpperCase(),
+        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
       ),
     );
   }
 }
 
-enum _SourceAction { show, overlay, favorite, details, clearCache, saveRegion, delete }
-
-class _SourceTile extends StatelessWidget {
-  const _SourceTile({
+/// A catalog map as a [MapCard]: tap shows it (or adds it as a layer when
+/// picking an overlay), ⋮ opens [onMenu].
+class _SourceCard extends StatelessWidget {
+  const _SourceCard({
     required this.source,
-    required this.cacheBytes,
-    required this.isolated,
-    required this.baseIsolated,
+    required this.sizeBytes,
+    required this.cached,
+    required this.kind,
+    required this.canOverlay,
     required this.favorite,
+    required this.selected,
     required this.pickOverlay,
-    required this.onShow,
-    required this.onAddOverlay,
-    required this.onFavorite,
-    required this.onClearCache,
-    required this.onSaveRegion,
-    this.onDelete,
+    required this.onTap,
+    required this.onMenu,
   });
 
   final MapSource source;
-  final int cacheBytes;
-  final bool isolated;
-  final bool baseIsolated;
+
+  /// What MapLibre's cache holds for an online map ([cached]), or the disk
+  /// size of an installed one.
+  final int sizeBytes;
+  final bool cached;
+  final MapKind kind;
+  final bool canOverlay;
   final bool favorite;
+  final bool selected;
   final bool pickOverlay;
-  final VoidCallback onShow;
-  final VoidCallback onAddOverlay;
-  final VoidCallback onFavorite;
-  final VoidCallback onClearCache;
-  final VoidCallback onSaveRegion;
-
-  /// Deletes an installed offline region (null for other maps).
-  final VoidCallback? onDelete;
-
-  bool get _canOverlay => source.canBeOverlay && source.format == TileFormat.raster && !isolated && !baseIsolated;
+  final VoidCallback onTap;
+  final VoidCallback onMenu;
 
   @override
   Widget build(BuildContext context) {
-    final subtitle = cacheBytes > 0
-        ? '${storageModeLabel(source.storageMode)} · ${formatBytes(cacheBytes)}'
-        : storageModeLabel(source.storageMode);
-    final thumbnail = source.thumbnailAsset;
-    return ListTile(
+    return MapCard(
       key: Key('source_${source.id}'),
-      enabled: !pickOverlay || _canOverlay,
-      leading: thumbnail != null
-          ? Image.asset(thumbnail, width: 40, height: 40, fit: BoxFit.cover)
-          : AppIcon(source.format == TileFormat.vector ? AppIcons.map : AppIcons.layers),
-      title: Row(
-        children: [
-          Flexible(child: Text(source.name)),
-          if (favorite) ...[const SizedBox(width: 6), const AppIcon(AppIcons.star, size: 16)],
-        ],
-      ),
-      subtitle: Text(subtitle),
-      onTap: pickOverlay ? (_canOverlay ? onAddOverlay : null) : onShow,
-      trailing: pickOverlay
+      name: source.name,
+      caption: sizeBytes <= 0 ? 'Нет' : (cached ? '≈ ${formatBytes(sizeBytes)} в кэше' : formatBytes(sizeBytes)),
+      kind: kind,
+      thumbnailAsset: source.thumbnailAsset,
+      favorite: favorite,
+      selected: selected,
+      enabled: !pickOverlay || canOverlay,
+      onTap: onTap,
+      menu: pickOverlay
           ? null
-          : PopupMenuButton<_SourceAction>(
+          : IconButton(
               key: Key('source_menu_${source.id}'),
-              onSelected: (action) => switch (action) {
-                _SourceAction.show => onShow(),
-                _SourceAction.overlay => onAddOverlay(),
-                _SourceAction.favorite => onFavorite(),
-                _SourceAction.details => showDialog<void>(context: context, builder: (_) => _DetailsDialog(source: source)),
-                _SourceAction.clearCache => onClearCache(),
-                _SourceAction.saveRegion => onSaveRegion(),
-                _SourceAction.delete => onDelete?.call(),
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: _SourceAction.show, child: Text('Показать')),
-                PopupMenuItem(value: _SourceAction.overlay, enabled: _canOverlay, child: const Text('Добавить как слой')),
-                CheckedPopupMenuItem(value: _SourceAction.favorite, checked: favorite, child: const Text('В избранное')),
-                const PopupMenuItem(value: _SourceAction.details, child: Text('Детали')),
-                if (source.storageMode != StorageMode.onlineOnly)
-                  const PopupMenuItem(value: _SourceAction.clearCache, child: Text('Очистить кэш')),
-                if (OfflineService.canSaveRegion(source) || ServerRegionService.canDownload(source))
-                  const PopupMenuItem(value: _SourceAction.saveRegion, child: Text('Сохранить участок карты')),
-                if (onDelete != null) const PopupMenuItem(value: _SourceAction.delete, child: Text('Удалить')),
-              ],
+              icon: const AppIcon(AppIcons.dotsVertical, color: Colors.white),
+              onPressed: onMenu,
             ),
     );
   }
@@ -437,30 +674,76 @@ class _RegionDownloadTile extends StatelessWidget {
   }
 }
 
+/// «Детали»: source, size, date, coverage and tile format of a map. Server
+/// addresses are deliberately left out.
 class _DetailsDialog extends StatelessWidget {
-  const _DetailsDialog({required this.source});
+  const _DetailsDialog({
+    required this.source,
+    required this.sourceName,
+    required this.sizeBytes,
+    required this.cachedBytes,
+    this.local,
+  });
 
   final MapSource source;
 
+  /// Group title and attribution of the map (or of the map it came from).
+  final String sourceName;
+  /// Disk size of an installed map, or the saved areas of an online one.
+  final int sizeBytes;
+
+  /// MapLibre's tile cache for the map's tile sets (shared ones included).
+  final int cachedBytes;
+  final LocalMapInfo? local;
+
   @override
   Widget build(BuildContext context) {
-    final style = source.styleUrl;
-    final url = source.tileUrlTemplate ??
-        (style == null ? '—' : (style.trimLeft().startsWith('{') ? 'Файл стиля JSON' : style));
+    final local = this.local;
+    final created = local?.createdAt?.toLocal();
+    final bbox = local?.bbox;
+    String two(int v) => v.toString().padLeft(2, '0');
+    String coord(double v) => v.toStringAsFixed(3);
+    final rows = <(String, String)>[
+      ('Источник', [sourceName, if (source.attribution case final a?) a].join(' · ')),
+      if (source.storageMode == StorageMode.offlineRegion)
+        ('Размер', sizeBytes > 0 ? formatBytes(sizeBytes) : '—')
+      else ...[
+        (
+          'В кэше',
+          cachedBytes > 0 ? '≈ ${formatBytes(cachedBytes)} (тайлы, общие с другими картами, входят и в их кэш)' : 'Нет',
+        ),
+        if (sizeBytes > 0) ('Сохранённые участки', formatBytes(sizeBytes)),
+      ],
+      (
+        'Обновлено',
+        created != null
+            ? '${two(created.day)}.${two(created.month)}.${created.year}'
+            : (source.version != null ? 'версия ${source.version}' : '—'),
+      ),
+      (
+        'Покрытие',
+        [
+          if (bbox != null) '${coord(bbox[1])}…${coord(bbox[3])} с. ш., ${coord(bbox[0])}…${coord(bbox[2])} в. д.',
+          'масштаб ${source.minZoom}–${local?.maxZoom ?? source.maxZoom}',
+        ].join(', '),
+      ),
+      ('Формат тайлов', '${source.format == TileFormat.vector ? 'Векторные' : 'Растровые'} · ${storageModeLabel(source.storageMode)}'),
+    ];
+    final theme = Theme.of(context);
     return AlertDialog(
       title: Text(source.name),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SelectableText('URL: $url'),
-          const SizedBox(height: 8),
-          Text('Лицензия: ${source.attribution ?? '—'}'),
-          const SizedBox(height: 8),
-          Text('Масштаб: ${source.minZoom}–${source.maxZoom}'),
-          const SizedBox(height: 8),
-          Text(storageModeLabel(source.storageMode)),
-        ],
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final (label, value) in rows) ...[
+              Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              Text(value),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
       ),
       actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Закрыть'))],
     );

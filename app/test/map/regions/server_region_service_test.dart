@@ -29,6 +29,9 @@ class FakeStorage implements StorageInfo {
 
   @override
   Future<int?> freeBytes(String path) async => free;
+
+  @override
+  Future<int?> totalBytes(String path) async => null;
 }
 
 const hybrid = MapSource(

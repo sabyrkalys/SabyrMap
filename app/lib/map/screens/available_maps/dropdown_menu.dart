@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 
-enum OnlineMapsMenuAction {
+enum MapsMenuAction {
   filter('Фильтр', Icons.filter_list),
   settings('Настройки', Icons.settings_outlined),
   help('Помощь', Icons.help_outline);
 
-  const OnlineMapsMenuAction(this.label, this.icon);
+  const MapsMenuAction(this.label, this.icon);
 
   final String label;
   final IconData icon;
 }
 
 /// Menu under the top bar's ⋮. A tap outside it calls [onDismiss].
-class OnlineMapsDropdownMenu extends StatelessWidget {
-  const OnlineMapsDropdownMenu({super.key, required this.isOpen, required this.onSelected, required this.onDismiss});
+class MapsDropdownMenu extends StatelessWidget {
+  const MapsDropdownMenu({super.key, required this.isOpen, required this.onSelected, required this.onDismiss});
 
   final bool isOpen;
-  final ValueChanged<OnlineMapsMenuAction> onSelected;
+  final ValueChanged<MapsMenuAction> onSelected;
   final VoidCallback onDismiss;
 
   @override
@@ -31,7 +31,7 @@ class OnlineMapsDropdownMenu extends StatelessWidget {
           top: 4,
           right: 8,
           child: Material(
-            key: const Key('online_maps_dropdown'),
+            key: const Key('maps_dropdown'),
             elevation: 6,
             borderRadius: BorderRadius.circular(8),
             child: IntrinsicWidth(
@@ -39,7 +39,7 @@ class OnlineMapsDropdownMenu extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  for (final action in OnlineMapsMenuAction.values)
+                  for (final action in MapsMenuAction.values)
                     InkWell(
                       key: Key('dropdown_${action.name}'),
                       onTap: () => onSelected(action),

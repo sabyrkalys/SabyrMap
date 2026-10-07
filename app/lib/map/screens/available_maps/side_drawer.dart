@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../online_maps_models.dart';
+import 'available_maps_models.dart';
 import 'storage_bar.dart';
 
 /// Left panel sliding over the screen body. Closes on a tap on the dimmed
@@ -17,10 +17,10 @@ class SideDrawer extends StatelessWidget {
   });
 
   final bool isOpen;
-  final OnlineMapsSection activeSection;
-  final StorageUsage storage;
+  final MapsSection activeSection;
+  final StorageUsage? storage;
   final List<DeviceFolder> folders;
-  final ValueChanged<OnlineMapsSection> onSectionSelected;
+  final ValueChanged<MapsSection> onSectionSelected;
   final VoidCallback onClose;
 
   static const _duration = Duration(milliseconds: 220);
@@ -64,7 +64,7 @@ class SideDrawer extends StatelessWidget {
                     padding: EdgeInsets.zero,
                     children: [
                       const _Header('ОНЛАЙН-КАРТЫ'),
-                      for (final section in OnlineMapsSection.values)
+                      for (final section in MapsSection.values)
                         ListTile(
                           key: Key('drawer_section_${section.name}'),
                           title: Text(section.label),

@@ -232,6 +232,31 @@ void main() {
   });
 
   group('offline region folders', () {
+    test('localMapInfo: disk size of folders and files; source map, date and coverage from manifest.json', () async {
+      final fs = MemoryFileSystem();
+      fs.file('$mapsDir/Говерла/osm.mbtiles')
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(List.filled(1000, 0));
+      fs.file('$mapsDir/Говерла/fonts/a.pbf')
+        ..createSync(recursive: true)
+        ..writeAsBytesSync(List.filled(200, 0));
+      fs.file('$mapsDir/Говерла/manifest.json').writeAsStringSync(
+          '{"map_id": "server-hybrid-day", "created_at": "2026-10-07T09:00:00+00:00", '
+          '"bbox": [24.4, 48.1, 24.6, 48.2], "max_zoom": 15}');
+      fs.file('$mapsDir/Карпаты.mbtiles').writeAsBytesSync(List.filled(300, 0));
+
+      final info = await repo(fs: fs).localMapInfo();
+
+      final hoverla = info['local-dir-Говерла']!;
+      expect(hoverla.originSourceId, 'server-hybrid-day');
+      expect(hoverla.createdAt, DateTime.utc(2026, 10, 7, 9));
+      expect(hoverla.bbox, [24.4, 48.1, 24.6, 48.2]);
+      expect(hoverla.maxZoom, 15);
+      expect(hoverla.sizeBytes, 1200 + fs.file('$mapsDir/Говерла/manifest.json').lengthSync());
+      expect(info['local-Карпаты.mbtiles']!.sizeBytes, 300);
+      expect(info['local-Карпаты.mbtiles']!.originSourceId, isNull);
+    });
+
     test('a folder with style.json is one vector map, one with only MBTiles a raster map', () async {
       final fs = MemoryFileSystem();
       fs.file('$mapsDir/Говерла/style.json')
