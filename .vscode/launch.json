@@ -1,0 +1,51 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API: FastAPI (uvicorn)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["app.main:app", "--reload", "--host", "0.0.0.0", "--port", "8500"],
+      "cwd": "${workspaceFolder}/api",
+      "python": "${workspaceFolder}/api/.venv/bin/python",
+      "env": {
+        "AUTH_DISABLED": "true"
+      },
+      "jinja": true,
+      "justMyCode": true
+    },
+    {
+      "name": "API: pytest",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["-x", "tests"],
+      "cwd": "${workspaceFolder}/api",
+      "python": "${workspaceFolder}/api/.venv/bin/python",
+      "justMyCode": false
+    },
+    {
+      "name": "App: Flutter (emulator)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/app",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "App: Flutter (USB device, adb reverse)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/app",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define=API_BASE_URL=http://localhost:8500"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "API + App (emulator)",
+      "configurations": ["API: FastAPI (uvicorn)", "App: Flutter (emulator)"],
+      "stopAll": true
+    }
+  ]
+}
