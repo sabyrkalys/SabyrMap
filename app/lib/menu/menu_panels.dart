@@ -5,6 +5,7 @@ import '../app_icons.dart';
 import '../compass/compass_screen.dart';
 import '../map/screens/available_maps_screen.dart';
 import '../map/screens/layers_panel.dart';
+import '../online_maps/online_maps_screen.dart';
 import '../tracks/track_recording_actions.dart';
 import '../tracks/track_recording_controller.dart';
 import '../waypoints/waypoint_create_action.dart';
@@ -86,6 +87,11 @@ class _MapsPanel extends StatelessWidget {
           icon: AppIcons.folderMap,
           label: 'Доступные карты',
           onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AvailableMapsScreen())),
+        ),
+        MenuListItem(
+          icon: AppIcons.map,
+          label: 'Онлайн-карты',
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const OnlineMapsScreen())),
         ),
         MenuListItem(
           icon: AppIcons.layers,
