@@ -24,7 +24,7 @@ _MAPS = [
     ("server-hybrid-night", "{region} · ночь", "style/hybrid-night", "vector", 0, 20, False),
     ("server-vector-day", "{region} · только дороги", "style/vector-day", "vector", 0, 20, False),
     ("server-vector-night", "{region} · только дороги (ночь)", "style/vector-night", "vector", 0, 20, False),
-    ("server-satellite", "{region} · спутник", "satellite/{z}/{x}/{y}", "raster", 0, 16, True),
+    ("server-satellite", "{region} · спутник", "satellite/{z}/{x}/{y}", "raster", 0, 17, True),
 ]
 
 

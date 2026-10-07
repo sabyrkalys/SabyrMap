@@ -154,7 +154,7 @@ class CatalogRepository {
           format: TileFormat.raster,
           storageMode: StorageMode.onlineCache,
           minZoom: 0,
-          maxZoom: 16,
+          maxZoom: 17,
           canBeOverlay: true,
           downloadable: true,
         ),

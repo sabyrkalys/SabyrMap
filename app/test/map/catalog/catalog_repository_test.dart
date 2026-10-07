@@ -92,7 +92,7 @@ void main() {
     final sat = sources[CatalogRepository.serverSatelliteSourceId]!;
     expect(sat.format, TileFormat.raster);
     expect(sat.tileUrlTemplate, 'http://tiles.test/satellite/{z}/{x}/{y}');
-    expect(sat.maxZoom, 16);
+    expect(sat.maxZoom, 17);
     expect(sat.canBeOverlay, isTrue);
   });
 

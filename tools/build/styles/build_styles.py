@@ -9,7 +9,7 @@
 
 Источники и адреса совпадают с infra/martin/martin.yaml:
   overview   — обзор мира Natural Earth, растр WebP 256px, z0–5 (overview.sh)
-  satellite  — растр WebP 256px, z0–16
+  satellite  — растр WebP 256px, z0–17
   osm        — вектор OpenMapTiles (Planetiler), z0–14, дальше overzoom
   font/...   — Noto Sans (кириллица + латиница), глифы PBF генерирует Martin
   sprite/sabyr — иконки из tools/build/sprites/sabyr/*.svg
@@ -284,7 +284,7 @@ def style(name, theme, hybrid, tiles_base, buildings=True):
         sources["satellite"] = {
             "type": "raster",
             "tiles": [f"{tiles_base}/satellite/{{z}}/{{x}}/{{y}}"],
-            "tileSize": 256, "minzoom": 0, "maxzoom": 16,
+            "tileSize": 256, "minzoom": 0, "maxzoom": 17,
             "attribution": "Esri, Maxar, Earthstar Geographics, and the GIS Community",
         }
         layers.append({"id": "satellite", "type": "raster",
