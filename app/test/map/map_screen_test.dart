@@ -10,10 +10,6 @@ import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoint_types.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
-import 'dart:math' show Point;
-
-import 'package:app/waypoints/waypoint_create_action.dart';
-import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -261,51 +257,9 @@ void main() {
     expect(container.read(mapTargetProvider), isA<MapTargetNone>());
   });
 
-  testWidgets('a map tap places a waypoint that waits for its point, and only then', (tester) async {
-    final repo = FakeWaypointsRepository()
-      ..createResult = Waypoint(
-        id: 'w1',
-        orgId: 'o1',
-        ownerId: 'u1',
-        name: 'Там',
-        type: 'generic',
-        note: null,
-        lat: 48.1,
-        lng: 37.8,
-        canEdit: true,
-        createdAt: DateTime.utc(2026, 10, 8),
-      );
-    final container = await pumpMap(tester, waypointsRepo: repo);
-    void tapMap(LatLng at) => tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick!(const Point(0, 0), at);
-
-    tapMap(const LatLng(48.1, 37.8));
-    await tester.pump();
-    expect(container.read(waypointsControllerProvider), isEmpty);
-
-    container.read(waypointPlacementProvider.notifier).start(const WaypointData(name: 'Там'));
-    await tester.pump();
-    expect(find.byKey(const Key('waypoint_placement_hint')), findsOneWidget);
-    // A tap on the crosshair goes to the map, not to the card.
-    await tester.tapAt(screenCenter(tester));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
-
-    tapMap(const LatLng(48.1, 37.8));
-    await tester.pumpAndSettle();
-    expect(container.read(waypointsControllerProvider).single.name, 'Там');
-    expect(container.read(waypointPlacementProvider), isNull);
-    expect(find.byKey(const Key('waypoint_placement_hint')), findsNothing);
-  });
-
-  testWidgets('«Отмена» on the placement hint drops the waiting waypoint', (tester) async {
-    final container = await pumpMap(tester);
-    container.read(waypointPlacementProvider.notifier).start(const WaypointData(name: 'Там'));
-    await tester.pump();
-
-    await tester.tap(find.byKey(const Key('waypoint_placement_cancel')));
-    await tester.pump();
-    expect(container.read(waypointPlacementProvider), isNull);
-    expect(find.byKey(const Key('waypoint_placement_hint')), findsNothing);
+  testWidgets('map taps are not handled by the app', (tester) async {
+    await pumpMap(tester);
+    expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick, isNull);
   });
 
   testWidgets('the crosshair is a white 8 dp dot in a 2 dp dark border', (tester) async {

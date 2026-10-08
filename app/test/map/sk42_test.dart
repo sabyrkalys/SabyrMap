@@ -23,6 +23,15 @@ void main() {
     });
   }
 
+  for (final (lat, lng, _, x, y) in cases) {
+    test('fromSk42($x, $y) gives back ($lat, $lng) within 1 m', () {
+      final (backLat, backLng) = fromSk42(x, y);
+      // 1e-5° is about 1 m.
+      expect(backLat, closeTo(lat, 1e-5));
+      expect(backLng, closeTo(lng, 1e-5));
+    });
+  }
+
   test('a longitude exactly on a zone boundary belongs to the eastern zone', () {
     expect(toSk42(43.0, 42.0).zone, 8);
     expect(toSk42(43.0, 42.0).y, greaterThan(8000000));

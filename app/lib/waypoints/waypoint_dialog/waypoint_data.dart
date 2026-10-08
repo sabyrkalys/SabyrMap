@@ -1,22 +1,14 @@
 import 'package:flutter/painting.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../waypoint_color.dart';
 import '../waypoint_types.dart';
-
-/// Where the new waypoint goes.
-enum WaypointCoords {
-  /// The crosshair (or the «Задать цель» target the dialog was opened for).
-  screenCenter,
-
-  /// A point the user taps on the map after «ОК».
-  customPoint,
-}
 
 /// What the «Путевая точка» dialog returns on «ОК».
 class WaypointData {
   const WaypointData({
     this.name = '',
-    this.coords = WaypointCoords.screenCenter,
+    this.point,
     this.groupId = unsortedGroupId,
     this.iconId,
     this.colorValue,
@@ -29,7 +21,10 @@ class WaypointData {
 
   /// May be empty: the waypoint is then named «Путевая точка N».
   final String name;
-  final WaypointCoords coords;
+
+  /// Coordinates typed in «Координаты»; null puts the waypoint at the
+  /// crosshair (or the target) as usual.
+  final LatLng? point;
   final String groupId;
 
   /// File name of the chosen icon; null keeps the standard marker.

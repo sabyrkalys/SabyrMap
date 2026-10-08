@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../../icons/icon_library_scanner.dart';
 import '../../icons/icon_picker_sheet.dart';
+import '../../map/map_crosshair.dart';
 import '../waypoint_color.dart';
 import '../waypoint_color_picker.dart';
 import '../waypoint_types.dart';
 import 'action_button.dart';
+import 'coordinates_dialog.dart';
+import 'coords_system.dart';
 import 'dropdown_field.dart';
 import 'more_sheet.dart';
 import 'waypoint_data.dart';
@@ -15,34 +20,41 @@ const Color _textColor = Color(0xFF212121);
 const Color _iconColor = Color(0xFF333333);
 
 /// Opens the «Путевая точка» dialog. Completes with what was entered on
-/// «ОК», or null on «ОТМЕНА». [pointLabel] names the place the waypoint
-/// goes by default (the screen centre, or the «Задать цель» target).
+/// «ОК», or null on «ОТМЕНА». The waypoint goes to [fixedPoint] (the
+/// «Задать цель» target, named by [pointLabel]) or, without one, to the
+/// map's crosshair, followed live while the dialog is open.
 Future<WaypointData?> showWaypointDialog(
   BuildContext context, {
   IconLibraryScanner? iconScanner,
   String pointLabel = 'Координаты центра экрана',
+  LatLng? fixedPoint,
 }) {
   return showDialog<WaypointData>(
     context: context,
-    builder: (_) => WaypointDialog(iconScanner: iconScanner, pointLabel: pointLabel),
+    builder: (_) => WaypointDialog(iconScanner: iconScanner, pointLabel: pointLabel, fixedPoint: fixedPoint),
   );
 }
 
 /// «Путевая точка»: name, where it goes, its group, then icon (flag), colour
 /// (palette), description (pencil) and «ЕЩЁ...» for the rest.
-class WaypointDialog extends StatefulWidget {
-  const WaypointDialog({super.key, this.iconScanner, this.pointLabel = 'Координаты центра экрана'});
+class WaypointDialog extends ConsumerStatefulWidget {
+  const WaypointDialog({super.key, this.iconScanner, this.pointLabel = 'Координаты центра экрана', this.fixedPoint});
 
   final IconLibraryScanner? iconScanner;
   final String pointLabel;
+  final LatLng? fixedPoint;
 
   @override
-  State<WaypointDialog> createState() => _WaypointDialogState();
+  ConsumerState<WaypointDialog> createState() => _WaypointDialogState();
 }
 
-class _WaypointDialogState extends State<WaypointDialog> {
+class _WaypointDialogState extends ConsumerState<WaypointDialog> {
   final _name = TextEditingController();
-  WaypointCoords _coords = WaypointCoords.screenCenter;
+  bool _coordsExpanded = false;
+
+  // Coordinates typed in «Координаты»; null follows the crosshair (or the target).
+  LatLng? _enteredPoint;
+  CoordsSystem _system = CoordsSystem.sk42;
   String _groupId = WaypointData.unsortedGroupId;
   String? _iconId;
   int? _colorValue;
@@ -123,10 +135,102 @@ class _WaypointDialogState extends State<WaypointDialog> {
     }
   }
 
+  /// The point the waypoint goes to; [watch] in build, so the shown
+  /// coordinates follow the map.
+  LatLng? _pointOf({required bool watch}) =>
+      _enteredPoint ?? widget.fixedPoint ?? (watch ? ref.watch(mapCrosshairProvider) : ref.read(mapCrosshairProvider));
+
+  Future<void> _editCoordinates() async {
+    final point = _pointOf(watch: false);
+    if (point == null) return;
+    final result = await showCoordinatesDialog(context, initial: point, system: _system);
+    if (result == null || !mounted) return;
+    setState(() {
+      _enteredPoint = result.point;
+      _system = result.system;
+    });
+  }
+
+  String get _coordsTitle => _enteredPoint != null ? 'Заданные координаты' : widget.pointLabel;
+
+  /// The coordinates row: a tap folds the block under it out or back in.
+  /// Unfolded it shows the point's coordinates and «Изменить».
+  Widget _coordsSection() {
+    final point = _pointOf(watch: true);
+    Widget action(Key key, IconData icon, String label, VoidCallback onTap, {Widget? trailing}) => InkWell(
+      key: key,
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: _iconColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label, style: const TextStyle(fontSize: 16, color: _textColor)),
+            ),
+            ?trailing,
+          ],
+        ),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          key: const Key('waypoint_dialog_coords'),
+          onTap: () => setState(() => _coordsExpanded = !_coordsExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.my_location_sharp, size: 20, color: _iconColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(_coordsTitle, style: const TextStyle(fontSize: 16, color: _textColor)),
+                ),
+                AnimatedRotation(
+                  key: const Key('waypoint_dialog_coords_chevron'),
+                  turns: _coordsExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.expand_more_sharp, size: 20, color: Color(0xFF757575)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_coordsExpanded)
+          Padding(
+            key: const Key('waypoint_dialog_coords_block'),
+            padding: const EdgeInsets.only(left: 32, top: 8, bottom: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (point != null)
+                  Text(
+                    _system.describe(point),
+                    key: const Key('waypoint_dialog_coords_value'),
+                    style: const TextStyle(fontSize: 13, color: Color(0xFF757575)),
+                  ),
+                const Divider(height: 16, color: Color(0xFFEEEEEE)),
+                action(
+                  const Key('waypoint_dialog_coords_edit'),
+                  Icons.edit_sharp,
+                  'Изменить',
+                  _editCoordinates,
+                  trailing: const Icon(Icons.expand_more_sharp, size: 20, color: Color(0xFF757575)),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   void _ok() => Navigator.of(context).pop(
     WaypointData(
       name: _name.text.trim(),
-      coords: _coords,
+      point: _enteredPoint,
       groupId: _groupId,
       iconId: _iconId,
       colorValue: _colorValue,
@@ -187,16 +291,7 @@ class _WaypointDialogState extends State<WaypointDialog> {
               ),
             ),
             const SizedBox(height: 20),
-            DropdownField<WaypointCoords>(
-              key: const Key('waypoint_dialog_coords'),
-              icon: Icons.my_location_sharp,
-              value: _coords,
-              options: [
-                (WaypointCoords.screenCenter, widget.pointLabel),
-                (WaypointCoords.customPoint, 'Указать точку на карте'),
-              ],
-              onChanged: (coords) => setState(() => _coords = coords),
-            ),
+            _coordsSection(),
             const SizedBox(height: 16),
             DropdownField<String>(
               key: const Key('waypoint_dialog_group'),

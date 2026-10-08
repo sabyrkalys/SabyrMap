@@ -131,23 +131,26 @@ void main() {
     expect(repo.created.map((c) => c.name), ['Путевая точка 1', 'Путевая точка 2']);
   });
 
-  testWidgets('«Указать точку на карте» waits for a tap instead of creating at once', (tester) async {
+  testWidgets('coordinates typed in «Координаты» are where the waypoint is created', (tester) async {
     final repo = _RecordingWaypointsRepository();
     final container = await pumpButton(tester, repo: repo);
     container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
 
     await tester.tap(find.text('go'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('waypoint_dialog_name_field')), 'Там');
     await tester.tap(find.byKey(const Key('waypoint_dialog_coords')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Указать точку на карте').last);
+    await tester.tap(find.byKey(const Key('waypoint_dialog_coords_edit')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('coords_x_field')), '6181945');
+    await tester.enterText(find.byKey(const Key('coords_y_field')), '7413188');
+    await tester.tap(find.byKey(const Key('coords_ok')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('waypoint_dialog_ok')));
     await tester.pumpAndSettle();
 
-    expect(repo.created, isEmpty);
-    expect(container.read(waypointPlacementProvider)?.name, 'Там');
+    expect(repo.created.single.lat, closeTo(55.75222, 1e-5));
+    expect(repo.created.single.lng, closeTo(37.61556, 1e-5));
   });
 
   testWidgets('a failure still shows its message after the widget that started it is gone', (tester) async {

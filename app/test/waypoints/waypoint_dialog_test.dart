@@ -1,23 +1,40 @@
+import 'package:app/map/map_crosshair.dart';
+import 'package:app/waypoints/waypoint_dialog/coords_system.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 void main() {
+  late ProviderContainer container;
+
   /// Opens the dialog from a button and records what it completes with.
-  Future<List<WaypointData?>> open(WidgetTester tester, {String? pointLabel}) async {
+  /// The crosshair sits at [crosshair].
+  Future<List<WaypointData?>> open(
+    WidgetTester tester, {
+    String? pointLabel,
+    LatLng? crosshair = const LatLng(47.9958, 37.81465),
+  }) async {
     final results = <WaypointData?>[];
+    container = ProviderContainer();
+    addTearDown(container.dispose);
+    if (crosshair != null) container.read(mapCrosshairProvider.notifier).set(crosshair);
     await tester.pumpWidget(
-      MaterialApp(
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: TextButton(
-              onPressed: () async => results.add(
-                pointLabel == null
-                    ? await showWaypointDialog(context)
-                    : await showWaypointDialog(context, pointLabel: pointLabel),
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: TextButton(
+                onPressed: () async => results.add(
+                  pointLabel == null
+                      ? await showWaypointDialog(context)
+                      : await showWaypointDialog(context, pointLabel: pointLabel),
+                ),
+                child: const Text('open'),
               ),
-              child: const Text('open'),
             ),
           ),
         ),
@@ -80,7 +97,7 @@ void main() {
 
     final data = results.single!;
     expect(data.name, '');
-    expect(data.coords, WaypointCoords.screenCenter);
+    expect(data.point, isNull);
     expect(data.groupId, WaypointData.unsortedGroupId);
     expect(data.iconId, isNull);
     expect(data.colorValue, isNull);
@@ -88,15 +105,9 @@ void main() {
     expect(data.note, '');
   });
 
-  testWidgets('«ОК» returns the name, the chosen point and the description', (tester) async {
+  testWidgets('«ОК» returns the name and the description', (tester) async {
     final results = await open(tester);
     await tester.enterText(find.byKey(const Key('waypoint_dialog_name_field')), '  Родник ');
-
-    await tester.tap(find.byKey(const Key('waypoint_dialog_coords')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Указать точку на карте').last);
-    await tester.pumpAndSettle();
-    expect(find.text('Указать точку на карте'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('waypoint_dialog_note')));
     await tester.pumpAndSettle();
@@ -107,7 +118,6 @@ void main() {
 
     final data = results.single!;
     expect(data.name, 'Родник');
-    expect(data.coords, WaypointCoords.customPoint);
     expect(data.note, 'Холодная вода');
   });
 
@@ -186,5 +196,262 @@ void main() {
 
     final okBottom = tester.getBottomLeft(find.byKey(const Key('waypoint_dialog_ok'))).dy;
     expect(okBottom, lessThanOrEqualTo((1920 - 900) / 3));
+  });
+
+  group('coordinates', () {
+    Future<void> expand(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('waypoint_dialog_coords')));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> openEditor(WidgetTester tester) async {
+      await expand(tester);
+      await tester.tap(find.byKey(const Key('waypoint_dialog_coords_edit')));
+      await tester.pumpAndSettle();
+    }
+
+    double chevronTurns(WidgetTester tester) =>
+        tester.widget<AnimatedRotation>(find.byKey(const Key('waypoint_dialog_coords_chevron'))).turns;
+
+    testWidgets('a tap folds the block out with the crosshair in СК-42, the chevron turns over', (tester) async {
+      await open(tester);
+      expect(find.byKey(const Key('waypoint_dialog_coords_block')), findsNothing);
+      expect(chevronTurns(tester), 0);
+
+      await expand(tester);
+      expect(chevronTurns(tester), 0.5);
+      // pyproj: (47.99580, 37.81465) is X 5318741.37, Y 7411649.30.
+      expect(find.text('X = 5318741  Y = 7411649'), findsOneWidget);
+      expect(find.text('Изменить'), findsOneWidget);
+      expect(find.text('Указать точку на карте'), findsNothing);
+
+      await tester.tap(find.byKey(const Key('waypoint_dialog_coords')));
+      await tester.pumpAndSettle();
+      expect(chevronTurns(tester), 0);
+      expect(find.byKey(const Key('waypoint_dialog_coords_block')), findsNothing);
+    });
+
+    testWidgets('the coordinates follow the map while the dialog is open', (tester) async {
+      await open(tester);
+      await expand(tester);
+      container.read(mapCrosshairProvider.notifier).set(const LatLng(55.75222, 37.61556));
+      await tester.pump();
+      expect(find.text('X = 6181945  Y = 7413188'), findsOneWidget);
+    });
+
+    testWidgets('«Изменить» opens «Координаты» over the waypoint dialog, СК-42 chosen and filled', (tester) async {
+      await open(tester);
+      await openEditor(tester);
+
+      expect(find.byKey(const Key('coordinates_dialog')), findsOneWidget);
+      expect(find.byKey(const Key('waypoint_dialog')), findsOneWidget);
+      expect(find.text('Критерий поиска'), findsOneWidget);
+      final x = find.byKey(const Key('coords_x_field'));
+      expect(tester.widget<TextField>(x).controller!.text, '5318741');
+      expect(tester.widget<TextField>(find.byKey(const Key('coords_y_field'))).controller!.text, '7411649');
+      final editable = tester.widget<EditableText>(find.descendant(of: x, matching: find.byType(EditableText)));
+      expect(editable.focusNode.hasFocus, isTrue);
+      expect(editable.keyboardType, const TextInputType.numberWithOptions(signed: true, decimal: true));
+
+      Color? background(CoordsSystem system) =>
+          (tester
+                      .widget<Container>(
+                        find
+                            .descendant(
+                              of: find.byKey(Key('coords_system_${system.name}')),
+                              matching: find.byType(Container),
+                            )
+                            .first,
+                      )
+                      .decoration
+                  as BoxDecoration?)
+              ?.color;
+      expect(background(CoordsSystem.sk42), const Color(0xFFE0E0E0));
+      expect(background(CoordsSystem.wgs84), isNull);
+
+      await tester.tap(find.byKey(const Key('coords_system_wgs84')));
+      await tester.pumpAndSettle();
+      expect(background(CoordsSystem.sk42), isNull);
+      expect(background(CoordsSystem.wgs84), isNull);
+    });
+
+    String fieldText(WidgetTester tester, String key) =>
+        tester.widget<TextField>(find.byKey(Key(key))).controller!.text;
+
+    testWidgets('switching to latitude/longitude converts the values: degrees, °, N/E buttons', (tester) async {
+      await open(tester);
+      await openEditor(tester);
+      await tester.tap(find.byKey(const Key('coords_system_wgs84')));
+      await tester.pumpAndSettle();
+
+      // X 5318741, Y 7411649 rounded to the metre: back within ~1e-5°.
+      expect(double.parse(fieldText(tester, 'coords_x_field')), closeTo(47.9958, 1e-5));
+      expect(double.parse(fieldText(tester, 'coords_y_field')), closeTo(37.81465, 1e-5));
+      expect(fieldText(tester, 'coords_x_field'), matches(RegExp(r'^\d+\.\d{6}$')));
+      expect(find.text('°'), findsNWidgets(2));
+      expect(find.text('N'), findsOneWidget);
+      expect(find.text('E'), findsOneWidget);
+      expect(find.text('X ='), findsNothing);
+
+      await tester.tap(find.byKey(const Key('coords_system_sk42')));
+      await tester.pumpAndSettle();
+      expect(int.parse(fieldText(tester, 'coords_x_field')), closeTo(5318741, 1));
+      expect(int.parse(fieldText(tester, 'coords_y_field')), closeTo(7411649, 1));
+      expect(find.text('X ='), findsOneWidget);
+    });
+
+    testWidgets('N/E buttons flip the hemisphere, and so the sign of the point', (tester) async {
+      final results = await open(tester);
+      await openEditor(tester);
+      await tester.tap(find.byKey(const Key('coords_system_wgs84')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('coords_x_field')), '33.5');
+      await tester.enterText(find.byKey(const Key('coords_y_field')), '70.25');
+      await tester.tap(find.byKey(const Key('coords_lat_hemisphere')));
+      await tester.tap(find.byKey(const Key('coords_lng_hemisphere')));
+      await tester.pumpAndSettle();
+      expect(find.text('S'), findsOneWidget);
+      expect(find.text('W'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('coords_ok')));
+      await tester.pumpAndSettle();
+      expect(find.text('33.500000°S  70.250000°W'), findsOneWidget);
+      await ok(tester);
+      expect(results.single!.point, const LatLng(-33.5, -70.25));
+    });
+
+    testWidgets('«Единое поле» in latitude/longitude reads «47.993239°N 37.801170°E»', (tester) async {
+      await open(tester);
+      await openEditor(tester);
+      await tester.tap(find.byKey(const Key('coords_system_wgs84')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('coords_x_field')), '47.993239');
+      await tester.enterText(find.byKey(const Key('coords_y_field')), '37.801170');
+      await tester.tap(find.byKey(const Key('coords_single_checkbox')));
+      await tester.pumpAndSettle();
+      expect(fieldText(tester, 'coords_single_field'), '47.993239°N 37.801170°E');
+
+      await tester.enterText(find.byKey(const Key('coords_single_field')), '12.5°S 8.25°W');
+      await tester.tap(find.byKey(const Key('coords_single_checkbox')));
+      await tester.pumpAndSettle();
+      expect(fieldText(tester, 'coords_x_field'), '12.500000');
+      expect(fieldText(tester, 'coords_y_field'), '8.250000');
+      expect(find.text('S'), findsOneWidget);
+      expect(find.text('W'), findsOneWidget);
+    });
+
+    testWidgets('«ОК» in «Координаты» moves the waypoint there and shows the new values', (tester) async {
+      final results = await open(tester);
+      await openEditor(tester);
+      await tester.enterText(find.byKey(const Key('coords_x_field')), '6181945');
+      await tester.enterText(find.byKey(const Key('coords_y_field')), '7413188');
+      await tester.tap(find.byKey(const Key('coords_ok')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('coordinates_dialog')), findsNothing);
+      expect(find.text('Заданные координаты'), findsOneWidget);
+      expect(find.text('X = 6181945  Y = 7413188'), findsOneWidget);
+      await ok(tester);
+
+      final point = results.single!.point!;
+      expect(point.latitude, closeTo(55.75222, 1e-5));
+      expect(point.longitude, closeTo(37.61556, 1e-5));
+    });
+
+    testWidgets('«ОТМЕНА» and a tap outside leave the coordinates as they were', (tester) async {
+      final results = await open(tester);
+      await openEditor(tester);
+      await tester.enterText(find.byKey(const Key('coords_x_field')), '1');
+      await tester.tap(find.byKey(const Key('coords_cancel')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('coordinates_dialog')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('waypoint_dialog_coords_edit')));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('coordinates_dialog')), findsNothing);
+      expect(find.byKey(const Key('waypoint_dialog')), findsOneWidget);
+
+      expect(find.text('X = 5318741  Y = 7411649'), findsOneWidget);
+      await ok(tester);
+      expect(results.single!.point, isNull);
+    });
+
+    testWidgets('bad numbers show «Некорректные координаты» and keep the dialog open', (tester) async {
+      await open(tester);
+      await openEditor(tester);
+      await tester.enterText(find.byKey(const Key('coords_x_field')), '-');
+      await tester.tap(find.byKey(const Key('coords_ok')));
+      await tester.pump();
+      expect(find.text('Некорректные координаты'), findsOneWidget);
+      expect(find.byKey(const Key('coordinates_dialog')), findsOneWidget);
+
+      // A number, but no СК-42 zone in Y.
+      await tester.enterText(find.byKey(const Key('coords_x_field')), '5318741');
+      await tester.enterText(find.byKey(const Key('coords_y_field')), '411649');
+      await tester.tap(find.byKey(const Key('coords_ok')));
+      await tester.pump();
+      expect(find.byKey(const Key('coordinates_dialog')), findsOneWidget);
+    });
+
+    testWidgets('«Единое поле» merges X and Y into one field and splits them back', (tester) async {
+      await open(tester);
+      await openEditor(tester);
+      await tester.tap(find.byKey(const Key('coords_single_checkbox')));
+      await tester.pumpAndSettle();
+
+      final single = find.byKey(const Key('coords_single_field'));
+      expect(tester.widget<TextField>(single).controller!.text, 'X=5318741 Y=7411649');
+      expect(find.byKey(const Key('coords_x_field')), findsNothing);
+
+      await tester.enterText(single, 'X=6181945\nY=7413188');
+      await tester.tap(find.byKey(const Key('coords_single_checkbox')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(find.byKey(const Key('coords_x_field'))).controller!.text, '6181945');
+      expect(tester.widget<TextField>(find.byKey(const Key('coords_y_field'))).controller!.text, '7413188');
+    });
+
+    testWidgets('«ОК» from «Единое поле» reads both numbers', (tester) async {
+      final results = await open(tester);
+      await openEditor(tester);
+      await tester.tap(find.byKey(const Key('coords_system_wgs84')));
+      await tester.tap(find.byKey(const Key('coords_single_checkbox')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('coords_single_field')), '55,75222 37,61556');
+      await tester.tap(find.byKey(const Key('coords_ok')));
+      await tester.pumpAndSettle();
+      await ok(tester);
+
+      expect(results.single!.point, const LatLng(55.75222, 37.61556));
+    });
+  });
+
+  test('parseCoordinatePair takes the first two numbers; a comma may be the decimal point', () {
+    expect(parseCoordinatePair('X=5318818 Y=7411502'), (5318818.0, 7411502.0));
+    expect(parseCoordinatePair('48,5\n-37.25'), (48.5, -37.25));
+    expect(parseCoordinatePair('X=5318818, Y=7411502'), (5318818.0, 7411502.0));
+    expect(parseCoordinatePair('X=5318818'), isNull);
+  });
+
+  test('parseLatLngPair: hemisphere letters, commas, minus signs', () {
+    expect(parseLatLngPair('47.993239°N 37.801170°E'), (47.993239, 37.80117));
+    expect(parseLatLngPair('47,5 S\n37,25 W'), (-47.5, -37.25));
+    expect(parseLatLngPair('-47.5 37.25'), (-47.5, 37.25));
+    expect(parseLatLngPair('47.5°Ю 37.25°З'), (-47.5, -37.25));
+    expect(parseLatLngPair('47.5'), isNull);
+  });
+
+  test('describe: СК-42 as X/Y, latitude/longitude with hemispheres', () {
+    const point = LatLng(-12.5, 37.80117);
+    expect(CoordsSystem.wgs84.describe(point), '12.500000°S  37.801170°E');
+    expect(CoordsSystem.sk42.describe(const LatLng(47.9958, 37.81465)), 'X = 5318741  Y = 7411649');
+  });
+
+  test('CoordinatesResult checks the range of its system', () {
+    expect(const CoordinatesResult(system: CoordsSystem.wgs84, x: 48, y: 37).isValid, isTrue);
+    expect(const CoordinatesResult(system: CoordsSystem.wgs84, x: 91, y: 37).isValid, isFalse);
+    expect(const CoordinatesResult(system: CoordsSystem.sk42, x: 5318741, y: 7411649).isValid, isTrue);
+    expect(const CoordinatesResult(system: CoordsSystem.sk42, x: 5318741, y: 411649).isValid, isFalse);
   });
 }

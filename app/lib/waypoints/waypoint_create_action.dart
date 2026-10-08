@@ -11,9 +11,8 @@ import 'waypoint_models.dart';
 import 'waypoints_controller.dart';
 
 /// Opens the «Путевая точка» dialog and creates the waypoint at the map's
-/// crosshair, or at [at] (the «Задать цель» target). With «Указать точку на
-/// карте» it is created where the map is tapped next ([waypointPlacementProvider]).
-/// Shared by the crosshair menu, the «Новая метка» sheet and the МЕТКИ panel.
+/// crosshair, or at [at] (the «Задать цель» target), or at the coordinates
+/// typed in the dialog. Shared by the crosshair menu, the «Новая метка» sheet and the МЕТКИ panel.
 ///
 /// The panel can be closed while the request is in flight, which unmounts
 /// [context] and disposes [ref]; the container and messenger are captured
@@ -35,13 +34,12 @@ Future<void> createWaypointAtCrosshair(
     context,
     iconScanner: iconScanner,
     pointLabel: at == null ? 'Координаты центра экрана' : 'Координаты цели',
+    fixedPoint: at,
   );
   if (data == null) return;
-  if (data.coords == WaypointCoords.customPoint) {
-    container.read(waypointPlacementProvider.notifier).start(data);
-    return;
-  }
-  await saveWaypoint(container, messenger, data, coordinates);
+  // The crosshair as it is now: the map may have moved while the dialog was open.
+  final point = data.point ?? at ?? container.read(mapCrosshairProvider) ?? coordinates;
+  await saveWaypoint(container, messenger, data, point);
 }
 
 /// Creates [data] at [at]. An empty name becomes the next «Путевая точка N».
@@ -74,16 +72,3 @@ Future<void> saveWaypoint(
     messenger.showSnackBar(SnackBar(content: Text(e.message)));
   }
 }
-
-/// A waypoint from the dialog that waits for its point: «Указать точку на
-/// карте». The map screen creates it at the next tap on the map.
-class WaypointPlacement extends Notifier<WaypointData?> {
-  @override
-  WaypointData? build() => null;
-
-  void start(WaypointData data) => state = data;
-
-  void cancel() => state = null;
-}
-
-final waypointPlacementProvider = NotifierProvider<WaypointPlacement, WaypointData?>(WaypointPlacement.new);
