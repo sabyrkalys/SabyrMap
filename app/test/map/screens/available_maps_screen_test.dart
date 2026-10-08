@@ -474,6 +474,95 @@ void main() {
     expect(find.text('СВОИ КАРТЫ'), findsNothing);
   });
 
+  Future<void> openSearch(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('maps_more_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('dropdown_search')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('⋮ offers only «Фильтр» and «Поиск»', (tester) async {
+    await pump(tester);
+    await tester.tap(find.byKey(const Key('maps_more_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.descendant(of: find.byKey(const Key('maps_dropdown')), matching: find.byType(InkWell)), findsNWidgets(2));
+    expect(find.text('Фильтр'), findsOneWidget);
+    expect(find.text('Поиск'), findsOneWidget);
+    expect(find.text('Настройки'), findsNothing);
+    expect(find.text('Помощь'), findsNothing);
+  });
+
+  testWidgets('«Поиск» turns the bar into a focused search field', (tester) async {
+    await pump(tester);
+    await openSearch(tester);
+
+    expect(find.byKey(const Key('maps_dropdown')), findsNothing);
+    expect(find.text('Онлайн-карты'), findsNothing);
+    expect(find.text('Доступные карты'), findsNothing);
+    expect(find.byKey(const Key('maps_menu_button')), findsNothing);
+    expect(find.byKey(const Key('maps_more_button')), findsNothing);
+    expect(find.byKey(const Key('maps_close_button')), findsNothing);
+    expect(find.byKey(const Key('maps_search_back')), findsOneWidget);
+    expect(find.byKey(const Key('maps_search_clear')), findsNothing);
+    final editable = tester.widget<EditableText>(
+      find.descendant(of: find.byKey(const Key('maps_search_field')), matching: find.byType(EditableText)),
+    );
+    expect(editable.focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets('search keeps maps and groups whose name has the query, any case', (tester) async {
+    await pump(tester);
+    await openSearch(tester);
+
+    await tester.enterText(find.byKey(const Key('maps_search_field')), 'КАРП');
+    await tester.pumpAndSettle();
+    expect(find.text('СВОИ КАРТЫ'), findsOneWidget);
+    expect(find.byKey(const Key('source_local-Карпаты.mbtiles')), findsOneWidget);
+    expect(find.text('GOOGLE MAPS'), findsNothing);
+    expect(find.text('ЯНДЕКС'), findsNothing);
+    expect(find.text('OPENSTREETMAP'), findsNothing);
+
+    // A group's own name keeps all of its maps; found maps aren't hidden in
+    // a closed group.
+    await tester.enterText(find.byKey(const Key('maps_search_field')), 'openstreet');
+    await tester.pumpAndSettle();
+    expect(find.text('OPENSTREETMAP'), findsOneWidget);
+    expect(find.byKey(const Key('source_ofm-liberty')), findsOneWidget);
+    expect(find.text('СВОИ КАРТЫ'), findsNothing);
+
+    await tester.enterText(find.byKey(const Key('maps_search_field')), 'нет такой');
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('maps_search_empty')), findsOneWidget);
+  });
+
+  testWidgets('back and × leave the search and show every map again', (tester) async {
+    await pump(tester);
+    for (final exit in ['maps_search_back', 'maps_search_clear']) {
+      await openSearch(tester);
+      await tester.enterText(find.byKey(const Key('maps_search_field')), 'карп');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key(exit)));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('maps_search_field')), findsNothing, reason: exit);
+      expect(find.text('Онлайн-карты'), findsOneWidget, reason: exit);
+      expect(find.text('GOOGLE MAPS'), findsOneWidget, reason: exit);
+      expect(find.text('OPENSTREETMAP'), findsOneWidget, reason: exit);
+    }
+  });
+
+  testWidgets('system back leaves the search, not the screen', (tester) async {
+    await pump(tester);
+    await openSearch(tester);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('maps_search_field')), findsNothing);
+    expect(find.text('Онлайн-карты'), findsOneWidget);
+  });
+
   testWidgets('drawer: altitude stub, closes on the scrim and on a second menu tap', (tester) async {
     await pump(tester);
     Finder drawer() => find.byKey(const Key('side_drawer'));

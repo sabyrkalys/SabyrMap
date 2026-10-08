@@ -61,10 +61,16 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
   bool _isDropdownOpen = false;
   MapsSection _section = MapsSection.available;
   MapsFilter _filter = const MapsFilter();
+  bool _isSearchActive = false;
+  final _search = TextEditingController();
+
+  /// Lower-cased; maps and groups are matched by name against it.
+  String get _searchQuery => _isSearchActive ? _search.text.trim().toLowerCase() : '';
 
   @override
   void initState() {
     super.initState();
+    _search.addListener(() => setState(() {}));
     _reloadRegions();
     if (widget.saveBaseRegion) WidgetsBinding.instance.addPostFrameCallback((_) => _saveBaseRegion());
   }
@@ -210,6 +216,12 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     _isDrawerOpen = false;
   });
 
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   Future<void> _onMenuAction(MapsMenuAction action) async {
     setState(() => _isDropdownOpen = false);
     switch (action) {
@@ -219,62 +231,77 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
           builder: (_) => MapsFilterDialog(initial: _filter),
         );
         if (filter != null && mounted) setState(() => _filter = filter);
-      case MapsMenuAction.settings:
-        await showDialog<void>(context: context, builder: (_) => const MapsSettingsDialog());
-      case MapsMenuAction.help:
-        await showDialog<void>(context: context, builder: (_) => const MapsHelpDialog());
+      case MapsMenuAction.search:
+        setState(() {
+          _isSearchActive = true;
+          _isDrawerOpen = false;
+        });
     }
   }
+
+  /// Back to the title bar; the list is no longer filtered by name.
+  void _exitSearch() => setState(() {
+    _search.clear();
+    _isSearchActive = false;
+  });
 
   @override
   Widget build(BuildContext context) {
     final showAdd = !widget.pickOverlay && _section == MapsSection.available;
-    return Scaffold(
-      floatingActionButton: showAdd
-          ? FloatingActionButton(key: const Key('add_map_button'), onPressed: _addMap, child: const Icon(Icons.add))
-          : null,
-      body: Column(
-        children: [
-          MapsAppBar(
-            title: widget.pickOverlay ? 'Добавить слой' : 'Онлайн-карты',
-            subtitle: _section.label,
-            onMenu: _toggleDrawer,
-            onClose: () => Navigator.of(context).maybePop(),
-            onMore: _toggleDropdown,
-          ),
-          Expanded(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: _section == MapsSection.available
-                      ? _mapList(bottomInset: MediaQuery.viewPaddingOf(context).bottom + (showAdd ? 88 : 16))
-                      : const Center(
-                          child: Card(
-                            child: Padding(padding: EdgeInsets.all(24), child: Text('Раздел в разработке')),
-                          ),
-                        ),
-                ),
-                Positioned.fill(
-                  child: SideDrawer(
-                    isOpen: _isDrawerOpen,
-                    activeSection: _section,
-                    storage: ref.watch(deviceStorageProvider).value,
-                    folders: mockDeviceFolders,
-                    onSectionSelected: _selectSection,
-                    onClose: () => setState(() => _isDrawerOpen = false),
-                  ),
-                ),
-                Positioned.fill(
-                  child: MapsDropdownMenu(
-                    isOpen: _isDropdownOpen,
-                    onSelected: _onMenuAction,
-                    onDismiss: () => setState(() => _isDropdownOpen = false),
-                  ),
-                ),
-              ],
+    // System back leaves the search first, then the screen.
+    return PopScope(
+      canPop: !_isSearchActive,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _exitSearch();
+      },
+      child: Scaffold(
+        floatingActionButton: showAdd
+            ? FloatingActionButton(key: const Key('add_map_button'), onPressed: _addMap, child: const Icon(Icons.add))
+            : null,
+        body: Column(
+          children: [
+            MapsAppBar(
+              title: widget.pickOverlay ? 'Добавить слой' : 'Онлайн-карты',
+              subtitle: _section.label,
+              onMenu: _toggleDrawer,
+              onClose: () => Navigator.of(context).maybePop(),
+              onMore: _toggleDropdown,
+              search: _isSearchActive ? MapsSearch(controller: _search, onExit: _exitSearch) : null,
             ),
-          ),
-        ],
+            Expanded(
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: _section == MapsSection.available
+                        ? _mapList(bottomInset: MediaQuery.viewPaddingOf(context).bottom + (showAdd ? 88 : 16))
+                        : const Center(
+                            child: Card(
+                              child: Padding(padding: EdgeInsets.all(24), child: Text('Раздел в разработке')),
+                            ),
+                          ),
+                  ),
+                  Positioned.fill(
+                    child: SideDrawer(
+                      isOpen: _isDrawerOpen,
+                      activeSection: _section,
+                      storage: ref.watch(deviceStorageProvider).value,
+                      folders: mockDeviceFolders,
+                      onSectionSelected: _selectSection,
+                      onClose: () => setState(() => _isDrawerOpen = false),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: MapsDropdownMenu(
+                      isOpen: _isDropdownOpen,
+                      onSelected: _onMenuAction,
+                      onDismiss: () => setState(() => _isDropdownOpen = false),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -456,10 +483,16 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
           ),
         );
 
+    // Search: a group whose title matches keeps all its maps, otherwise
+    // only the maps (regions, downloads) whose name matches.
+    final query = _searchQuery;
+    bool named(String groupId, String name) =>
+        query.isEmpty || titles[groupId]!.toLowerCase().contains(query) || name.toLowerCase().contains(query);
+
     final onlineCards = <String, List<Widget>>{};
     for (final g in online) {
       for (final s in g.sources) {
-        if (_filter.accepts(s, cacheOf(s))) (onlineCards[g.id] ??= []).add(card(s));
+        if (_filter.accepts(s, cacheOf(s)) && named(g.id, s.name)) (onlineCards[g.id] ??= []).add(card(s));
       }
     }
     final downloaded = <String, List<Widget>>{};
@@ -471,6 +504,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
 
     if (!widget.pickOverlay) {
       for (final download in downloads) {
+        if (!named(groupFor(download.sourceId), download.name)) continue;
         addDownloaded(
           groupFor(download.sourceId),
           _RegionDownloadTile(
@@ -485,7 +519,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     for (final source in installed?.sources ?? const <MapSource>[]) {
       final info = localInfo[source.id];
       final origin = sourcesById[info?.originSourceId];
-      if (!_filter.accepts(origin ?? source, 1)) continue;
+      if (!_filter.accepts(origin ?? source, 1) || !named(groupFor(origin?.id), source.name)) continue;
       final bytes = info?.sizeBytes ?? 0;
       addDownloaded(groupFor(origin?.id), card(source, sizeBytes: bytes, origin: origin), bytes);
     }
@@ -493,6 +527,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
       for (final region in regions) {
         final source = sourcesById[region.sourceId];
         if (_filter.onlySatellite && (source == null || !_filter.accepts(source, 1))) continue;
+        if (!named(groupFor(region.sourceId), region.name)) continue;
         addDownloaded(groupFor(region.sourceId), regionTile(region), region.sizeBytes);
       }
     }
@@ -519,7 +554,8 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
                       ))
                 'Только онлайн',
             ].join(' · '),
-            isOpen: _openGroups[id] ?? false,
+            // Found maps are shown, not hidden in a closed group.
+            isOpen: query.isNotEmpty || (_openGroups[id] ?? false),
             onToggle: () => _toggleGroup(id),
             children: [
               ...?onlineCards[id],
@@ -544,7 +580,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
           key: const Key('cache_indicator'),
           usage: ref.watch(deviceStorageProvider).value,
           caption: 'Кэш: ${formatBytes(total)}',
-          onSettings: () => _onMenuAction(MapsMenuAction.settings),
+          onSettings: () => showDialog<void>(context: context, builder: (_) => const MapsSettingsDialog()),
         ),
         if (progress != null)
           Padding(
@@ -553,7 +589,9 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
           ),
         const Divider(height: 1),
         Expanded(
-          child: groups.isEmpty && _filter.isActive
+          child: groups.isEmpty && query.isNotEmpty
+              ? const Center(key: Key('maps_search_empty'), child: Text('Ничего не найдено'))
+              : groups.isEmpty && _filter.isActive
               ? const Center(child: Text('Нет карт, подходящих под фильтр'))
               : ListView(padding: EdgeInsets.only(bottom: bottomInset), children: groups),
         ),

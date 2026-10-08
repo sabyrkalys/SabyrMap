@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 enum MapsMenuAction {
   filter('Фильтр', Icons.filter_list),
-  settings('Настройки', Icons.settings_outlined),
-  help('Помощь', Icons.help_outline);
+  search('Поиск', Icons.search);
 
   const MapsMenuAction(this.label, this.icon);
 

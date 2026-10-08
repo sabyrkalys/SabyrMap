@@ -97,22 +97,3 @@ class _MapsSettingsDialogState extends State<MapsSettingsDialog> {
     );
   }
 }
-
-class MapsHelpDialog extends StatelessWidget {
-  const MapsHelpDialog({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Помощь'),
-      content: const Text(
-        'Нажмите на название группы, чтобы раскрыть или свернуть её карты. '
-        'Группы раскрываются независимо друг от друга.\n\n'
-        'Нажмите на карту, чтобы показать её. ⋮ на карте — слой, избранное, кэш, сохранение участка.\n\n'
-        'Справа на карте — размер сохранённых участков («Нет» — участков нет).\n\n'
-        '«Фильтр» в меню ⋮ оставляет только скачанные или только спутниковые карты.',
-      ),
-      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Понятно'))],
-    );
-  }
-}
