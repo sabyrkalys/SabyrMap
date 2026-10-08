@@ -138,8 +138,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // Live camera centre, tracked only while a target is set so the distance
   // label follows a drag without rebuilding on every frame otherwise.
   LatLng? _liveCenter;
-  // Live camera for the «Задать цель» distance plate in the middle of the
-  // line (the line and dot themselves are MainActivity's TargetLine).
+  // Live camera for the «Задать цель» distance plate beside the crosshair
+  // (the line and dot themselves are MainActivity's TargetLine).
   final ValueNotifier<CameraPosition?> _liveCamera = ValueNotifier(null);
   // Crosshair position for the info panel's X/Y, every camera frame. A
   // notifier, so only the panel rebuilds while the map moves.
@@ -887,17 +887,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           if (target != null && center != null && toggles[MenuToggle.waypointsTargetStatus]!)
             IgnorePointer(
               child: Center(
-                // In the middle of the line from the crosshair to the target.
-                child: ValueListenableBuilder<CameraPosition?>(
-                  valueListenable: _liveCamera,
-                  builder: (context, camera, _) => Transform.translate(
-                    offset: camera == null
-                        ? Offset.zero
-                        : screenOffsetOf(target, center: camera.target, zoom: camera.zoom, bearing: camera.bearing) / 2,
-                    child: TargetDistanceLabel(
-                      key: const Key('target_distance_label'),
-                      from: camera?.target ?? center,
-                      to: target,
+                // A fixed spot right of the crosshair: only the number
+                // changes while the map moves, so there is nothing to lag.
+                child: Transform.translate(
+                  offset: const Offset(12, 0),
+                  child: FractionalTranslation(
+                    translation: const Offset(0.5, 0),
+                    child: ValueListenableBuilder<CameraPosition?>(
+                      valueListenable: _liveCamera,
+                      builder: (context, camera, _) => TargetDistanceLabel(
+                        key: const Key('target_distance_label'),
+                        from: camera?.target ?? center,
+                        to: target,
+                      ),
                     ),
                   ),
                 ),
@@ -993,12 +995,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: SizedBox(
                   width: 48,
                   height: 48,
-                  // A bright white 6 dp dot in a 2 dp dark border.
+                  // A bright white 8 dp dot in a 2 dp dark border.
                   child: Center(
                     child: Container(
                       key: const Key('map_crosshair'),
-                      width: 10,
-                      height: 10,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white,

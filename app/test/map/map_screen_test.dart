@@ -261,7 +261,7 @@ void main() {
     expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick, isNull);
   });
 
-  testWidgets('the crosshair is a white 6 dp dot in a 2 dp dark border', (tester) async {
+  testWidgets('the crosshair is a white 8 dp dot in a 2 dp dark border', (tester) async {
     await pumpMap(tester);
     final dot = tester.widget<Container>(find.byKey(const Key('map_crosshair')));
     final decoration = dot.decoration! as BoxDecoration;
@@ -269,7 +269,7 @@ void main() {
     final border = decoration.border! as Border;
     expect(border.top.width, 2);
     expect(border.top.color, Theme.of(tester.element(find.byKey(const Key('map_crosshair')))).colorScheme.onSurface);
-    expect(tester.getSize(find.byKey(const Key('map_crosshair'))), const Size(10, 10));
+    expect(tester.getSize(find.byKey(const Key('map_crosshair'))), const Size(12, 12));
   });
 
   testWidgets('distance label follows «Статус цели»', (tester) async {
@@ -283,6 +283,18 @@ void main() {
     container.read(menuTogglesProvider.notifier).set(MenuToggle.waypointsTargetStatus, false);
     await tester.pump();
     expect(find.byKey(const Key('target_distance_label')), findsNothing);
+  });
+
+  testWidgets('the distance plate sits at a fixed spot right of the crosshair', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
+    container.read(mapTargetProvider.notifier).setAt(const LatLng(48.5, 38.5));
+    await tester.pump();
+
+    final plate = find.byKey(const Key('target_distance_label'));
+    final crosshair = find.byKey(const Key('map_crosshair'));
+    expect(tester.getCenter(plate).dy, closeTo(tester.getCenter(crosshair).dy, 0.5));
+    expect(tester.getTopLeft(plate).dx, greaterThanOrEqualTo(tester.getTopRight(crosshair).dx));
   });
 
   testWidgets('«Новая метка...» before the map settles reports the map is not ready', (tester) async {
