@@ -3,6 +3,7 @@ import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../waypoint_color.dart';
 import '../waypoint_types.dart';
+import 'marker_group.dart';
 
 /// What the «Путевая точка» dialog returns on «ОК».
 class WaypointData {
@@ -16,8 +17,8 @@ class WaypointData {
     this.note = '',
   });
 
-  /// The one group there is so far: «Несортированные метки».
-  static const unsortedGroupId = 'unsorted';
+  /// «Несортированные метки», where waypoints go by default.
+  static const unsortedGroupId = MarkerGroup.unsortedId;
 
   /// May be empty: the waypoint is then named «Путевая точка N».
   final String name;

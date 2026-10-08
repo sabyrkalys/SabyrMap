@@ -106,7 +106,7 @@ class MapsFilter {
 // Stub until the app opens the device's file browser.
 
 const mockDeviceFolders = [
-  DeviceFolder(name: 'AlpineQuest Maps', path: '/pinequest.free/AlpineQuest Maps/'),
-  DeviceFolder(name: 'Медиафайлы', path: 'Android/media/psyberia.alpinequest/'),
+  DeviceFolder(name: 'SabyrMap Maps', path: '/SabyrMap/Maps/'),
+  DeviceFolder(name: 'Медиафайлы', path: 'Android/media/com.sabyrmap.app/'),
   DeviceFolder(name: 'Мои загрузки', path: 'Download/'),
 ];

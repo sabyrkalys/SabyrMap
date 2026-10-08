@@ -1,5 +1,9 @@
+import 'dart:io';
+
+import 'package:app/config/storage_paths.dart';
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/waypoints/waypoint_dialog/coords_system.dart';
+import 'package:app/waypoints/waypoint_dialog/marker_group.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_dialog.dart';
 import 'package:flutter/material.dart';
@@ -453,5 +457,102 @@ void main() {
     expect(const CoordinatesResult(system: CoordsSystem.wgs84, x: 91, y: 37).isValid, isFalse);
     expect(const CoordinatesResult(system: CoordsSystem.sk42, x: 5318741, y: 7411649).isValid, isTrue);
     expect(const CoordinatesResult(system: CoordsSystem.sk42, x: 5318741, y: 411649).isValid, isFalse);
+  });
+
+  group('groups', () {
+    Finder panel() => find.byKey(const Key('waypoint_dialog_group_panel'));
+
+    Future<void> expandGroups(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('waypoint_dialog_group')));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('a tap folds out a raised white panel with every group and its path', (tester) async {
+      await open(tester);
+      expect(panel(), findsNothing);
+      await expandGroups(tester);
+
+      expect(tester.widget<AnimatedRotation>(find.byKey(const Key('waypoint_dialog_group_chevron'))).turns, 0.5);
+      final decoration = tester.widget<Container>(panel()).decoration! as BoxDecoration;
+      expect(decoration.color, Colors.white);
+      expect(decoration.borderRadius, BorderRadius.circular(8));
+      expect(decoration.boxShadow, isNotEmpty);
+
+      expect(find.descendant(of: panel(), matching: find.text('Несортированные метки')), findsOneWidget);
+      expect(find.text('${StoragePaths.unsorted}/'), findsOneWidget);
+      expect(find.text('Мои метки'), findsOneWidget);
+      expect(find.text('${StoragePaths.landmarks}/'), findsOneWidget);
+      expect(find.text('МОИ МЕТКИ'), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.text('МОИ МЕТКИ')).dy,
+        allOf(
+          greaterThan(tester.getTopLeft(find.text('${StoragePaths.unsorted}/')).dy),
+          lessThan(tester.getTopLeft(find.text('Мои метки')).dy),
+        ),
+      );
+
+      final all = find.byKey(const Key('waypoint_dialog_group_all'));
+      expect(find.descendant(of: all, matching: find.byIcon(Icons.folder_sharp)), findsOneWidget);
+      expect(find.descendant(of: all, matching: find.byType(Text)), findsOneWidget);
+      // The chosen group is the one with the bullet.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('waypoint_dialog_group_unsorted')),
+          matching: find.byKey(const Key('waypoint_dialog_group_bullet')),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.widget<Text>(find.text('${StoragePaths.unsorted}/')).softWrap, isTrue);
+    });
+
+    testWidgets('picking a group names the row after it, folds the panel and goes into «ОК»', (tester) async {
+      final results = await open(tester);
+      await expandGroups(tester);
+      await tester.tap(find.byKey(const Key('waypoint_dialog_group_my-markers')));
+      await tester.pumpAndSettle();
+
+      expect(panel(), findsNothing);
+      expect(
+        find.descendant(of: find.byKey(const Key('waypoint_dialog_group')), matching: find.text('Мои метки')),
+        findsOneWidget,
+      );
+      await ok(tester);
+      expect(results.single!.groupId, MarkerGroup.myMarkersId);
+    });
+
+    testWidgets('«Все метки» folds the panel and keeps the chosen group', (tester) async {
+      final results = await open(tester);
+      await expandGroups(tester);
+      await tester.tap(find.byKey(const Key('waypoint_dialog_group_all')));
+      await tester.pumpAndSettle();
+
+      expect(panel(), findsNothing);
+      await ok(tester);
+      expect(results.single!.groupId, MarkerGroup.unsortedId);
+    });
+
+    testWidgets('only one of the coordinates and the groups is open at a time', (tester) async {
+      await open(tester);
+      await tester.tap(find.byKey(const Key('waypoint_dialog_coords')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('waypoint_dialog_coords_block')), findsOneWidget);
+
+      await expandGroups(tester);
+      expect(panel(), findsOneWidget);
+      expect(find.byKey(const Key('waypoint_dialog_coords_block')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('waypoint_dialog_coords')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('waypoint_dialog_coords_block')), findsOneWidget);
+      expect(panel(), findsNothing);
+    });
+  });
+
+  test('the app\'s Dart code never says «alpinequest» (the product is SabyrMap)', () {
+    final offenders = [
+      for (final file in Directory('lib').listSync(recursive: true).whereType<File>())
+        if (file.path.endsWith('.dart') && file.readAsStringSync().toLowerCase().contains('alpinequest')) file.path,
+    ];
+    expect(offenders, isEmpty);
   });
 }

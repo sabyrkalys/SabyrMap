@@ -11,7 +11,7 @@ import '../waypoint_types.dart';
 import 'action_button.dart';
 import 'coordinates_dialog.dart';
 import 'coords_system.dart';
-import 'dropdown_field.dart';
+import 'marker_group.dart';
 import 'more_sheet.dart';
 import 'waypoint_data.dart';
 
@@ -55,7 +55,8 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
   // Coordinates typed in «Координаты»; null follows the crosshair (or the target).
   LatLng? _enteredPoint;
   CoordsSystem _system = CoordsSystem.sk42;
-  String _groupId = WaypointData.unsortedGroupId;
+  String _groupId = MarkerGroup.unsortedId;
+  bool _groupExpanded = false;
   String? _iconId;
   int? _colorValue;
   String _type = defaultWaypointType;
@@ -179,7 +180,10 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
       children: [
         InkWell(
           key: const Key('waypoint_dialog_coords'),
-          onTap: () => setState(() => _coordsExpanded = !_coordsExpanded),
+          onTap: () => setState(() {
+            _coordsExpanded = !_coordsExpanded;
+            if (_coordsExpanded) _groupExpanded = false;
+          }),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(
@@ -223,6 +227,81 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  void _pickGroup(MarkerGroup group) => setState(() {
+    if (group.id == MarkerGroup.allId) {
+      // The list of all waypoints comes in a later iteration.
+      debugPrint('Open all markers');
+    } else {
+      _groupId = group.id;
+    }
+    _groupExpanded = false;
+  });
+
+  /// The group row: a tap folds out a raised white panel of the groups
+  /// with their storage paths, and folds it back in.
+  Widget _groupSection() {
+    final groups = builtInMarkerGroups;
+    final selected = groups.firstWhere((g) => g.id == _groupId, orElse: () => groups.first);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          key: const Key('waypoint_dialog_group'),
+          onTap: () => setState(() {
+            _groupExpanded = !_groupExpanded;
+            if (_groupExpanded) _coordsExpanded = false;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.bookmark_sharp, size: 20, color: _iconColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(selected.title, style: const TextStyle(fontSize: 16, color: _textColor)),
+                ),
+                AnimatedRotation(
+                  key: const Key('waypoint_dialog_group_chevron'),
+                  turns: _groupExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(Icons.expand_more_sharp, size: 20, color: Color(0xFF757575)),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          alignment: Alignment.topCenter,
+          child: !_groupExpanded
+              ? const SizedBox(width: double.infinity)
+              : Container(
+                  key: const Key('waypoint_dialog_group_panel'),
+                  margin: const EdgeInsets.only(top: 4, bottom: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8)],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (final (i, group) in groups.indexed) ...[
+                        if (group.sectionLabel case final label?)
+                          _GroupSectionLabel(label: label)
+                        else if (i > 0)
+                          const SizedBox(height: 12),
+                        _GroupItem(group: group, selected: group.id == _groupId, onTap: () => _pickGroup(group)),
+                      ],
+                    ],
+                  ),
+                ),
+        ),
       ],
     );
   }
@@ -293,13 +372,7 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
             const SizedBox(height: 20),
             _coordsSection(),
             const SizedBox(height: 16),
-            DropdownField<String>(
-              key: const Key('waypoint_dialog_group'),
-              icon: Icons.bookmark_sharp,
-              value: _groupId,
-              options: const [(WaypointData.unsortedGroupId, 'Несортированные метки')],
-              onChanged: (group) => setState(() => _groupId = group),
-            ),
+            _groupSection(),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -380,6 +453,84 @@ class _NoteDialogState extends State<_NoteDialog> {
           child: const Text('ОК'),
         ),
       ],
+    );
+  }
+}
+
+/// «— МОИ МЕТКИ»: a line, then the section's name, above its first group.
+class _GroupSectionLabel extends StatelessWidget {
+  const _GroupSectionLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 8),
+      child: Row(
+        children: [
+          const SizedBox(width: 16, child: Divider(height: 1, color: Color(0xFFBDBDBD))),
+          const SizedBox(width: 8),
+          Text(label.toUpperCase(), style: const TextStyle(fontSize: 12, color: Color(0xFF757575), letterSpacing: 0.5)),
+          const SizedBox(width: 8),
+          const Expanded(child: Divider(height: 1, color: Color(0xFFBDBDBD))),
+        ],
+      ),
+    );
+  }
+}
+
+/// One group in the panel: a bullet when it is the chosen one (a folder
+/// for «Все метки»), its title and, under it, where it is stored.
+class _GroupItem extends StatelessWidget {
+  const _GroupItem({required this.group, required this.selected, required this.onTap});
+
+  final MarkerGroup group;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = group.subtitle;
+    return InkWell(
+      key: Key('waypoint_dialog_group_${group.id}'),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 20,
+            height: 22,
+            child: group.id == MarkerGroup.allId
+                ? const Icon(Icons.folder_sharp, size: 20, color: _iconColor)
+                : selected
+                ? const Center(
+                    key: Key('waypoint_dialog_group_bullet'),
+                    child: CircleAvatar(radius: 3.5, backgroundColor: _textColor),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  group.title,
+                  style: const TextStyle(fontSize: 16, color: _textColor, fontWeight: FontWeight.w400),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    softWrap: true,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF757575), height: 1.3),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
