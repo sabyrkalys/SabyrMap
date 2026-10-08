@@ -12,6 +12,7 @@ class WaypointData {
     this.point,
     this.groupId = unsortedGroupId,
     this.iconId,
+    this.markerIconId,
     this.colorValue,
     this.type = defaultWaypointType,
     this.note = '',
@@ -28,8 +29,12 @@ class WaypointData {
   final LatLng? point;
   final String groupId;
 
-  /// File name of the chosen icon; null keeps the standard marker.
+  /// File name of the chosen icon file; null keeps the standard marker.
   final String? iconId;
+
+  /// A built-in icon from «Иконка» (MarkerIcon.id). Not drawn on the map
+  /// yet: that comes with the real icon set.
+  final String? markerIconId;
 
   /// ARGB of the chosen colour; null keeps the type's colour.
   final int? colorValue;

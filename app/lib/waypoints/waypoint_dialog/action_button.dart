@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 const Color _background = Color(0xFFEEEEEE);
 const Color _foreground = Color(0xFF333333);
 
-/// A 48×48 grey square with an icon (flag, palette, pencil).
+/// A 48×48 grey square with an icon (flag, palette, pencil), or [child]
+/// in its place (the chosen waypoint icon).
 class ActionButton extends StatelessWidget {
-  const ActionButton({super.key, required this.icon, required this.onTap, this.iconColor = _foreground});
+  const ActionButton({super.key, required this.icon, required this.onTap, this.iconColor = _foreground, this.child});
 
   final IconData icon;
   final VoidCallback onTap;
   final Color iconColor;
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +21,11 @@ class ActionButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(6),
-        child: SizedBox(width: 48, height: 48, child: Icon(icon, size: 24, color: iconColor)),
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(child: child ?? Icon(icon, size: 24, color: iconColor)),
+        ),
       ),
     );
   }

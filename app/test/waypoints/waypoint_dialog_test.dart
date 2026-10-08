@@ -125,6 +125,41 @@ void main() {
     expect(data.note, 'Холодная вода');
   });
 
+  testWidgets('the flag opens «Иконка»; the chosen icon shows on the button and goes into «ОК»', (tester) async {
+    final results = await open(tester);
+    await tester.tap(find.byKey(const Key('waypoint_dialog_icon')));
+    await tester.pumpAndSettle();
+    expect(find.text('Иконка'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('icon_category_tourism')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Camp'));
+    await tester.pumpAndSettle();
+
+    final button = find.byKey(const Key('waypoint_dialog_icon'));
+    expect(find.descendant(of: button, matching: find.byIcon(Icons.cabin)), findsOneWidget);
+    expect(find.descendant(of: button, matching: find.byIcon(Icons.flag_sharp)), findsNothing);
+    await ok(tester);
+    expect(results.single!.markerIconId, 'tourism-camp');
+    expect(results.single!.iconId, isNull);
+  });
+
+  testWidgets('«Нет» in «Иконка» brings the flag back', (tester) async {
+    await open(tester);
+    final button = find.byKey(const Key('waypoint_dialog_icon'));
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('icon_category_marker')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Star'));
+    await tester.pumpAndSettle();
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('marker_icon_none')));
+    await tester.pumpAndSettle();
+
+    expect(find.descendant(of: button, matching: find.byIcon(Icons.flag_sharp)), findsOneWidget);
+  });
+
   testWidgets('the palette picks a colour and tints itself', (tester) async {
     final results = await open(tester);
     await tester.tap(find.byKey(const Key('waypoint_dialog_color')));

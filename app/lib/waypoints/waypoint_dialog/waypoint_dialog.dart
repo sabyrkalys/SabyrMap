@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../../icons/icon_library_scanner.dart';
-import '../../icons/icon_picker_sheet.dart';
 import '../../map/map_crosshair.dart';
 import '../waypoint_color.dart';
 import '../waypoint_color_picker.dart';
 import '../waypoint_types.dart';
+import '../icon_picker/icon_item.dart';
+import '../icon_picker/icon_picker_sheet.dart';
+import '../icon_picker/marker_icon.dart';
 import 'action_button.dart';
 import 'coordinates_dialog.dart';
 import 'coords_system.dart';
@@ -57,7 +59,8 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
   CoordsSystem _system = CoordsSystem.sk42;
   String _groupId = MarkerGroup.unsortedId;
   bool _groupExpanded = false;
-  String? _iconId;
+  // The icon from «Иконка»; null is the standard marker.
+  MarkerIcon? _icon;
   int? _colorValue;
   String _type = defaultWaypointType;
   String _note = '';
@@ -73,8 +76,8 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
       : colorFromHex(waypointTypeColors[_type] ?? waypointTypeColors[defaultWaypointType]!);
 
   Future<void> _pickIcon() async {
-    final result = await showIconPickerSheet(context, scanner: widget.iconScanner);
-    if (result != null && mounted) setState(() => _iconId = result.fileName);
+    final result = await showMarkerIconSheet(context, currentIconId: _icon?.id, scanner: widget.iconScanner);
+    if (result != null && mounted) setState(() => _icon = result.id == noneOption.id ? null : result);
   }
 
   Future<void> _pickColor() async {
@@ -311,7 +314,8 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
       name: _name.text.trim(),
       point: _enteredPoint,
       groupId: _groupId,
-      iconId: _iconId,
+      iconId: _icon?.fileName,
+      markerIconId: _icon == null || _icon!.isFile ? null : _icon!.id,
       colorValue: _colorValue,
       type: _type,
       note: _note,
@@ -376,7 +380,12 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
             const SizedBox(height: 24),
             Row(
               children: [
-                ActionButton(key: const Key('waypoint_dialog_icon'), icon: Icons.flag_sharp, onTap: _pickIcon),
+                ActionButton(
+                  key: const Key('waypoint_dialog_icon'),
+                  icon: Icons.flag_sharp,
+                  onTap: _pickIcon,
+                  child: _icon == null ? null : MarkerIconGlyph(icon: _icon!, size: 24),
+                ),
                 const SizedBox(width: 8),
                 ActionButton(
                   key: const Key('waypoint_dialog_color'),
