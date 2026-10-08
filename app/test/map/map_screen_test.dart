@@ -11,6 +11,7 @@ import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoint_types.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -166,7 +167,7 @@ void main() {
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
   });
 
-  testWidgets('«Задать цель» makes the point under the crosshair the target start', (tester) async {
+  testWidgets('«Задать цель» makes the point under the crosshair the target, right away', (tester) async {
     final container = await pumpMap(tester);
     container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
     await tester.tapAt(screenCenter(tester));
@@ -176,13 +177,72 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
     expect(container.read(mapTargetProvider).point, const LatLng(48, 37.8));
+    expect(find.textContaining('Коснитесь карты'), findsNothing);
+    expect(find.text('0,0 м'), findsOneWidget);
+  });
+
+  testWidgets('the target line and dot are handed to the native map; «Линия к цели» off hides them', (tester) async {
+    final calls = <Object?>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(const MethodChannel('sabyrmap/map'), (call) async {
+      if (call.method == 'setTarget') calls.add(call.arguments);
+      return 1;
+    });
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(const MethodChannel('sabyrmap/map'), null),
+    );
+    final container = await pumpMap(tester);
+
+    container.read(mapTargetProvider.notifier).setAt(const LatLng(48.1, 37.8));
+    await tester.pump();
+    expect(calls.last, {'lat': closeTo(48.1, 1e-9), 'lng': closeTo(37.8, 1e-9)});
+
+    container.read(menuTogglesProvider.notifier).set(MenuToggle.waypointsTargetLine, false);
+    await tester.pump();
+    expect(calls.last, isEmpty);
+
+    container.read(menuTogglesProvider.notifier).set(MenuToggle.waypointsTargetLine, true);
+    await tester.pump();
+    expect(calls.last, {'lat': closeTo(48.1, 1e-9), 'lng': closeTo(37.8, 1e-9)});
+
+    container.read(mapTargetProvider.notifier).clear();
+    await tester.pump();
+    expect(calls.last, isEmpty);
+  });
+
+  testWidgets('with a target the crosshair opens «Убрать цель» / «Путевая точка»; «Убрать цель» resets it', (
+    tester,
+  ) async {
+    final container = await pumpMap(tester);
+    container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
+    container.read(mapTargetProvider.notifier).setAt(const LatLng(48.1, 37.8));
+    await tester.pump();
 
     await tester.tapAt(screenCenter(tester));
     await tester.pumpAndSettle();
+    expect(find.text('Путевая точка'), findsOneWidget);
+    expect(find.text('Задать цель'), findsNothing);
+
     await tester.tap(find.text('Убрать цель'));
     await tester.pumpAndSettle();
     expect(container.read(mapTargetProvider), isA<MapTargetNone>());
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+    expect(find.byKey(const Key('target_distance_label')), findsNothing);
+  });
+
+  testWidgets('«Путевая точка» opens the new waypoint form and keeps the target', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
+    container.read(mapTargetProvider.notifier).setAt(const LatLng(48.1, 37.8));
+    await tester.pump();
+
+    await tester.tapAt(screenCenter(tester));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Путевая точка'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(container.read(mapTargetProvider).point, const LatLng(48.1, 37.8));
   });
 
   testWidgets('«Задать цель» before the map has settled reports the map is not ready', (tester) async {
@@ -196,9 +256,20 @@ void main() {
     expect(container.read(mapTargetProvider), isA<MapTargetNone>());
   });
 
-  testWidgets('map taps are not handled by the app any more', (tester) async {
+  testWidgets('map taps are not handled by the app', (tester) async {
     await pumpMap(tester);
     expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick, isNull);
+  });
+
+  testWidgets('the crosshair is a white 6 dp dot in a 2 dp dark border', (tester) async {
+    await pumpMap(tester);
+    final dot = tester.widget<Container>(find.byKey(const Key('map_crosshair')));
+    final decoration = dot.decoration! as BoxDecoration;
+    expect(decoration.color, Colors.white);
+    final border = decoration.border! as Border;
+    expect(border.top.width, 2);
+    expect(border.top.color, Theme.of(tester.element(find.byKey(const Key('map_crosshair')))).colorScheme.onSurface);
+    expect(tester.getSize(find.byKey(const Key('map_crosshair'))), const Size(10, 10));
   });
 
   testWidgets('distance label follows «Статус цели»', (tester) async {
@@ -207,7 +278,7 @@ void main() {
     container.read(mapTargetProvider.notifier).setAt(const LatLng(48, 37.8));
     await tester.pump();
     expect(find.byKey(const Key('target_distance_label')), findsOneWidget);
-    expect(find.text('0.0 м'), findsOneWidget);
+    expect(find.text('0,0 м'), findsOneWidget);
 
     container.read(menuTogglesProvider.notifier).set(MenuToggle.waypointsTargetStatus, false);
     await tester.pump();

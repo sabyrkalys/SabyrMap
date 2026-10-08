@@ -21,6 +21,7 @@ import org.maplibre.android.snapshotter.MapSnapshotter
 class MainActivity : FlutterActivity() {
     private val tileCacheThread = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val targetLine = TargetLine()
 
     // Snapshots in flight: held so they aren't collected before they answer,
     // and so a timeout and a late result don't both reply.
@@ -117,14 +118,22 @@ class MainActivity : FlutterActivity() {
             })
         }
         // maplibre_gl has no Dart API for the prefetch zoom delta: find the
-        // MapViews it created in the window and set it on each map.
+        // MapViews it created and set it on each map.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "sabyrmap/map").setMethodCallHandler { call, result ->
             when (call.method) {
                 "setPrefetchZoomDelta" -> {
                     val delta = call.argument<Int>("delta") ?: 4
-                    val maps = mutableListOf<MapView>()
-                    collectMapViews(window.decorView, maps)
+                    val maps = mapViews(flutterEngine)
                     maps.forEach { view -> view.getMapAsync { map -> map.prefetchZoomDelta = delta } }
+                    result.success(maps.size)
+                }
+                // «Задать цель»: lat/lng of the target, or none to remove it.
+                "setTarget" -> {
+                    val lat = call.argument<Double>("lat")
+                    val lng = call.argument<Double>("lng")
+                    val target = if (lat != null && lng != null) LatLng(lat, lng) else null
+                    val maps = mapViews(flutterEngine)
+                    maps.forEach { view -> targetLine.set(view, target) }
                     result.success(maps.size)
                 }
                 else -> result.notImplemented()
@@ -134,6 +143,22 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val SNAPSHOT_TIMEOUT_MS = 30_000L
+        private const val MAX_PLATFORM_VIEW_ID = 1024
+    }
+
+    /**
+     * The MapViews maplibre_gl created. They are Flutter platform views and
+     * usually sit in a virtual display rather than in this window, so they
+     * are looked up through the engine (view ids are small and increasing).
+     */
+    private fun mapViews(engine: FlutterEngine): List<MapView> {
+        val maps = mutableListOf<MapView>()
+        collectMapViews(window.decorView, maps)
+        val platformViews = engine.platformViewsControllerDelegator
+        for (id in 0 until MAX_PLATFORM_VIEW_ID) {
+            platformViews.getPlatformViewById(id)?.let { collectMapViews(it, maps) }
+        }
+        return maps.distinct()
     }
 
     private fun collectMapViews(view: View, into: MutableList<MapView>) {

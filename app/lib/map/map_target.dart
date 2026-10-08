@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-/// The «Задать цель» measuring tool: a start point the crosshair measures from.
-/// Memory only -- it is a tool, not an object, and is gone after a restart.
+/// The «Задать цель» measuring tool: the point that was under the crosshair
+/// stays put, and the crosshair measures to it as the map moves. Memory only -- it is a tool, not an object, and is gone
+/// after a restart.
 sealed class MapTargetState {
   const MapTargetState();
 
@@ -27,9 +28,10 @@ class MapTargetController extends Notifier<MapTargetState> {
   MapTargetState build() => const MapTargetNone();
 
   /// «Задать цель»: [point] (the spot under the crosshair) becomes the
-  /// start of the measurement; the crosshair is its other end.
+  /// target; the line runs from the crosshair to it.
   void setAt(LatLng point) => state = MapTargetSet(point);
 
+  /// «Убрать цель».
   void clear() => state = const MapTargetNone();
 }
 
@@ -48,9 +50,3 @@ class CrosshairMenuOpen extends Notifier<bool> {
 }
 
 final crosshairMenuOpenProvider = NotifierProvider<CrosshairMenuOpen, bool>(CrosshairMenuOpen.new);
-
-/// «349.6 м» (to 0.1 m) under a kilometre, «1.2 км» from one kilometre up.
-String formatDistance(double meters) {
-  if (meters < 999.95) return '${meters.toStringAsFixed(1)} м';
-  return '${(meters / 1000).toStringAsFixed(1)} км';
-}

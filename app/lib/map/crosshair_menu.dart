@@ -8,8 +8,10 @@ import '../theme/app_text_styles.dart';
 import '../widgets/app_icon.dart';
 
 /// Context card opened by tapping the map crosshair. The pin / camera /
-/// info icons are a separate function from the items, so they sit in their
-/// own row above a divider. Tools are placeholders for now.
+/// info / share icons are a separate function from the items, so they sit
+/// in their own row above a divider. Tools are placeholders for now. With
+/// a target ([hasTarget]) it is a different card: «Убрать цель» and
+/// «Путевая точка» (a waypoint at the target) only.
 class CrosshairMenu extends StatefulWidget {
   const CrosshairMenu({
     super.key,
@@ -17,6 +19,7 @@ class CrosshairMenu extends StatefulWidget {
     required this.onSetTarget,
     required this.onRemoveTarget,
     required this.onNewWaypoint,
+    required this.onTargetWaypoint,
     required this.onInfo,
   });
 
@@ -38,6 +41,7 @@ class CrosshairMenu extends StatefulWidget {
   final VoidCallback onSetTarget;
   final VoidCallback onRemoveTarget;
   final VoidCallback onNewWaypoint;
+  final VoidCallback onTargetWaypoint;
   final VoidCallback onInfo;
 
   @override
@@ -66,7 +70,11 @@ class _CrosshairMenuState extends State<CrosshairMenu> {
                     child: AnimatedSize(
                       duration: const Duration(milliseconds: 200),
                       curve: Curves.easeOut,
-                      child: _showTools ? _buildTools(context) : _buildMain(context),
+                      child: widget.hasTarget
+                          ? _buildTarget()
+                          : _showTools
+                          ? _buildTools(context)
+                          : _buildMain(context),
                     ),
                   ),
                 ),
@@ -105,16 +113,24 @@ class _CrosshairMenuState extends State<CrosshairMenu> {
                 onPressed: widget.onInfo,
                 icon: AppIcon(AppIcons.info, size: 24, color: AppTextStyles.menuItem(context).color),
               ),
+              placeholderIcon('crosshair_menu_share', AppIcons.export),
             ],
           ),
         ),
         const Divider(height: 1, thickness: 0.5, color: Color(0xFFDADCE0)),
-        if (widget.hasTarget)
-          MenuListItem(icon: AppIcons.close, label: 'Убрать цель', onTap: widget.onRemoveTarget)
-        else
-          MenuListItem(icon: AppIcons.arrowRight, label: 'Задать цель', onTap: widget.onSetTarget),
+        MenuListItem(icon: AppIcons.arrowRight, label: 'Задать цель', onTap: widget.onSetTarget),
         MenuListItem(icon: AppIcons.flagPlus, label: 'Новая метка...', onTap: widget.onNewWaypoint),
         MenuListItem(icon: AppIcons.wrench, label: 'Инструменты...', onTap: () => setState(() => _showTools = true)),
+      ],
+    );
+  }
+
+  Widget _buildTarget() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        MenuListItem(icon: AppIcons.close, label: 'Убрать цель', onTap: widget.onRemoveTarget),
+        MenuListItem(icon: AppIcons.pinPlus, label: 'Путевая точка', onTap: widget.onTargetWaypoint),
       ],
     );
   }

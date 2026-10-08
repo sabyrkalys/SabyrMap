@@ -14,7 +14,7 @@ void main() {
     expect(container().read(mapTargetProvider), isA<MapTargetNone>());
   });
 
-  test('setAt sets the target start; clear removes it', () {
+  test('setAt sets the target; clear removes it', () {
     final c = container();
     c.read(mapTargetProvider.notifier).setAt(const LatLng(1, 2));
     expect(c.read(mapTargetProvider).point, const LatLng(1, 2));
@@ -37,15 +37,5 @@ void main() {
     c.read(crosshairMenuOpenProvider.notifier).close();
     expect(c.read(crosshairMenuOpenProvider), isFalse);
     expect(c.read(mapTargetProvider).point, const LatLng(1, 2));
-  });
-
-  test('formatDistance', () {
-    expect(formatDistance(0), '0.0 м');
-    expect(formatDistance(349.6), '349.6 м');
-    expect(formatDistance(1.26), '1.3 м');
-    expect(formatDistance(999.4), '999.4 м');
-    expect(formatDistance(999.96), '1.0 км');
-    expect(formatDistance(1000), '1.0 км');
-    expect(formatDistance(1234), '1.2 км');
   });
 }

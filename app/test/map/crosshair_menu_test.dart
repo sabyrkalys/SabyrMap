@@ -24,6 +24,7 @@ void main() {
               onSetTarget: () => calls.add('set'),
               onRemoveTarget: () => calls.add('remove'),
               onNewWaypoint: () => calls.add('new'),
+              onTargetWaypoint: () => calls.add('waypoint'),
               onInfo: () => calls.add('info'),
             ),
           ),
@@ -42,15 +43,16 @@ void main() {
     expect(pin, findsOneWidget);
     expect(find.byKey(const Key('crosshair_menu_camera')), findsOneWidget);
     expect(find.byKey(const Key('crosshair_menu_info')), findsOneWidget);
+    expect(find.byKey(const Key('crosshair_menu_share')), findsOneWidget);
     expect(top(tester, pin), lessThan(top(tester, find.text('Задать цель'))));
     expect(top(tester, find.text('Задать цель')), lessThan(top(tester, find.text('Новая метка...'))));
     expect(top(tester, find.text('Новая метка...')), lessThan(top(tester, find.text('Инструменты...'))));
     expect(find.byType(Divider), findsOneWidget);
   });
 
-  testWidgets('pin and camera are disabled placeholders', (tester) async {
+  testWidgets('pin, camera and share are disabled placeholders', (tester) async {
     await pump(tester);
-    for (final key in ['crosshair_menu_pin', 'crosshair_menu_camera']) {
+    for (final key in ['crosshair_menu_pin', 'crosshair_menu_camera', 'crosshair_menu_share']) {
       expect(tester.widget<IconButton>(find.byKey(Key(key))).onPressed, isNull, reason: key);
     }
   });
@@ -62,11 +64,16 @@ void main() {
     expect(calls, ['set', 'new']);
   });
 
-  testWidgets('with a target the first item is «Убрать цель»', (tester) async {
+  testWidgets('with a target the card has only «Убрать цель» and «Путевая точка»', (tester) async {
     final calls = await pump(tester, hasTarget: true);
     expect(find.text('Задать цель'), findsNothing);
+    expect(find.text('Новая метка...'), findsNothing);
+    expect(find.text('Инструменты...'), findsNothing);
+    expect(find.byKey(const Key('crosshair_menu_info')), findsNothing);
+    expect(top(tester, find.text('Убрать цель')), lessThan(top(tester, find.text('Путевая точка'))));
     await tester.tap(find.text('Убрать цель'));
-    expect(calls, ['remove']);
+    await tester.tap(find.text('Путевая точка'));
+    expect(calls, ['remove', 'waypoint']);
   });
 
   testWidgets('«Инструменты...» shows the tools list and back returns', (tester) async {

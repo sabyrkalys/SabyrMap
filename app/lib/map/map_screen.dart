@@ -135,18 +135,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   LatLng? _crosshairPosition;
   double _cameraZoom = initialMapCamera.zoom;
 
-  // «Задать цель» line: one annotation, refreshed on every camera change
-  // while a target is set. Serialized like _requestSync so rapid camera
-  // ticks never run overlapping add/update calls.
-  Line? _targetLine;
-  // Dot at the target start, the size of the crosshair's centre dot; the
-  // crosshair itself marks the other end of the line.
-  Circle? _targetDot;
-  bool _targetLineBusy = false;
-  bool _targetLinePending = false;
   // Live camera centre, tracked only while a target is set so the distance
   // label follows a drag without rebuilding on every frame otherwise.
   LatLng? _liveCenter;
+  // Live camera for the «Задать цель» distance plate in the middle of the
+  // line (the line and dot themselves are MainActivity's TargetLine).
+  final ValueNotifier<CameraPosition?> _liveCamera = ValueNotifier(null);
   // Crosshair position for the info panel's X/Y, every camera frame. A
   // notifier, so only the panel rebuilds while the map moves.
   final ValueNotifier<LatLng?> _panelCenter = ValueNotifier(null);
@@ -259,6 +253,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       } catch (_) {}
     });
     _panelCenter.dispose();
+    _liveCamera.dispose();
     super.dispose();
   }
 
@@ -309,6 +304,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // rebuild on every frame it is only applied once it moved by 0.1 or more.
   void _onCameraMove(CameraPosition position) {
     _panelCenter.value = position.target;
+    _liveCamera.value = position;
     if (!_mapBusy) {
       if (mounted) setState(() => _mapBusy = true);
       ref.read(neighborPrefetcherProvider).cancel();
@@ -322,7 +318,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         if (hasTarget) _liveCenter = position.target;
       });
     }
-    if (hasTarget) _syncTargetLine();
   }
 
   // The crosshair watches raw pointers without taking part in gestures, so
@@ -355,54 +350,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (_crosshairPointers.isEmpty) _crosshairMultiTouch = false;
   }
 
-  static const double _targetDotRadius = 3; // 6 dp, like the crosshair's centre dot
-  static const String _targetDotColorHex = '#1A1C1E';
-
-  Future<void> _syncTargetLine() async {
-    if (_targetLineBusy) {
-      _targetLinePending = true;
-      return;
-    }
-    _targetLineBusy = true;
+  /// The «Задать цель» line and dot are drawn natively (MainActivity's
+  /// TargetLine), which moves the line's crosshair end with the map in the
+  /// same frame. Hidden with «Линия к цели» off.
+  Future<void> _syncTarget() async {
+    final target = ref.read(mapTargetProvider).point;
+    final show = target != null && ref.read(menuTogglesProvider)[MenuToggle.waypointsTargetLine]!;
     try {
-      do {
-        _targetLinePending = false;
-        final controller = _controller;
-        if (controller == null) return;
-        final target = ref.read(mapTargetProvider).point;
-        final showLine = ref.read(menuTogglesProvider)[MenuToggle.waypointsTargetLine]!;
-        final center = _liveCenter ?? controller.cameraPosition?.target;
-        final existing = _targetLine;
-        final existingDot = _targetDot;
-        if (target == null || !showLine || center == null) {
-          if (existing != null) {
-            _targetLine = null;
-            await controller.removeLine(existing);
-          }
-          if (existingDot != null) {
-            _targetDot = null;
-            await controller.removeCircle(existingDot);
-          }
-        } else {
-          final dot = CircleOptions(geometry: target, circleRadius: _targetDotRadius, circleColor: _targetDotColorHex);
-          if (existingDot == null) {
-            _targetDot = await controller.addCircle(dot);
-          } else if (existingDot.options.geometry != target) {
-            await controller.updateCircle(existingDot, dot);
-          }
-          final options = LineOptions(geometry: [center, target], lineColor: targetLineColorHex, lineWidth: 3);
-          if (existing == null) {
-            _targetLine = await controller.addLine(options);
-          } else {
-            await controller.updateLine(existing, options);
-          }
-        }
-      } while (_targetLinePending);
+      await _mapChannel.invokeMethod<int>('setTarget', {
+        if (show) 'lat': target.latitude,
+        if (show) 'lng': target.longitude,
+      });
     } catch (_) {
-      // Same soft-failure policy as _runSync: a manager not ready yet or a
-      // style reload race; the next camera tick or state change retries.
-    } finally {
-      _targetLineBusy = false;
+      // Not on Android (tests, other platforms).
     }
   }
 
@@ -454,6 +414,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (position == null) return;
     _prefetchAround(position.zoom);
     _panelCenter.value = position.target;
+    _liveCamera.value = position;
     setState(() {
       _crosshairPosition = position.target;
       _cameraZoom = position.zoom;
@@ -489,8 +450,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _appliedSymbolKeys.clear();
     _iconImageCache.clear();
     _myLocationCircle = null;
-    _targetLine = null;
-    _targetDot = null;
     // The symbol manager defaults to iconAllowOverlap/iconIgnorePlacement:
     // false, so symbol placement collides against every symbol on the map
     // (including the basemap style's own POI/label symbols). Without this,
@@ -507,7 +466,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     } catch (_) {}
     _maybeCenterCamera();
     _requestSync();
-    _syncTargetLine();
+    _syncTarget();
   }
 
   /// Entry point for requesting a combined circle+symbol+line sync. Coalesces
@@ -848,9 +807,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
     ref.listen<MapTargetState>(mapTargetProvider, (previous, next) {
       _liveCenter = next.point == null ? null : _controller?.cameraPosition?.target;
-      _syncTargetLine();
+      _syncTarget();
     });
-    ref.listen<Map<MenuToggle, bool>>(menuTogglesProvider, (previous, next) => _syncTargetLine());
+    ref.listen<Map<MenuToggle, bool>>(menuTogglesProvider, (previous, next) => _syncTarget());
     final target = ref.watch(mapTargetProvider).point;
     final toggles = ref.watch(menuTogglesProvider);
     final menuOpen = ref.watch(crosshairMenuOpenProvider);
@@ -928,9 +887,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           if (target != null && center != null && toggles[MenuToggle.waypointsTargetStatus]!)
             IgnorePointer(
               child: Center(
-                child: Transform.translate(
-                  offset: const Offset(0, -34),
-                  child: TargetDistanceLabel(key: const Key('target_distance_label'), from: center, to: target),
+                // In the middle of the line from the crosshair to the target.
+                child: ValueListenableBuilder<CameraPosition?>(
+                  valueListenable: _liveCamera,
+                  builder: (context, camera, _) => Transform.translate(
+                    offset: camera == null
+                        ? Offset.zero
+                        : screenOffsetOf(target, center: camera.target, zoom: camera.zoom, bearing: camera.bearing) / 2,
+                    child: TargetDistanceLabel(
+                      key: const Key('target_distance_label'),
+                      from: camera?.target ?? center,
+                      to: target,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -982,6 +951,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     }
                     ref.read(mapTargetProvider.notifier).setAt(center);
                   },
+                  // The target stays: the waypoint is just made at it.
+                  onTargetWaypoint: () {
+                    ref.read(crosshairMenuOpenProvider.notifier).close();
+                    createWaypointAtCrosshair(context, ref, iconScanner: _iconLibraryScanner, at: target);
+                  },
                   onRemoveTarget: () {
                     ref.read(crosshairMenuOpenProvider.notifier).close();
                     ref.read(mapTargetProvider.notifier).clear();
@@ -1019,13 +993,17 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: SizedBox(
                   width: 48,
                   height: 48,
-                  // Just a bright white dot, no ring around it.
+                  // A bright white 6 dp dot in a 2 dp dark border.
                   child: Center(
                     child: Container(
                       key: const Key('map_crosshair'),
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
+                      ),
                     ),
                   ),
                 ),

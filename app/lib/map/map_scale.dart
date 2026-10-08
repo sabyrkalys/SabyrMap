@@ -55,10 +55,10 @@ String zoomText(double zoom) {
   return (meters: meters, widthDp: meters / perDp, label: label);
 }
 
+/// «232,03 км»; under a kilometre, to 0.1 m: «349,6 м».
+String formatTargetDistance(double meters) => meters < 999.95
+    ? '${meters.toStringAsFixed(1).replaceAll('.', ',')} м'
+    : '${(meters / 1000).toStringAsFixed(2).replaceAll('.', ',')} км';
+
 /// «→ 232,03 км 348.6°»; under a kilometre, to 0.1 m: «→ 349,6 м 12.0°».
-String targetText(double meters, double azimuth) {
-  final distance = meters < 999.95
-      ? '${meters.toStringAsFixed(1).replaceAll('.', ',')} м'
-      : '${(meters / 1000).toStringAsFixed(2).replaceAll('.', ',')} км';
-  return '→ $distance ${azimuth.toStringAsFixed(1)}°';
-}
+String targetText(double meters, double azimuth) => '→ ${formatTargetDistance(meters)} ${azimuth.toStringAsFixed(1)}°';

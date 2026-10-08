@@ -1,12 +1,31 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import 'geo_utils.dart';
-import 'map_target.dart';
+import 'map_scale.dart';
 
-/// Colour of the «Задать цель» line and distance label.
-const Color targetColor = Color(0xFFFF8C00);
-const String targetLineColorHex = '#FF8C00';
+/// Colour of the «Задать цель» distance plate; the line and dot are drawn
+/// natively in the same colour (TargetLine.kt).
+const Color targetColor = Color(0xFFE0218A);
+
+/// Where [point] is drawn relative to the map's centre [center], in logical
+/// pixels (Web Mercator, 512 px tiles, map turned by [bearing]). A line
+/// between two points is straight on screen, so half of this is its middle.
+Offset screenOffsetOf(LatLng point, {required LatLng center, required double zoom, required double bearing}) {
+  final worldSize = 512 * math.pow(2, zoom);
+  double x(LatLng p) => (p.longitude + 180) / 360;
+  double y(LatLng p) {
+    final sin = math.sin(p.latitude.clamp(-85.05112878, 85.05112878) * math.pi / 180);
+    return 0.5 - math.log((1 + sin) / (1 - sin)) / (4 * math.pi);
+  }
+
+  final dx = (x(point) - x(center)) * worldSize;
+  final dy = (y(point) - y(center)) * worldSize;
+  final turn = -bearing * math.pi / 180;
+  return Offset(dx * math.cos(turn) - dy * math.sin(turn), dx * math.sin(turn) + dy * math.cos(turn));
+}
 
 /// Round «+» / «−» buttons stacked vertically, bottom-right over the map.
 class MapZoomButtons extends StatelessWidget {
@@ -56,7 +75,8 @@ class _RoundButton extends StatelessWidget {
   }
 }
 
-/// Orange distance from the crosshair to the target, shown above the crosshair.
+/// Plate with the distance from the crosshair to the target, «36,64 км»;
+/// the map screen puts it in the middle of the target line.
 class TargetDistanceLabel extends StatelessWidget {
   const TargetDistanceLabel({super.key, required this.from, required this.to});
 
@@ -66,13 +86,18 @@ class TargetDistanceLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final meters = distanceMeters(from.latitude, from.longitude, to.latitude, to.longitude);
-    return Text(
-      formatDistance(meters),
-      style: const TextStyle(
+    return DecoratedBox(
+      decoration: BoxDecoration(
         color: targetColor,
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        shadows: [Shadow(color: Colors.white, blurRadius: 3)],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Color(0x40000000), blurRadius: 4, offset: Offset(0, 1))],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          formatTargetDistance(meters),
+          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }

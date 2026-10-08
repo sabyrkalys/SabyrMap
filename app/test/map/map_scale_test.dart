@@ -50,6 +50,12 @@ void main() {
     expect(m.label, endsWith(' м'));
   });
 
+  test('formatTargetDistance', () {
+    expect(formatTargetDistance(36640), '36,64 км');
+    expect(formatTargetDistance(349.6), '349,6 м');
+    expect(formatTargetDistance(999.96), '1,00 км');
+  });
+
   test('targetText', () {
     expect(targetText(232030, 348.63), '→ 232,03 км 348.6°');
     expect(targetText(349.6, 12.04), '→ 349,6 м 12.0°');

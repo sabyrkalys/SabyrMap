@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
@@ -9,15 +10,21 @@ import 'waypoint_models.dart';
 import 'waypoints_controller.dart';
 
 /// Opens the new-waypoint form and creates the waypoint at the map's
-/// crosshair. Shared by the crosshair menu and the МЕТКИ panel.
+/// crosshair, or at [at] (the «Задать цель» target). Shared by the
+/// crosshair menu and the МЕТКИ panel.
 ///
 /// The panel can be closed while the request is in flight, which unmounts
 /// [context] and disposes [ref]; the container and messenger are captured
 /// up front so the result is still applied and reported.
-Future<void> createWaypointAtCrosshair(BuildContext context, WidgetRef ref, {IconLibraryScanner? iconScanner}) async {
+Future<void> createWaypointAtCrosshair(
+  BuildContext context,
+  WidgetRef ref, {
+  IconLibraryScanner? iconScanner,
+  LatLng? at,
+}) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.of(context);
-  final coordinates = ref.read(mapCrosshairProvider);
+  final coordinates = at ?? ref.read(mapCrosshairProvider);
   if (coordinates == null) {
     messenger.showSnackBar(const SnackBar(content: Text('Карта ещё не готова')));
     return;
