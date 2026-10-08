@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart' hide colorFromHex, colorToHex;
 
 import '../icons/icon_library_scanner.dart';
 import '../icons/icon_picker_sheet.dart';
 import 'waypoint_color.dart';
+import 'waypoint_color_picker.dart';
 import 'waypoint_models.dart';
 import 'waypoint_types.dart';
 
@@ -80,42 +80,9 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
   bool get _colorPickerVisible => _selectedIconFileName == null || _selectedIconFileName!.toLowerCase().endsWith('.svg');
 
   Future<void> _openColorPicker() async {
-    Color picked = colorFromHex(_effectiveColorHex);
-    final action = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        content: SingleChildScrollView(
-          child: ColorPicker(
-            pickerColor: picked,
-            onColorChanged: (color) => picked = color,
-            enableAlpha: false,
-            labelTypes: const [],
-          ),
-        ),
-        actions: [
-          TextButton(
-            key: const Key('waypoint_color_picker_reset_button'),
-            onPressed: () => Navigator.of(dialogContext).pop('reset'),
-            child: const Text('Сбросить'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop('cancel'),
-            child: const Text('Отмена'),
-          ),
-          FilledButton(
-            key: const Key('waypoint_color_picker_select_button'),
-            onPressed: () => Navigator.of(dialogContext).pop('select'),
-            child: const Text('Выбрать'),
-          ),
-        ],
-      ),
-    );
-
-    if (action == 'select') {
-      setState(() => _selectedColor = colorToHex(picked));
-    } else if (action == 'reset') {
-      setState(() => _selectedColor = null);
-    }
+    final pick = await showWaypointColorPicker(context, colorFromHex(_effectiveColorHex));
+    if (pick == null) return;
+    setState(() => _selectedColor = pick.reset ? null : colorToHex(pick.color));
   }
 
   Future<void> _openIconPicker() async {

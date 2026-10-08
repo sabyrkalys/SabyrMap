@@ -10,6 +10,10 @@ import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoint_types.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
+import 'dart:math' show Point;
+
+import 'package:app/waypoints/waypoint_create_action.dart';
+import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -114,8 +118,8 @@ void main() {
 
   Offset screenCenter(WidgetTester tester) => tester.getCenter(find.byType(MapLibreMap));
 
-  Future<ProviderContainer> pumpMap(WidgetTester tester) async {
-    final container = ProviderContainer(overrides: _baseOverrides());
+  Future<ProviderContainer> pumpMap(WidgetTester tester, {FakeWaypointsRepository? waypointsRepo}) async {
+    final container = ProviderContainer(overrides: _baseOverrides(waypointsRepo: waypointsRepo));
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const MaterialApp(home: MapScreen())),
@@ -229,7 +233,7 @@ void main() {
     expect(find.byKey(const Key('target_distance_label')), findsNothing);
   });
 
-  testWidgets('«Путевая точка» opens the new waypoint form and keeps the target', (tester) async {
+  testWidgets('«Путевая точка» opens the waypoint dialog for the target and keeps the target', (tester) async {
     final container = await pumpMap(tester);
     container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
     container.read(mapTargetProvider.notifier).setAt(const LatLng(48.1, 37.8));
@@ -241,7 +245,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
-    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byKey(const Key('waypoint_dialog')), findsOneWidget);
+    expect(find.text('Координаты цели'), findsOneWidget);
     expect(container.read(mapTargetProvider).point, const LatLng(48.1, 37.8));
   });
 
@@ -256,9 +261,51 @@ void main() {
     expect(container.read(mapTargetProvider), isA<MapTargetNone>());
   });
 
-  testWidgets('map taps are not handled by the app', (tester) async {
-    await pumpMap(tester);
-    expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick, isNull);
+  testWidgets('a map tap places a waypoint that waits for its point, and only then', (tester) async {
+    final repo = FakeWaypointsRepository()
+      ..createResult = Waypoint(
+        id: 'w1',
+        orgId: 'o1',
+        ownerId: 'u1',
+        name: 'Там',
+        type: 'generic',
+        note: null,
+        lat: 48.1,
+        lng: 37.8,
+        canEdit: true,
+        createdAt: DateTime.utc(2026, 10, 8),
+      );
+    final container = await pumpMap(tester, waypointsRepo: repo);
+    void tapMap(LatLng at) => tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick!(const Point(0, 0), at);
+
+    tapMap(const LatLng(48.1, 37.8));
+    await tester.pump();
+    expect(container.read(waypointsControllerProvider), isEmpty);
+
+    container.read(waypointPlacementProvider.notifier).start(const WaypointData(name: 'Там'));
+    await tester.pump();
+    expect(find.byKey(const Key('waypoint_placement_hint')), findsOneWidget);
+    // A tap on the crosshair goes to the map, not to the card.
+    await tester.tapAt(screenCenter(tester));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+
+    tapMap(const LatLng(48.1, 37.8));
+    await tester.pumpAndSettle();
+    expect(container.read(waypointsControllerProvider).single.name, 'Там');
+    expect(container.read(waypointPlacementProvider), isNull);
+    expect(find.byKey(const Key('waypoint_placement_hint')), findsNothing);
+  });
+
+  testWidgets('«Отмена» on the placement hint drops the waiting waypoint', (tester) async {
+    final container = await pumpMap(tester);
+    container.read(waypointPlacementProvider.notifier).start(const WaypointData(name: 'Там'));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('waypoint_placement_cancel')));
+    await tester.pump();
+    expect(container.read(waypointPlacementProvider), isNull);
+    expect(find.byKey(const Key('waypoint_placement_hint')), findsNothing);
   });
 
   testWidgets('the crosshair is a white 8 dp dot in a 2 dp dark border', (tester) async {
@@ -297,15 +344,38 @@ void main() {
     expect(tester.getTopLeft(plate).dx, greaterThanOrEqualTo(tester.getTopRight(crosshair).dx));
   });
 
-  testWidgets('«Новая метка...» before the map settles reports the map is not ready', (tester) async {
+  testWidgets('«Новая метка...» opens the «Новая метка» sheet; «ОТМЕНА» does nothing else', (tester) async {
     await pumpMap(tester);
     await tester.tapAt(screenCenter(tester));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Новая метка...'));
     await tester.pumpAndSettle();
-    expect(find.text('Карта ещё не готова'), findsOneWidget);
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+    expect(find.byKey(const Key('new_marker_sheet')), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('new_marker_cancel')),
+      200,
+      scrollable: find.descendant(of: find.byKey(const Key('new_marker_sheet')), matching: find.byType(Scrollable)),
+    );
+    await tester.tap(find.byKey(const Key('new_marker_cancel')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('new_marker_sheet')), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
+  });
+
+  testWidgets('«Путевая точка» in the sheet goes on to the waypoint form (map not ready yet here)', (tester) async {
+    await pumpMap(tester);
+    await tester.tapAt(screenCenter(tester));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Новая метка...'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Путевая точка'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('new_marker_sheet')), findsNothing);
+    expect(find.text('Карта ещё не готова'), findsOneWidget);
   });
 
   testWidgets('a drag that starts on the crosshair does not open the card', (tester) async {

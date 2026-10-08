@@ -34,6 +34,8 @@ import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
 import '../tracks/tracks_visibility_controller.dart';
 import '../waypoints/waypoint_actions.dart';
+import '../waypoints/new_marker/marker_type.dart';
+import '../waypoints/new_marker/new_marker_sheet.dart';
 import '../waypoints/waypoint_create_action.dart';
 import '../waypoints/waypoint_models.dart';
 import '../waypoints/waypoint_types.dart';
@@ -342,6 +344,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final (position, time) = down;
     if ((event.position - position).distance > kTouchSlop) return;
     if (event.timeStamp - time > _crosshairTapTimeout) return;
+    // A waypoint waits for its point: the tap goes to the map (_onMapClick).
+    if (ref.read(waypointPlacementProvider) != null) return;
     ref.read(crosshairMenuOpenProvider.notifier).toggle();
   }
 
@@ -364,6 +368,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     } catch (_) {
       // Not on Android (tests, other platforms).
     }
+  }
+
+  /// «Указать точку на карте»: the waypoint from the dialog is created where
+  /// the map is tapped. Other taps on the map do nothing.
+  void _onMapClick(Point<double> point, LatLng coordinates) {
+    final pending = ref.read(waypointPlacementProvider);
+    if (pending == null) return;
+    ref.read(waypointPlacementProvider.notifier).cancel();
+    saveWaypoint(ProviderScope.containerOf(context, listen: false), ScaffoldMessenger.of(context), pending, coordinates);
   }
 
   void _onMapIdle() {
@@ -840,6 +853,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             // Lines never take taps (nothing in the app handles them).
             annotationConsumeTapEvents: const [AnnotationType.symbol, AnnotationType.circle, AnnotationType.fill],
             onCameraMove: _onCameraMove,
+            onMapClick: _onMapClick,
             // MapLibre's own (i) can't be switched off and opens empty (it
             // lists only attributions written as links): pushed off screen,
             // AttributionButton replaces it.
@@ -900,6 +914,35 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         from: camera?.target ?? center,
                         to: target,
                       ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          // Bottom, level with the zoom buttons and clear of them.
+          if (ref.watch(waypointPlacementProvider) != null)
+            Positioned(
+              left: 16,
+              right: 80,
+              bottom: MediaQuery.paddingOf(context).bottom + 16,
+              child: Center(
+                child: Material(
+                  key: const Key('waypoint_placement_hint'),
+                  color: Colors.white,
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(24),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 16),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Flexible(child: Text('Коснитесь карты, чтобы поставить метку')),
+                        TextButton(
+                          key: const Key('waypoint_placement_cancel'),
+                          onPressed: () => ref.read(waypointPlacementProvider.notifier).cancel(),
+                          child: const Text('Отмена'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -975,9 +1018,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       sk42: ref.read(menuTogglesProvider)[MenuToggle.settingsSk42Grid]!,
                     );
                   },
-                  onNewWaypoint: () {
+                  onNewWaypoint: () async {
                     ref.read(crosshairMenuOpenProvider.notifier).close();
-                    createWaypointAtCrosshair(context, ref, iconScanner: _iconLibraryScanner);
+                    final type = await showNewMarkerSheet(context);
+                    if (type == null || !context.mounted) return;
+                    if (type.id == MarkerTypeIds.waypoint) {
+                      await createWaypointAtCrosshair(context, ref, iconScanner: _iconLibraryScanner);
+                    } else {
+                      // The other types come in a later iteration.
+                      debugPrint('Selected: ${type.id}');
+                    }
                   },
                 ),
               ),
