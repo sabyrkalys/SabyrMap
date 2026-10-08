@@ -27,7 +27,7 @@ class _HomeShellState extends State<HomeShell> {
     _NavDestination(key: Key('nav_settings'), icon: AppIcons.peakMark, label: 'Настройки'),
     _NavDestination(key: Key('nav_map'), icon: AppIcons.map, label: 'Карты'),
     _NavDestination(key: Key('nav_waypoints'), icon: AppIcons.flag, label: 'Метки'),
-    _NavDestination(key: Key('nav_positioning'), icon: AppIcons.target, label: 'Позиционирование'),
+    _NavDestination(key: Key('nav_positioning'), icon: AppIcons.geoTarget, label: 'Позиционирование'),
     _NavDestination(key: Key('nav_compass'), icon: AppIcons.compass, label: 'Ориентирование'),
   ];
 

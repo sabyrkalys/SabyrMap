@@ -9,6 +9,21 @@ void registerThirdPartyLicenses() {
   _registered = true;
   LicenseRegistry.addLicense(() async* {
     yield const LicenseEntryWithLineBreaks(
+      ['Material Symbols'],
+      'The icons in assets/icons (except peak-mark, sunrise, sunset, folder-doc '
+      'and lock-badge) are Material Symbols Sharp by Google '
+      '(https://github.com/google/material-design-icons).\n\n'
+      'Licensed under the Apache License, Version 2.0 (the "License"); you may '
+      'not use these files except in compliance with the License. You may obtain '
+      'a copy of the License at\n\n'
+      '    http://www.apache.org/licenses/LICENSE-2.0\n\n'
+      'Unless required by applicable law or agreed to in writing, software '
+      'distributed under the License is distributed on an "AS IS" BASIS, '
+      'WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. '
+      'See the License for the specific language governing permissions and '
+      'limitations under the License.',
+    );
+    yield const LicenseEntryWithLineBreaks(
       ['Material Design Icons (sunrise, sunset)'],
       'assets/icons/sunrise.svg and assets/icons/sunset.svg are the icons '
       '"weather-sunset-up" and "weather-sunset-down" from Material Design Icons '

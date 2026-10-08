@@ -1,3 +1,4 @@
+import 'package:app/app_icons.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
@@ -175,6 +176,14 @@ void main() {
     expect(tester.getCenter(find.byKey(const Key('menu_panel_arrow'))).dx, tester.getCenter(icon).dx);
     expect(tester.getTopLeft(find.byKey(const Key('menu_panel_card'))).dx, 126 / 2.625 + 5);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('«Позиционирование» shows the geo-target icon', (tester) async {
+    await pumpShell(tester);
+    final picture = tester.widget<SvgPicture>(
+      find.descendant(of: find.byKey(const Key('nav_positioning')), matching: find.byType(SvgPicture)),
+    );
+    expect((picture.bytesLoader as SvgAssetLoader).assetName, AppIcons.geoTarget);
   });
 
   testWidgets('opening a nav panel closes the crosshair card', (tester) async {

@@ -16,6 +16,18 @@ void main() {
     }
   });
 
+  testWidgets('every bundled icon is an svg flutter_svg can draw', (tester) async {
+    final files = Directory('assets/icons').listSync().whereType<File>().where((f) => f.path.endsWith('.svg'));
+    expect(files, isNotEmpty);
+    await tester.runAsync(() async {
+      for (final file in files) {
+        final info = await vg.loadPicture(SvgStringLoader(file.readAsStringSync()), null);
+        expect(info.size, const Size(24, 24), reason: file.path);
+        info.picture.dispose();
+      }
+    });
+  });
+
   testWidgets('AppIcon renders the svg and tints it with the icon theme color', (tester) async {
     await tester.pumpWidget(
       const MaterialApp(

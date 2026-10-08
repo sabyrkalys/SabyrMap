@@ -1,132 +1,94 @@
-// Сгенерировано: пути к SVG-ассетам иконок.
+// Material Symbols Sharp (filled) — SVG-ассеты.
+// Альтернатива без ассетов: пакет material_symbols_icons → Symbols.<name>_sharp, fill: 1
 class AppIcons {
   AppIcons._();
 
   static const String _base = 'assets/icons';
 
-  static const String arrowRight = '$_base/arrow-right.svg';
-  static const String arrowTarget = '$_base/arrow-target.svg';
-  static const String bell = '$_base/bell.svg';
-  static const String bookmarkPlus = '$_base/bookmark-plus.svg';
-  static const String calendar = '$_base/calendar.svg';
-  static const String camera = '$_base/camera.svg';
-  static const String cart = '$_base/cart.svg';
-  static const String chart = '$_base/chart.svg';
-  static const String check = '$_base/check.svg';
-  static const String checkboxOff = '$_base/checkbox-off.svg';
-  static const String checkboxOn = '$_base/checkbox-on.svg';
-  static const String chevronUpdown = '$_base/chevron-updown.svg';
-  static const String clock = '$_base/clock.svg';
-  static const String close = '$_base/close.svg';
-  static const String compass = '$_base/compass.svg';
-  static const String dotsVertical = '$_base/dots-vertical.svg';
-  static const String download = '$_base/download.svg';
-  static const String edit = '$_base/edit.svg';
-  static const String export = '$_base/export.svg';
-  static const String eye = '$_base/eye.svg';
-  static const String eyeOff = '$_base/eye-off.svg';
-  static const String filter = '$_base/filter.svg';
-  static const String flag = '$_base/flag.svg';
-  static const String flagPlus = '$_base/flag-plus.svg';
-  static const String folder = '$_base/folder.svg';
-  static const String folderDoc = '$_base/folder-doc.svg';
-  static const String folderFlag = '$_base/folder-flag.svg';
-  static const String folderMap = '$_base/folder-map.svg';
-  static const String folderOutline = '$_base/folder-outline.svg';
-  static const String fullscreen = '$_base/fullscreen.svg';
-  static const String gauge = '$_base/gauge.svg';
-  static const String gear = '$_base/gear.svg';
-  static const String geoTarget = '$_base/geo-target.svg';
-  static const String heart = '$_base/heart.svg';
-  static const String helpCircle = '$_base/help-circle.svg';
-  static const String home = '$_base/home.svg';
-  static const String info = '$_base/info.svg';
-  static const String layers = '$_base/layers.svg';
-  static const String list = '$_base/list.svg';
-  static const String listRemove = '$_base/list-remove.svg';
-  static const String lock = '$_base/lock.svg';
-  static const String lockBadge = '$_base/lock-badge.svg';
-  static const String mail = '$_base/mail.svg';
-  static const String map = '$_base/map.svg';
-  static const String mapSmall = '$_base/map-small.svg';
-  static const String peakMark = '$_base/peak-mark.svg';
-  static const String peaks = '$_base/peaks.svg';
-  static const String pinPlus = '$_base/pin-plus.svg';
-  static const String plus = '$_base/plus.svg';
-  static const String sdCard = '$_base/sd-card.svg';
-  static const String search = '$_base/search.svg';
-  static const String settings = '$_base/settings.svg';
-  static const String sortText = '$_base/sort-text.svg';
-  static const String star = '$_base/star.svg';
-  static const String sunrise = '$_base/sunrise.svg';
-  static const String sunset = '$_base/sunset.svg';
-  static const String target = '$_base/target.svg';
-  static const String trash = '$_base/trash.svg';
-  static const String upload = '$_base/upload.svg';
-  static const String user = '$_base/user.svg';
-  static const String wrench = '$_base/wrench.svg';
-
-  static const List<String> all = <String>[
-    arrowRight,
-    arrowTarget,
-    bell,
-    bookmarkPlus,
-    calendar,
-    camera,
-    cart,
-    chart,
-    check,
-    checkboxOff,
-    checkboxOn,
-    chevronUpdown,
-    clock,
-    close,
-    compass,
-    dotsVertical,
-    download,
-    edit,
-    export,
-    eye,
-    eyeOff,
-    filter,
-    flag,
-    flagPlus,
-    folder,
-    folderDoc,
-    folderFlag,
-    folderMap,
-    folderOutline,
-    fullscreen,
-    gauge,
-    gear,
-    geoTarget,
-    heart,
-    helpCircle,
-    home,
-    info,
-    layers,
-    list,
-    listRemove,
-    lock,
-    lockBadge,
-    mail,
-    map,
-    mapSmall,
-    peakMark,
-    peaks,
-    pinPlus,
-    plus,
-    sdCard,
-    search,
-    settings,
-    sortText,
-    star,
-    sunrise,
-    sunset,
-    target,
-    trash,
-    upload,
-    user,
-    wrench,
-  ];
+  static const String arrowRight = '$_base/arrow-right.svg'; // arrow_forward
+  static const String arrowTarget = '$_base/arrow-target.svg'; // assistant_navigation
+  static const String bell = '$_base/bell.svg'; // notifications
+  static const String bookmark = '$_base/bookmark.svg'; // bookmark
+  static const String bookmarkCheck = '$_base/bookmark-check.svg'; // bookmark_added
+  static const String bookmarkOutline = '$_base/bookmark-outline.svg'; // bookmark_outline
+  static const String bookmarkPlus = '$_base/bookmark-plus.svg'; // bookmark_add
+  static const String bullseye = '$_base/bullseye.svg'; // target
+  static const String calendar = '$_base/calendar.svg'; // calendar_month
+  static const String camera = '$_base/camera.svg'; // photo_camera
+  static const String cart = '$_base/cart.svg'; // shopping_cart
+  static const String chart = '$_base/chart.svg'; // bar_chart
+  static const String check = '$_base/check.svg'; // check
+  static const String checkboxOff = '$_base/checkbox-off.svg'; // check_box_outline_blank
+  static const String checkboxOn = '$_base/checkbox-on.svg'; // check_box
+  static const String chevronUpdown = '$_base/chevron-updown.svg'; // unfold_more
+  static const String clock = '$_base/clock.svg'; // schedule
+  static const String close = '$_base/close.svg'; // close
+  static const String compass = '$_base/compass.svg'; // explore
+  static const String compassOff = '$_base/compass-off.svg'; // explore_off
+  static const String dotsVertical = '$_base/dots-vertical.svg'; // more_vert
+  static const String download = '$_base/download.svg'; // download
+  static const String edit = '$_base/edit.svg'; // edit
+  static const String export = '$_base/export.svg'; // output
+  static const String eye = '$_base/eye.svg'; // visibility
+  static const String eyeOff = '$_base/eye-off.svg'; // visibility_off
+  static const String filter = '$_base/filter.svg'; // filter_alt
+  static const String flag = '$_base/flag.svg'; // flag
+  static const String flagCheckered = '$_base/flag-checkered.svg'; // sports_score
+  static const String flagMinus = '$_base/flag-minus.svg'; // flag_2
+  static const String flagOutline = '$_base/flag-outline.svg'; // flag
+  static const String flagPlus = '$_base/flag-plus.svg'; // flag_2
+  static const String folder = '$_base/folder.svg'; // folder
+  static const String folderDoc = '$_base/folder-doc.svg'; // not in Material Symbols (kept from the old set)
+  static const String folderFlag = '$_base/folder-flag.svg'; // create_new_folder
+  static const String folderMap = '$_base/folder-map.svg'; // folder_special
+  static const String folderOutline = '$_base/folder-outline.svg'; // folder_open
+  static const String fullscreen = '$_base/fullscreen.svg'; // fullscreen
+  static const String gauge = '$_base/gauge.svg'; // speed
+  static const String gear = '$_base/gear.svg'; // settings
+  static const String geoTarget = '$_base/geo-target.svg'; // my_location
+  static const String globe = '$_base/globe.svg'; // public
+  static const String heart = '$_base/heart.svg'; // favorite
+  static const String helpCircle = '$_base/help-circle.svg'; // help
+  static const String home = '$_base/home.svg'; // home
+  static const String info = '$_base/info.svg'; // info
+  static const String layers = '$_base/layers.svg'; // layers
+  static const String layersOff = '$_base/layers-off.svg'; // layers_clear
+  static const String list = '$_base/list.svg'; // list
+  static const String listRemove = '$_base/list-remove.svg'; // playlist_remove
+  static const String lock = '$_base/lock.svg'; // lock
+  static const String lockBadge = '$_base/lock-badge.svg'; // not in Material Symbols (kept from the old set)
+  static const String mail = '$_base/mail.svg'; // mail
+  static const String map = '$_base/map.svg'; // map
+  static const String mapMarker = '$_base/map-marker.svg'; // location_on
+  static const String mapMarkerCheck = '$_base/map-marker-check.svg'; // where_to_vote
+  static const String mapMarkerEdit = '$_base/map-marker-edit.svg'; // edit_location
+  static const String mapMarkerMinus = '$_base/map-marker-minus.svg'; // wrong_location
+  static const String mapMarkerOff = '$_base/map-marker-off.svg'; // location_off
+  static const String mapMarkerPlus = '$_base/map-marker-plus.svg'; // add_location
+  static const String mapSearch = '$_base/map-search.svg'; // travel_explore
+  static const String mapSmall = '$_base/map-small.svg'; // map
+  static const String navigation = '$_base/navigation.svg'; // navigation
+  static const String nearMe = '$_base/near-me.svg'; // near_me
+  static const String peakMark = '$_base/peak-mark.svg'; // not in Material Symbols (kept from the old set)
+  static const String peaks = '$_base/peaks.svg'; // landscape
+  static const String pinPlus = '$_base/pin-plus.svg'; // add_location_alt
+  static const String plus = '$_base/plus.svg'; // add
+  static const String radar = '$_base/radar.svg'; // radar
+  static const String route = '$_base/route.svg'; // route
+  static const String satellite = '$_base/satellite.svg'; // satellite_alt
+  static const String sdCard = '$_base/sd-card.svg'; // sd_card
+  static const String search = '$_base/search.svg'; // search
+  static const String settings = '$_base/settings.svg'; // tune
+  static const String sortText = '$_base/sort-text.svg'; // sort_by_alpha
+  static const String star = '$_base/star.svg'; // star
+  static const String sunrise = '$_base/sunrise.svg'; // not in Material Symbols (kept from the old set)
+  static const String sunset = '$_base/sunset.svg'; // not in Material Symbols (kept from the old set)
+  static const String target = '$_base/target.svg'; // location_searching
+  static const String terrain = '$_base/terrain.svg'; // landscape
+  static const String trash = '$_base/trash.svg'; // delete
+  static const String upload = '$_base/upload.svg'; // upload
+  static const String user = '$_base/user.svg'; // person
+  static const String wrench = '$_base/wrench.svg'; // build
+  static const String zoomIn = '$_base/zoom-in.svg'; // zoom_in
+  static const String zoomOut = '$_base/zoom-out.svg'; // zoom_out
 }
