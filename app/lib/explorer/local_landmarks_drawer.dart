@@ -1,10 +1,11 @@
 import 'package:app/landmarks/explorer/places/place_root.dart';
 import 'package:flutter/material.dart';
-import 'package:path/path.dart' as p;
 
 import '../map/screens/available_maps/available_maps_models.dart';
 import '../map/screens/available_maps/side_drawer.dart';
 import '../map/screens/available_maps/storage_bar.dart';
+import '../bookmarks/bookmark_controller.dart';
+import '../bookmarks/bookmarks_section.dart';
 import 'online_marks_placeholder.dart';
 
 /// Боковая панель «Локальных меток» в стиле «Доступных карт»: выезжает
@@ -18,15 +19,15 @@ class LocalLandmarksDrawer extends StatelessWidget {
     required this.deviceUsage,
     required this.onPlace,
     required this.onClose,
-    this.bookmarks = const [],
-    this.onBookmark,
-    this.onRemoveBookmark,
+    required this.bookmarkController,
+    required this.onBookmark,
   });
 
-  /// Папки из закладок (существующие).
-  final List<String> bookmarks;
-  final ValueChanged<String>? onBookmark;
-  final ValueChanged<String>? onRemoveBookmark;
+  /// Закладки (раздел вверху панели).
+  final BookmarkController bookmarkController;
+
+  /// Тап по закладке — путь её папки.
+  final ValueChanged<String> onBookmark;
 
   final bool isOpen;
   final List<PlaceRoot> places;
@@ -52,15 +53,16 @@ class LocalLandmarksDrawer extends StatelessWidget {
     PlaceRootKind.custom => Icons.folder_outlined,
   };
 
-  /// Долгое нажатие на закладку: шторка с предложением удалить её.
-  Future<void> _askRemove(BuildContext context, String path) async {
-    final remove = await showModalBottomSheet<bool>(
+  /// Долгое нажатие на раздел: «Добавить в закладки».
+  Future<void> _offerBookmark(BuildContext context, PlaceRoot place) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final add = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        key: const Key('bookmark_menu'),
+        key: const Key('place_menu'),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -76,12 +78,12 @@ class LocalLandmarksDrawer extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(
-                    p.basename(path),
+                    place.title,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500, color: Color(0xFF212121)),
                   ),
                 ),
                 InkWell(
-                  key: const Key('bookmark_menu_remove'),
+                  key: const Key('place_menu_bookmark'),
                   onTap: () => Navigator.pop(context, true),
                   borderRadius: BorderRadius.circular(8),
                   child: const Padding(
@@ -90,10 +92,10 @@ class LocalLandmarksDrawer extends StatelessWidget {
                       children: [
                         SizedBox(
                           width: 32,
-                          child: Icon(Icons.bookmark_remove_outlined, size: 24, color: Color(0xFFD32F2F)),
+                          child: Icon(Icons.bookmark_add_outlined, size: 24, color: Color(0xFF00A38E)),
                         ),
                         SizedBox(width: 16),
-                        Text('Удалить закладку', style: TextStyle(fontSize: 16, color: Color(0xFF212121))),
+                        Text('Добавить в закладки', style: TextStyle(fontSize: 16, color: Color(0xFF212121))),
                       ],
                     ),
                   ),
@@ -103,7 +105,7 @@ class LocalLandmarksDrawer extends StatelessWidget {
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      key: const Key('bookmark_menu_cancel'),
+                      key: const Key('place_menu_cancel'),
                       onPressed: () => Navigator.pop(context, false),
                       style: TextButton.styleFrom(foregroundColor: const Color(0xFF00A38E)),
                       child: const Text('ОТМЕНА', style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5)),
@@ -116,7 +118,9 @@ class LocalLandmarksDrawer extends StatelessWidget {
         ),
       ),
     );
-    if (remove ?? false) onRemoveBookmark?.call(path);
+    if (add != true) return;
+    final added = await bookmarkController.addFromFolder(place.path, customName: place.title);
+    messenger.showSnackBar(SnackBar(content: Text(added ? 'Добавлено в закладки' : 'Уже в закладках')));
   }
 
   @override
@@ -157,19 +161,7 @@ class LocalLandmarksDrawer extends StatelessWidget {
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      if (bookmarks.isNotEmpty) ...[
-                        const SideDrawerHeader('ЗАКЛАДКИ'),
-                        for (final path in bookmarks)
-                          ListTile(
-                            key: Key('drawer_bookmark_${p.basename(path)}'),
-                            leading: const Icon(Icons.bookmark_outline),
-                            title: Text(p.basename(path)),
-                            subtitle: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            onTap: () => onBookmark?.call(path),
-                            onLongPress: () => _askRemove(context, path),
-                          ),
-                        const Divider(),
-                      ],
+                      BookmarksSection(controller: bookmarkController, onOpen: (b) => onBookmark(b.path)),
                       const SideDrawerHeader('ЛОКАЛЬНЫЕ МЕТКИ'),
                       for (final place in places) ...[
                         ListTile(
@@ -179,6 +171,7 @@ class LocalLandmarksDrawer extends StatelessWidget {
                           subtitle: Text(place.path, maxLines: 1, overflow: TextOverflow.ellipsis),
                           selected: place.id == currentPlace?.id,
                           onTap: () => onPlace(place),
+                          onLongPress: () => _offerBookmark(context, place),
                         ),
                         if (place.kind == PlaceRootKind.deviceFolder)
                           StorageBar(key: const Key('drawer_device_storage'), usage: deviceUsage),

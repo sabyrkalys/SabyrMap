@@ -80,8 +80,8 @@ void main() {
   test('actions: bookmark, copy, cut, rename and delete report what happened', () async {
     final s = f.services;
     expect(await FolderContextActions.bookmark(s, node(trip)), 'Добавлено в закладки');
-    await FolderContextActions.bookmark(s, node(trip));
-    expect(FolderContextActions.bookmarks(s), [trip]);
+    expect(await FolderContextActions.bookmark(s, node(trip)), 'Уже в закладках');
+    expect(s.bookmarkController.bookmarks.map((b) => b.path), [trip]);
 
     expect(FolderContextActions.copy(s, node(trip)), 'Скопировано: Поход');
     expect(s.explorerController.clipboard.entries.single.isFolder, isTrue);
@@ -99,25 +99,19 @@ void main() {
     expect(Directory(lake).existsSync(), isFalse);
   });
 
-  test('bookmarks follow a rename and go away with a delete', () async {
+  test('bookmarks follow a rename (names kept) and go away with a delete', () async {
     final s = f.services;
     final day = p.join(trip, 'День 1');
     await FolderContextActions.bookmark(s, node(trip));
     await FolderContextActions.bookmark(s, node(day));
-    expect(await FolderContextActions.bookmark(s, node(trip)), 'Уже в закладках');
+    await s.bookmarkController.rename(s.bookmarkController.byPath(trip)!.id, 'Мой поход');
     await FolderContextActions.rename(s, node(trip), 'Озеро');
     final lake = p.join(f.paths.landmarks, 'Озеро');
-    expect(FolderContextActions.bookmarks(s), [lake, p.join(lake, 'День 1')]);
+    expect(s.bookmarkController.bookmarks.map((b) => b.path), [lake, p.join(lake, 'День 1')]);
+    expect(s.bookmarkController.bookmarks.first.name, 'Мой поход');
+    expect(s.bookmarkController.hasUnder(lake), isTrue);
     await FolderContextActions.delete(s, node(lake));
-    expect(FolderContextActions.bookmarks(s), isEmpty);
-  });
-
-  test('removeBookmark drops only that path', () async {
-    final s = f.services;
-    await FolderContextActions.bookmark(s, node(trip));
-    await FolderContextActions.bookmark(s, node(f.paths.importDefault));
-    await FolderContextActions.removeBookmark(s, trip);
-    expect(FolderContextActions.bookmarks(s), [f.paths.importDefault]);
+    expect(s.bookmarkController.isEmpty, isTrue);
   });
 
   group('pasting folders', () {

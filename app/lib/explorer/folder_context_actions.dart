@@ -1,12 +1,8 @@
-import 'dart:convert';
-
 import 'package:app/exceptions/folder_exception.dart';
 import 'package:app/exceptions/storage_exception.dart';
 import 'package:app/landmarks/explorer/clipboard/clipboard_entry.dart';
 import 'package:app/landmarks/explorer/explorer_node.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
-import 'package:app/landmarks/settings/settings_keys.dart';
-import 'package:collection/collection.dart';
 import 'package:path/path.dart' as p;
 
 /// Действия меню папки. Возвращают текст для сообщения пользователю;
@@ -14,46 +10,9 @@ import 'package:path/path.dart' as p;
 abstract final class FolderContextActions {
   static const String unavailable = 'Действие недоступно';
 
-  /// Закладки — список путей в настройках.
-  static List<String> bookmarks(LandmarkServices s) {
-    final raw = s.settings.getString(SettingsKeys.explorerBookmarks);
-    if (raw == null) return const [];
-    try {
-      return [for (final v in jsonDecode(raw) as List<dynamic>) v as String];
-    } on Object {
-      return const [];
-    }
-  }
-
-  static Future<String> bookmark(LandmarkServices s, ExplorerFolderNode folder) async {
-    final list = bookmarks(s);
-    if (list.contains(folder.path)) return 'Уже в закладках';
-    await _saveBookmarks(s, [...list, folder.path]);
-    return 'Добавлено в закладки';
-  }
-
-  /// Убирает закладку [path].
-  static Future<void> removeBookmark(LandmarkServices s, String path) =>
-      _saveBookmarks(s, [...bookmarks(s).where((b) => b != path)]);
-
-  /// После переименования или удаления папки: закладки на неё и на папки
-  /// внутри неё переезжают на [newPath] или удаляются (null).
-  static Future<void> _moveBookmarks(LandmarkServices s, String oldPath, String? newPath) async {
-    final list = bookmarks(s);
-    final updated = <String>[
-      for (final b in list)
-        if (p.equals(b, oldPath) || p.isWithin(oldPath, b))
-          if (newPath != null) p.normalize(p.join(newPath, p.relative(b, from: oldPath))) else ...[]
-        else
-          b,
-    ];
-    if (updated.length != list.length || !const ListEquality<String>().equals(updated, list)) {
-      await _saveBookmarks(s, updated);
-    }
-  }
-
-  static Future<void> _saveBookmarks(LandmarkServices s, List<String> list) =>
-      s.settings.setString(SettingsKeys.explorerBookmarks, jsonEncode(list));
+  /// Закладка на папку.
+  static Future<String> bookmark(LandmarkServices s, ExplorerFolderNode folder) async =>
+      await s.bookmarkController.addFromFolder(folder.path) ? 'Добавлено в закладки' : 'Уже в закладках';
 
   /// Копировать и вырезать можно только папки внутри «Мои метки».
   static bool _insideLandmarks(LandmarkServices s, String path) =>
@@ -78,7 +37,7 @@ abstract final class FolderContextActions {
     try {
       final newPath = p.join(p.dirname(folder.path), newName.trim());
       await s.folders.rename(folder.path, newPath);
-      await _moveBookmarks(s, folder.path, newPath);
+      await s.bookmarkController.updatePath(folder.path, newPath);
       return 'Папка переименована';
     } on FolderException catch (e) {
       return e.message == 'уже существует' ? 'Папка «${newName.trim()}» уже существует' : e.message;
@@ -91,7 +50,7 @@ abstract final class FolderContextActions {
     if (!s.folders.isEditable(folder.path)) return unavailable;
     try {
       await s.folders.deleteRecursive(folder.path);
-      await _moveBookmarks(s, folder.path, null);
+      await s.bookmarkController.removeByPathPrefix(folder.path);
       return 'Папка удалена';
     } on FolderException catch (e) {
       return e.message;

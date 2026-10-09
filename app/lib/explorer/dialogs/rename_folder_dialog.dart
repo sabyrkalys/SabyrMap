@@ -9,8 +9,10 @@ class RenameFolderDialog extends StatefulWidget {
 
   static const Color accent = Color(0xFF00A38E);
 
-  static Future<String?> show(BuildContext context, String currentName) =>
-      showDialog<String>(context: context, builder: (_) => RenameFolderDialog(currentName: currentName));
+  static Future<String?> show(BuildContext context, String currentName) => showDialog<String>(
+    context: context,
+    builder: (_) => RenameFolderDialog(currentName: currentName),
+  );
 
   /// Ошибка имени для подсказки; null — имя годится.
   static String? validate(String name) {

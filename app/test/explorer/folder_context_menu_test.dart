@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:app/explorer/folder_context_actions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -43,7 +42,7 @@ void main() {
   testWidgets('«Закладка» saves the path and says so', (tester) async {
     await openMenu(tester);
     await h.tap(tester, find.byKey(const Key('folder_menu_bookmark')));
-    expect(FolderContextActions.bookmarks(h.f.services), [trip]);
+    expect(h.f.services.bookmarkController.bookmarks.single.path, trip);
     expect(find.text('Добавлено в закладки'), findsOneWidget);
     await h.dispose(tester);
   });

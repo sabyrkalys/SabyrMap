@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:app/derived_export/details_renderer.dart';
 import 'package:app/landmarks/explorer/explorer_controller.dart';
 import 'package:app/landmarks/explorer/explorer_state.dart';
@@ -426,7 +424,9 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
               ListTile(
                 key: Key('filter_${type?.extension ?? 'all'}'),
                 title: Text(label),
-                trailing: current.onlyType == type ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
+                trailing: current.onlyType == type
+                    ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                    : null,
                 onTap: () => Navigator.pop(context, current.copyWith(onlyType: type)),
               ),
           ],
@@ -523,15 +523,8 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
                   ),
                   Positioned.fill(
                     child: LocalLandmarksDrawer(
-                      bookmarks: [
-                        for (final b in FolderContextActions.bookmarks(_services))
-                          if (Directory(b).existsSync()) b,
-                      ],
+                      bookmarkController: _services.bookmarkController,
                       onBookmark: _openBookmark,
-                      onRemoveBookmark: (path) async {
-                        await FolderContextActions.removeBookmark(_services, path);
-                        if (mounted) setState(() {});
-                      },
                       isOpen: _drawerOpen,
                       places: _places,
                       currentPlace: place,

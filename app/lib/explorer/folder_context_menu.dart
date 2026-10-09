@@ -135,7 +135,9 @@ class FolderContextMenu extends ConsumerWidget {
                 final ok = await showConfirmDialog(
                   screen,
                   title: 'Удалить папку?',
-                  message: 'Папка "${folder.name}" и всё её содержимое будут удалены без возможности восстановления.',
+                  message:
+                      'Папка "${folder.name}" и всё её содержимое будут удалены без возможности восстановления.'
+                      '${services.bookmarkController.hasUnder(folder.path) ? '\n\nВ закладках есть ссылки на удаляемые папки — они тоже будут удалены.' : ''}',
                   confirmLabel: 'Удалить',
                   cancelLabel: 'Отмена',
                 );
@@ -234,7 +236,10 @@ class FolderDetailsSheet extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(width: 96, child: Text(k, style: const TextStyle(color: Color(0xFF757575)))),
+                    SizedBox(
+                      width: 96,
+                      child: Text(k, style: const TextStyle(color: Color(0xFF757575))),
+                    ),
                     Expanded(child: SelectableText(v)),
                   ],
                 ),

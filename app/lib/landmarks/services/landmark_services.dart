@@ -1,5 +1,7 @@
 import 'package:app/app_settings/app_settings_controller.dart';
 import 'package:app/backup/backup_service.dart';
+import 'package:app/bookmarks/bookmark_controller.dart';
+import 'package:app/bookmarks/bookmark_store.dart';
 import 'package:app/backup/restore_service.dart';
 import 'package:app/dashboard/dashboard_controller.dart';
 import 'package:app/derived_export/details_text_exporter.dart';
@@ -115,6 +117,7 @@ class LandmarkServices {
     required this.paths,
     required this.storage,
     required this.settings,
+    required this.bookmarkController,
     required this.permissionService,
     required this.placesProvider,
     required this.explorerController,
@@ -185,6 +188,9 @@ class LandmarkServices {
 
   /// Настройки приложения (сырые ключи).
   final AppSettings settings;
+
+  /// Закладки проводника.
+  final BookmarkController bookmarkController;
 
   /// Доступ к папкам вне папки приложения.
   final PermissionService permissionService;
@@ -270,6 +276,8 @@ class LandmarkServices {
     );
     await workspaces.load();
     final creation = MarkerCreationService(repository, folders, clock: clock);
+    final bookmarks = BookmarkController(BookmarkStore(settings), clock: clock);
+    await bookmarks.load();
     final reader = LandmarkItemReader(storage);
     final places = placesProvider ?? PlacesProvider(storagePaths);
     final clipboard = LandmarksClipboard();
@@ -331,6 +339,7 @@ class LandmarkServices {
       paths: storagePaths,
       storage: storage,
       settings: settings,
+      bookmarkController: bookmarks,
       permissionService: permissionService ?? WriteCheckPermissionService(storage),
       placesProvider: places,
       explorerController: ExplorerController(
