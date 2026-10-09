@@ -107,6 +107,7 @@ class CompositeCalculator {
       LandmarkMetadata.lengthKey: object is AreaObject ? null : stats.totalLengthMeters,
       LandmarkMetadata.durationKey: stats.durationMs,
       LandmarkMetadata.elevationGainKey: hasElevation ? stats.elevationGainMeters : null,
+      LandmarkMetadata.elevationLossKey: hasElevation ? stats.elevationLossMeters : null,
       LandmarkMetadata.areaKey: stats.areaSquareMeters,
     };
     return MetadataPatch(

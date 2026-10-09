@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:app/intents/tracker_intent.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:app/storage/storage_paths.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,7 +17,7 @@ class ServicesFixture {
   DateTime get now => _now.single;
   set now(DateTime value) => _now[0] = value;
 
-  static Future<ServicesFixture> create() async {
+  static Future<ServicesFixture> create({TrackerService tracker = const LoggingTrackerService()}) async {
     SharedPreferences.setMockInitialValues({});
     final root = Directory.systemTemp.createTempSync('landmark_services_');
     final paths = StoragePaths.forRoot(root.path);
@@ -25,6 +26,7 @@ class ServicesFixture {
       paths: paths,
       prefs: await SharedPreferences.getInstance(),
       clock: () => now.single,
+      trackerService: tracker,
     );
     return ServicesFixture._(root, paths, services, now);
   }

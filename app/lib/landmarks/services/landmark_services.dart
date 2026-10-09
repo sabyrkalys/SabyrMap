@@ -1,4 +1,14 @@
+import 'package:app/app_settings/app_settings_controller.dart';
+import 'package:app/backup/backup_service.dart';
+import 'package:app/backup/restore_service.dart';
+import 'package:app/dashboard/dashboard_controller.dart';
+import 'package:app/derived_export/details_text_exporter.dart';
+import 'package:app/derived_export/profile_csv_exporter.dart';
+import 'package:app/intents/intent_dispatcher.dart';
+import 'package:app/intents/tracker_intent.dart';
 import 'package:app/landmarks/composite/edit_mode/edit_mode_controller.dart';
+import 'package:app/landmarks/explorer/display/display_registry.dart';
+import 'package:app/landmarks/explorer/listing/landmark_item_reader.dart';
 import 'package:app/landmarks/composite/services/area_service.dart';
 import 'package:app/landmarks/composite/services/composite_creation_service.dart';
 import 'package:app/landmarks/composite/services/route_service.dart';
@@ -37,6 +47,9 @@ import 'package:app/navigation/settings/navigation_settings.dart';
 import 'package:app/navigation/signals/audio_signaler.dart';
 import 'package:app/navigation/signals/silent_signaler.dart';
 import 'package:app/navigation/target/target_controller.dart';
+import 'package:app/share/share_service.dart';
+import 'package:app/workspace/workspace_controller.dart';
+import 'package:app/workspace/workspace_store.dart';
 import 'package:app/storage/storage_paths.dart';
 import 'package:app/storage/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -83,6 +96,16 @@ class LandmarkServices {
     required this.calibrationController,
     required this.demManager,
     required this.offlineArea,
+    required this.appSettingsController,
+    required this.workspaceController,
+    required this.displayRegistry,
+    required this.backupService,
+    required this.restoreService,
+    required this.intentDispatcher,
+    required this.detailsTextExporter,
+    required this.profileCsvExporter,
+    required this.dashboardController,
+    required this.shareService,
   });
 
   final MarkerCreationService creation;
@@ -128,6 +151,21 @@ class LandmarkServices {
   final DemManager demManager;
   final OfflineAreaController offlineArea;
 
+  /// Общие настройки, пространства, копии, внешние запросы, экспорт,
+  /// дашборд, отправка.
+  final AppSettingsController appSettingsController;
+  final WorkspaceController workspaceController;
+
+  /// Метки на карте (общий для проводника и пространств).
+  final DisplayRegistry displayRegistry;
+  final BackupService backupService;
+  final RestoreService restoreService;
+  final IntentDispatcher intentDispatcher;
+  final DetailsTextExporter detailsTextExporter;
+  final ProfileCsvExporter profileCsvExporter;
+  final DashboardController dashboardController;
+  final ShareService shareService;
+
   /// Собирает сервисы: пути, базовые папки, репозиторий, настройки,
   /// реестр иконок (сразу просканированный), сервисы составных объектов
   /// и режим правки. [paths], [prefs] и [clock]
@@ -138,6 +176,8 @@ class LandmarkServices {
     DateTime Function()? clock,
     PositionSource positionSource = const StubPositionSource(),
     AudioSignaler signaler = const SilentSignaler(),
+    ShareService shareService = const UnavailableShareService(),
+    TrackerService trackerService = const LoggingTrackerService(),
   }) async {
     final storagePaths = paths ?? await StoragePaths.resolve();
     final storage = StorageService(storagePaths);
@@ -183,8 +223,24 @@ class LandmarkServices {
     await aqx.refresh();
     final dem = DemManager(storagePaths, maps.demSettings, store: maps);
     await dem.loadSettings();
+
+    final appSettings = AppSettingsController(settings);
+    await appSettings.load();
+    final display = DisplayRegistry();
+    final workspaces = WorkspaceController(
+      WorkspaceStore(settings),
+      layers,
+      target,
+      maps,
+      navigation,
+      display: display,
+      proximity: proximity,
+      clock: clock,
+    );
+    await workspaces.load();
+    final creation = MarkerCreationService(repository, folders, clock: clock);
     return LandmarkServices(
-      creation: MarkerCreationService(repository, folders, clock: clock),
+      creation: creation,
       waypoints: waypoints,
       editor: editor,
       folders: folders,
@@ -228,6 +284,16 @@ class LandmarkServices {
       calibrationController: CalibrationController(maps),
       demManager: dem,
       offlineArea: OfflineAreaController(const OfflineAreaEstimator(), storage),
+      appSettingsController: appSettings,
+      workspaceController: workspaces,
+      displayRegistry: display,
+      backupService: BackupService(storagePaths, storage, settings, clock: clock),
+      restoreService: RestoreService(storagePaths, storage, settings),
+      intentDispatcher: IntentDispatcher(creation, target, folders, trackerService),
+      detailsTextExporter: DetailsTextExporter(storagePaths, storage, locale: () => appSettings.model.locale),
+      profileCsvExporter: ProfileCsvExporter(storagePaths, storage),
+      dashboardController: DashboardController(LandmarkItemReader(storage)),
+      shareService: shareService,
     );
   }
 }

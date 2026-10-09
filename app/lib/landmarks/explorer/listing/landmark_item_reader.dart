@@ -119,6 +119,7 @@ class LandmarkItemReader {
       lengthMeters: _number(user, LandmarkMetadata.lengthKey),
       durationMs: _int(user, LandmarkMetadata.durationKey),
       elevationGainMeters: _number(user, LandmarkMetadata.elevationGainKey),
+      elevationLossMeters: _number(user, LandmarkMetadata.elevationLossKey),
       areaSquareMeters: _number(user, LandmarkMetadata.areaKey),
       activity: _string(user, LandmarkMetadata.activityKey),
       year: _int(user, LandmarkMetadata.yearKey),

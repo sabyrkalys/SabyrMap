@@ -20,6 +20,7 @@ import 'package:collection/collection.dart';
 /// | `length_m`    | double | Длина трека/маршрута, метры                |
 /// | `duration_ms` | int    | Длительность трека, мс                     |
 /// | `elevation_gain_m` | double | Набор высоты, метры                   |
+/// | `elevation_loss_m` | double | Сброс высоты, метры                   |
 /// | `area_m2`     | double | Площадь области, м²                        |
 /// | `activity`    | String | Вид активности (пешком, авто...)           |
 /// | `year`        | int    | Год, к которому относится объект           |
@@ -42,6 +43,7 @@ class LandmarkMetadata {
   static const String lengthKey = 'length_m';
   static const String durationKey = 'duration_ms';
   static const String elevationGainKey = 'elevation_gain_m';
+  static const String elevationLossKey = 'elevation_loss_m';
   static const String areaKey = 'area_m2';
   static const String activityKey = 'activity';
   static const String yearKey = 'year';

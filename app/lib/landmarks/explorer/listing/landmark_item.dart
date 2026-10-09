@@ -18,6 +18,7 @@ class LandmarkItem {
     this.lengthMeters,
     this.durationMs,
     this.elevationGainMeters,
+    this.elevationLossMeters,
     this.areaSquareMeters,
     this.activity,
     this.year,
@@ -48,6 +49,7 @@ class LandmarkItem {
   final double? lengthMeters;
   final int? durationMs;
   final double? elevationGainMeters;
+  final double? elevationLossMeters;
   final double? areaSquareMeters;
   final String? activity;
   final int? year;
@@ -74,6 +76,7 @@ class LandmarkItem {
     Object? lengthMeters = _keep,
     Object? durationMs = _keep,
     Object? elevationGainMeters = _keep,
+    Object? elevationLossMeters = _keep,
     Object? areaSquareMeters = _keep,
     Object? activity = _keep,
     Object? year = _keep,
@@ -92,6 +95,7 @@ class LandmarkItem {
     lengthMeters: identical(lengthMeters, _keep) ? this.lengthMeters : lengthMeters as double?,
     durationMs: identical(durationMs, _keep) ? this.durationMs : durationMs as int?,
     elevationGainMeters: identical(elevationGainMeters, _keep) ? this.elevationGainMeters : elevationGainMeters as double?,
+    elevationLossMeters: identical(elevationLossMeters, _keep) ? this.elevationLossMeters : elevationLossMeters as double?,
     areaSquareMeters: identical(areaSquareMeters, _keep) ? this.areaSquareMeters : areaSquareMeters as double?,
     activity: identical(activity, _keep) ? this.activity : activity as String?,
     year: identical(year, _keep) ? this.year : year as int?,
@@ -114,6 +118,7 @@ class LandmarkItem {
       other.lengthMeters == lengthMeters &&
       other.durationMs == durationMs &&
       other.elevationGainMeters == elevationGainMeters &&
+      other.elevationLossMeters == elevationLossMeters &&
       other.areaSquareMeters == areaSquareMeters &&
       other.activity == activity &&
       other.year == year;
@@ -134,6 +139,7 @@ class LandmarkItem {
     lengthMeters,
     durationMs,
     elevationGainMeters,
+    elevationLossMeters,
     areaSquareMeters,
     activity,
     year,
