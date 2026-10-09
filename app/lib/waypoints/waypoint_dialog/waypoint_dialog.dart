@@ -305,15 +305,17 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
     );
   }
 
-  void _pickGroup(MarkerGroup group) => setState(() {
+  void _pickGroup(MarkerGroup group) {
     if (group.id == MarkerGroup.allId) {
-      // The list of all waypoints comes in a later iteration.
-      debugPrint('Open all markers');
-    } else {
-      _groupId = group.id;
+      setState(() => _groupExpanded = false);
+      ref.read(allMarkersOpenerProvider)(context);
+      return;
     }
-    _groupExpanded = false;
-  });
+    setState(() {
+      _groupId = group.id;
+      _groupExpanded = false;
+    });
+  }
 
   /// The group row: a tap folds out a raised white panel of the groups
   /// with their storage paths, and folds it back in.

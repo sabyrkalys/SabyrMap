@@ -7,8 +7,8 @@ import '../map/screens/available_maps_screen.dart';
 import '../map/screens/layers_panel.dart';
 import '../tracks/track_recording_actions.dart';
 import '../tracks/track_recording_controller.dart';
+import '../app/landmark_services_provider.dart';
 import '../waypoints/waypoint_create_action.dart';
-import '../waypoints/waypoints_list_screen.dart';
 import 'menu_toggles.dart';
 import 'menu_widgets.dart';
 
@@ -128,7 +128,7 @@ class _WaypointsPanel extends ConsumerWidget {
         MenuListItem(
           icon: AppIcons.flag,
           label: 'Все метки',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WaypointsListScreen())),
+          onTap: () => ref.read(allMarkersOpenerProvider)(context),
         ),
         const MenuListItem(icon: AppIcons.list, label: 'Метки на экране'),
         MenuListItem(

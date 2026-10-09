@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/config/storage_paths.dart';
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/waypoints/waypoint_color.dart';
@@ -14,6 +15,7 @@ import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 void main() {
   late ProviderContainer container;
+  var openedAllMarkers = 0;
 
   /// Opens the dialog from a button and records what it completes with.
   /// The crosshair sits at [crosshair].
@@ -23,7 +25,10 @@ void main() {
     LatLng? crosshair = const LatLng(47.9958, 37.81465),
   }) async {
     final results = <WaypointData?>[];
-    container = ProviderContainer();
+    openedAllMarkers = 0;
+    container = ProviderContainer(
+      overrides: [allMarkersOpenerProvider.overrideWithValue((_) => openedAllMarkers++)],
+    );
     addTearDown(container.dispose);
     if (crosshair != null) container.read(mapCrosshairProvider.notifier).set(crosshair);
     await tester.pumpWidget(
@@ -780,12 +785,13 @@ void main() {
       expect(results.single!.groupId, MarkerGroup.myMarkersId);
     });
 
-    testWidgets('«Все метки» folds the panel and keeps the chosen group', (tester) async {
+    testWidgets('«Все метки» opens the local markers, folds the panel and keeps the group', (tester) async {
       final results = await open(tester);
       await expandGroups(tester);
       await tester.tap(find.byKey(const Key('waypoint_dialog_group_all')));
       await tester.pumpAndSettle();
 
+      expect(openedAllMarkers, 1);
       expect(panel(), findsNothing);
       await ok(tester);
       expect(results.single!.groupId, MarkerGroup.unsortedId);

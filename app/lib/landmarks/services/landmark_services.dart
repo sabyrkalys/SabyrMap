@@ -7,7 +7,12 @@ import 'package:app/derived_export/profile_csv_exporter.dart';
 import 'package:app/intents/intent_dispatcher.dart';
 import 'package:app/intents/tracker_intent.dart';
 import 'package:app/landmarks/composite/edit_mode/edit_mode_controller.dart';
+import 'package:app/landmarks/explorer/clipboard/landmarks_clipboard.dart';
 import 'package:app/landmarks/explorer/display/display_registry.dart';
+import 'package:app/landmarks/explorer/explorer_controller.dart';
+import 'package:app/landmarks/explorer/operations/explorer_operations.dart';
+import 'package:app/landmarks/explorer/places/places_provider.dart';
+import 'package:app/landmarks/explorer/selection/selection_controller.dart';
 import 'package:app/landmarks/explorer/listing/landmark_item_reader.dart';
 import 'package:app/landmarks/composite/services/area_service.dart';
 import 'package:app/landmarks/composite/services/composite_creation_service.dart';
@@ -50,6 +55,7 @@ import 'package:app/navigation/target/target_controller.dart';
 import 'package:app/share/share_service.dart';
 import 'package:app/workspace/workspace_controller.dart';
 import 'package:app/workspace/workspace_store.dart';
+import 'package:app/storage/permission_service.dart';
 import 'package:app/storage/storage_paths.dart';
 import 'package:app/storage/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -106,6 +112,12 @@ class LandmarkServices {
     required this.profileCsvExporter,
     required this.dashboardController,
     required this.shareService,
+    required this.paths,
+    required this.storage,
+    required this.permissionService,
+    required this.placesProvider,
+    required this.explorerController,
+    required this.explorerOperations,
   });
 
   final MarkerCreationService creation;
@@ -166,6 +178,18 @@ class LandmarkServices {
   final DashboardController dashboardController;
   final ShareService shareService;
 
+  /// Пути и файлы хранилища.
+  final StoragePaths paths;
+  final StorageService storage;
+
+  /// Доступ к папкам вне папки приложения.
+  final PermissionService permissionService;
+
+  /// Проводник меток: разделы, контроллер, операции над файлами.
+  final PlacesProvider placesProvider;
+  final ExplorerController explorerController;
+  final ExplorerOperations explorerOperations;
+
   /// Собирает сервисы: пути, базовые папки, репозиторий, настройки,
   /// реестр иконок (сразу просканированный), сервисы составных объектов
   /// и режим правки. [paths], [prefs] и [clock]
@@ -174,6 +198,8 @@ class LandmarkServices {
     StoragePaths? paths,
     SharedPreferences? prefs,
     DateTime Function()? clock,
+    PermissionService? permissionService,
+    PlacesProvider? placesProvider,
     PositionSource positionSource = const StubPositionSource(),
     AudioSignaler signaler = const SilentSignaler(),
     ShareService shareService = const UnavailableShareService(),
@@ -239,6 +265,9 @@ class LandmarkServices {
     );
     await workspaces.load();
     final creation = MarkerCreationService(repository, folders, clock: clock);
+    final reader = LandmarkItemReader(storage);
+    final places = placesProvider ?? PlacesProvider(storagePaths);
+    final clipboard = LandmarksClipboard();
     return LandmarkServices(
       creation: creation,
       waypoints: waypoints,
@@ -292,8 +321,29 @@ class LandmarkServices {
       intentDispatcher: IntentDispatcher(creation, target, folders, trackerService),
       detailsTextExporter: DetailsTextExporter(storagePaths, storage, locale: () => appSettings.model.locale),
       profileCsvExporter: ProfileCsvExporter(storagePaths, storage),
-      dashboardController: DashboardController(LandmarkItemReader(storage)),
+      dashboardController: DashboardController(reader),
       shareService: shareService,
+      paths: storagePaths,
+      storage: storage,
+      permissionService: permissionService ?? WriteCheckPermissionService(storage),
+      placesProvider: places,
+      explorerController: ExplorerController(
+        folders: folders,
+        places: places,
+        reader: reader,
+        displayRegistry: display,
+        selection: SelectionController(),
+        clipboard: clipboard,
+        settings: settings,
+      ),
+      explorerOperations: ExplorerOperations(
+        repository: repository,
+        reader: reader,
+        storage: storage,
+        clipboard: clipboard,
+        display: display,
+        editor: editor,
+      ),
     );
   }
 }

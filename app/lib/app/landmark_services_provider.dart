@@ -1,5 +1,6 @@
 import 'package:app/config/storage_paths.dart' as mock;
 import 'package:app/landmarks/services/landmark_services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
@@ -37,3 +38,7 @@ class MarkerGroupFolders {
 final markerGroupFoldersProvider = Provider<MarkerGroupFolders>(
   (ref) => MarkerGroupFolders(unsorted: mock.StoragePaths.unsorted, myMarkers: mock.StoragePaths.landmarks),
 );
+
+/// Открывает «Локальные метки» поверх [BuildContext]. Задаётся в `main`;
+/// по умолчанию ничего не делает (тесты подставляют свою запись вызова).
+final allMarkersOpenerProvider = Provider<void Function(BuildContext context)>((ref) => (_) {});

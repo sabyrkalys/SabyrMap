@@ -49,7 +49,7 @@ void main() {
     final places = await c.loadPlaces();
     expect(places.map((pl) => pl.kind), [PlaceRootKind.landmarks, PlaceRootKind.downloads]);
     expect(places.first.path, f.paths.landmarks);
-    expect(places.first.title, 'Метки');
+    expect(places.first.title, 'Мои метки');
 
     downloads = f.paths.landmarks;
     expect(await c.loadPlaces(), hasLength(1));

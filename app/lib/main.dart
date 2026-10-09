@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/landmark_services_provider.dart';
+import 'explorer/local_landmarks_screen.dart';
 import 'home/home_shell.dart';
 import 'landmarks/services/landmark_services.dart';
 import 'licenses.dart';
@@ -19,6 +20,9 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         landmarkServicesProvider.overrideWithValue(services),
+        allMarkersOpenerProvider.overrideWithValue(
+          (context) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LocalLandmarksScreen())),
+        ),
         markerGroupFoldersProvider.overrideWithValue(
           MarkerGroupFolders(
             unsorted: await services.folders.getDefaultFolder(),

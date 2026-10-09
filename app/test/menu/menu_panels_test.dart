@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_screen.dart';
 import 'package:app/map/screens/available_maps_screen.dart';
 import 'package:app/map/screens/layers_panel.dart';
@@ -10,7 +11,6 @@ import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
-import 'package:app/waypoints/waypoints_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -41,6 +41,8 @@ class _SlowTracksRepository extends FakeTracksRepository {
       pending.future;
 }
 
+var openedAllMarkers = 0;
+
 void main() {
   Future<ProviderContainer> pumpPanel(
     WidgetTester tester,
@@ -53,6 +55,7 @@ void main() {
     addTearDown(tester.view.reset);
     final container = ProviderContainer(
       overrides: [
+        allMarkersOpenerProvider.overrideWithValue((_) => openedAllMarkers++),
         menuTogglesStoreProvider.overrideWithValue(_MemoryStore()),
         waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
         tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
@@ -143,11 +146,11 @@ void main() {
     expect(checkboxOf('Названия меток').value, isFalse);
   });
 
-  testWidgets('«Все метки» opens the waypoints list', (tester) async {
+  testWidgets('«Все метки» opens the local markers', (tester) async {
     await pumpPanel(tester, MenuTab.waypoints);
     await tester.tap(find.text('Все метки'));
     await tester.pumpAndSettle();
-    expect(find.byType(WaypointsListScreen), findsOneWidget);
+    expect(openedAllMarkers, 1);
   });
 
   testWidgets('«Компас» switch opens the compass screen and turns off after going back', (tester) async {

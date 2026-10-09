@@ -10,7 +10,8 @@ import 'place_root.dart';
 /// Поиск папки; null — папки нет на этой платформе.
 typedef DirectoryLookup = Future<String?> Function();
 
-/// Корневые разделы проводника: «Метки», «Загрузки», «Устройство».
+/// Корневые разделы проводника: «Мои метки», «Мои загрузки», «Память
+/// устройства».
 class PlacesProvider {
   PlacesProvider(this._paths, {@visibleForTesting DirectoryLookup? downloads, @visibleForTesting DirectoryLookup? device})
     : _downloads = downloads ?? _systemDownloads,
@@ -23,15 +24,18 @@ class PlacesProvider {
   /// Общая папка загрузок Android.
   static const String androidDownloads = '/storage/emulated/0/Download';
 
+  /// Корень общей памяти Android.
+  static const String androidStorageRoot = '/storage/emulated/0';
+
   /// Разделы в порядке меню. Несуществующие папки и повторы по пути
   /// пропускаются.
   Future<List<PlaceRoot>> listPlaces() async {
     final candidates = [
-      PlaceRoot(id: 'landmarks', title: 'Метки', path: _paths.landmarks, kind: PlaceRootKind.landmarks),
+      PlaceRoot(id: 'landmarks', title: 'Мои метки', path: _paths.landmarks, kind: PlaceRootKind.landmarks),
       if (await _safe(_downloads) case final path?)
-        PlaceRoot(id: 'downloads', title: 'Загрузки', path: path, kind: PlaceRootKind.downloads),
+        PlaceRoot(id: 'downloads', title: 'Мои загрузки', path: path, kind: PlaceRootKind.downloads),
       if (await _safe(_device) case final path?)
-        PlaceRoot(id: 'device', title: 'Устройство', path: path, kind: PlaceRootKind.deviceFolder),
+        PlaceRoot(id: 'device', title: 'Память устройства', path: path, kind: PlaceRootKind.deviceFolder),
     ];
     final seen = <String>{};
     final places = <PlaceRoot>[];
@@ -59,5 +63,10 @@ class PlacesProvider {
     return (await getDownloadsDirectory())?.path;
   }
 
-  static Future<String?> _externalStorage() async => (await getExternalStorageDirectory())?.path;
+  /// Decision: «Память устройства» — корень общей памяти (на Android
+  /// `/storage/emulated/0`), а не папка приложения.
+  static Future<String?> _externalStorage() async {
+    if (Platform.isAndroid && await Directory(androidStorageRoot).exists()) return androidStorageRoot;
+    return (await getExternalStorageDirectory())?.path;
+  }
 }
