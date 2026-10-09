@@ -99,6 +99,8 @@ class FolderContextMenu extends ConsumerWidget {
               item('bookmark', Icons.bookmark_add_outlined, _accent, 'Закладка', () async {
                 navigator.pop();
                 say(await FolderContextActions.bookmark(services, folder));
+                // Перерисовать экран: закладка появляется в боковой панели.
+                await explorer.refresh();
               }),
               item('details', Icons.info_outline, _accent, 'Детали', () async {
                 navigator.pop();

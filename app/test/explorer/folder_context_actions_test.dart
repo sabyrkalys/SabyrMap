@@ -99,6 +99,27 @@ void main() {
     expect(Directory(lake).existsSync(), isFalse);
   });
 
+  test('bookmarks follow a rename and go away with a delete', () async {
+    final s = f.services;
+    final day = p.join(trip, 'День 1');
+    await FolderContextActions.bookmark(s, node(trip));
+    await FolderContextActions.bookmark(s, node(day));
+    expect(await FolderContextActions.bookmark(s, node(trip)), 'Уже в закладках');
+    await FolderContextActions.rename(s, node(trip), 'Озеро');
+    final lake = p.join(f.paths.landmarks, 'Озеро');
+    expect(FolderContextActions.bookmarks(s), [lake, p.join(lake, 'День 1')]);
+    await FolderContextActions.delete(s, node(lake));
+    expect(FolderContextActions.bookmarks(s), isEmpty);
+  });
+
+  test('removeBookmark drops only that path', () async {
+    final s = f.services;
+    await FolderContextActions.bookmark(s, node(trip));
+    await FolderContextActions.bookmark(s, node(f.paths.importDefault));
+    await FolderContextActions.removeBookmark(s, trip);
+    expect(FolderContextActions.bookmarks(s), [f.paths.importDefault]);
+  });
+
   group('pasting folders', () {
     test('a copied folder is copied with its content; a taken name gets _1', () async {
       final s = f.services;

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:app/derived_export/details_renderer.dart';
 import 'package:app/landmarks/explorer/explorer_controller.dart';
 import 'package:app/landmarks/explorer/explorer_state.dart';
@@ -164,6 +166,15 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Доступ не предоставлен')));
     }
+  }
+
+  /// Открывает папку закладки внутри её раздела (чтобы «Назад» и путь в
+  /// шапке шли от раздела).
+  Future<void> _openBookmark(String path) async {
+    setState(() => _drawerOpen = false);
+    final place = _places.where((pl) => p.equals(pl.path, path) || p.isWithin(pl.path, path)).firstOrNull;
+    if (place != null && _explorer.state.currentPlace?.id != place.id) await _explorer.openPlace(place);
+    await _explorer.openFolder(path);
   }
 
   Future<void> _onPlace(PlaceRoot place) async {
@@ -512,6 +523,15 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
                   ),
                   Positioned.fill(
                     child: LocalLandmarksDrawer(
+                      bookmarks: [
+                        for (final b in FolderContextActions.bookmarks(_services))
+                          if (Directory(b).existsSync()) b,
+                      ],
+                      onBookmark: _openBookmark,
+                      onRemoveBookmark: (path) async {
+                        await FolderContextActions.removeBookmark(_services, path);
+                        if (mounted) setState(() {});
+                      },
                       isOpen: _drawerOpen,
                       places: _places,
                       currentPlace: place,

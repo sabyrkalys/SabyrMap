@@ -1,5 +1,6 @@
 import 'package:app/landmarks/explorer/places/place_root.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
 
 import '../map/screens/available_maps/available_maps_models.dart';
 import '../map/screens/available_maps/side_drawer.dart';
@@ -17,7 +18,15 @@ class LocalLandmarksDrawer extends StatelessWidget {
     required this.deviceUsage,
     required this.onPlace,
     required this.onClose,
+    this.bookmarks = const [],
+    this.onBookmark,
+    this.onRemoveBookmark,
   });
+
+  /// Папки из закладок (существующие).
+  final List<String> bookmarks;
+  final ValueChanged<String>? onBookmark;
+  final ValueChanged<String>? onRemoveBookmark;
 
   final bool isOpen;
   final List<PlaceRoot> places;
@@ -42,6 +51,73 @@ class LocalLandmarksDrawer extends StatelessWidget {
     PlaceRootKind.deviceFolder => Icons.smartphone_outlined,
     PlaceRootKind.custom => Icons.folder_outlined,
   };
+
+  /// Долгое нажатие на закладку: шторка с предложением удалить её.
+  Future<void> _askRemove(BuildContext context, String path) async {
+    final remove = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        key: const Key('bookmark_menu'),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    p.basename(path),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500, color: Color(0xFF212121)),
+                  ),
+                ),
+                InkWell(
+                  key: const Key('bookmark_menu_remove'),
+                  onTap: () => Navigator.pop(context, true),
+                  borderRadius: BorderRadius.circular(8),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 32,
+                          child: Icon(Icons.bookmark_remove_outlined, size: 24, color: Color(0xFFD32F2F)),
+                        ),
+                        SizedBox(width: 16),
+                        Text('Удалить закладку', style: TextStyle(fontSize: 16, color: Color(0xFF212121))),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      key: const Key('bookmark_menu_cancel'),
+                      onPressed: () => Navigator.pop(context, false),
+                      style: TextButton.styleFrom(foregroundColor: const Color(0xFF00A38E)),
+                      child: const Text('ОТМЕНА', style: TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (remove ?? false) onRemoveBookmark?.call(path);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,6 +157,19 @@ class LocalLandmarksDrawer extends StatelessWidget {
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
+                      if (bookmarks.isNotEmpty) ...[
+                        const SideDrawerHeader('ЗАКЛАДКИ'),
+                        for (final path in bookmarks)
+                          ListTile(
+                            key: Key('drawer_bookmark_${p.basename(path)}'),
+                            leading: const Icon(Icons.bookmark_outline),
+                            title: Text(p.basename(path)),
+                            subtitle: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            onTap: () => onBookmark?.call(path),
+                            onLongPress: () => _askRemove(context, path),
+                          ),
+                        const Divider(),
+                      ],
                       const SideDrawerHeader('ЛОКАЛЬНЫЕ МЕТКИ'),
                       for (final place in places) ...[
                         ListTile(
