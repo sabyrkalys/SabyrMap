@@ -23,6 +23,7 @@ import 'package:collection/collection.dart';
 /// | `area_m2`     | double | Площадь области, м²                        |
 /// | `activity`    | String | Вид активности (пешком, авто...)           |
 /// | `year`        | int    | Год, к которому относится объект           |
+/// | `closed`      | bool   | Замкнут ли контур области (нет — true)     |
 ///
 /// Допустимые типы значений: [bool], [int] (64 бита), [double], [String],
 /// [Uint8List] (сырые байты). Любой другой тип — [SerializationException]
@@ -44,6 +45,7 @@ class LandmarkMetadata {
   static const String areaKey = 'area_m2';
   static const String activityKey = 'activity';
   static const String yearKey = 'year';
+  static const String closedKey = 'closed';
 
   /// Записи метаданных; порядок ключей сохраняется при записи.
   final Map<String, dynamic> entries;

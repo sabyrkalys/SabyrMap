@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'package:app/landmarks/composite/distance/haversine.dart';
 
 import 'landmark_item.dart';
 import 'sort_direction.dart';
@@ -80,14 +80,8 @@ class SortOptions {
   }
 
   /// Расстояние по большому кругу (гаверсинус), метры.
-  static double distanceMeters(double lat1, double lon1, double lat2, double lon2) {
-    const earthRadius = 6371008.8;
-    double rad(double deg) => deg * pi / 180;
-    final dLat = rad(lat2 - lat1);
-    final dLon = rad(lon2 - lon1);
-    final a = pow(sin(dLat / 2), 2) + cos(rad(lat1)) * cos(rad(lat2)) * pow(sin(dLon / 2), 2);
-    return 2 * earthRadius * asin(sqrt(a));
-  }
+  static double distanceMeters(double lat1, double lon1, double lat2, double lon2) =>
+      Haversine.distanceDegrees(lat1, lon1, lat2, lon2);
 
   @override
   bool operator ==(Object other) => other is SortOptions && other.field == field && other.direction == direction;

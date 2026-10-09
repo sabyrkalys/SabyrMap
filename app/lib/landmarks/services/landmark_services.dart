@@ -1,3 +1,10 @@
+import 'package:app/landmarks/composite/edit_mode/edit_mode_controller.dart';
+import 'package:app/landmarks/composite/services/area_service.dart';
+import 'package:app/landmarks/composite/services/composite_creation_service.dart';
+import 'package:app/landmarks/composite/services/route_service.dart';
+import 'package:app/landmarks/composite/services/set_service.dart';
+import 'package:app/landmarks/composite/services/track_service.dart';
+import 'package:app/landmarks/composite/statistics/composite_calculator.dart';
 import 'package:app/landmarks/icons/icon_registry.dart';
 import 'package:app/landmarks/icons/icon_resolver.dart';
 import 'package:app/landmarks/repository/landmark_repository.dart';
@@ -20,6 +27,13 @@ class LandmarkServices {
     required this.folders,
     required this.icons,
     required this.repository,
+    required this.compositeCreation,
+    required this.setService,
+    required this.routeService,
+    required this.trackService,
+    required this.areaService,
+    required this.editMode,
+    required this.calculator,
   });
 
   final MarkerCreationService creation;
@@ -28,9 +42,19 @@ class LandmarkServices {
   final FolderService folders;
   final IconRegistry icons;
   final LandmarkRepository repository;
+  final CompositeCreationService compositeCreation;
+  final SetService setService;
+  final RouteService routeService;
+  final TrackService trackService;
+  final AreaService areaService;
+
+  /// Режим правки составных объектов (один на приложение).
+  final EditModeController editMode;
+  final CompositeCalculator calculator;
 
   /// Собирает сервисы: пути, базовые папки, репозиторий, настройки,
-  /// реестр иконок (сразу просканированный). [paths], [prefs] и [clock]
+  /// реестр иконок (сразу просканированный), сервисы составных объектов
+  /// и режим правки. [paths], [prefs] и [clock]
   /// подменяются в тестах.
   static Future<LandmarkServices> bootstrap({
     StoragePaths? paths,
@@ -46,6 +70,11 @@ class LandmarkServices {
     await icons.refresh();
     final folders = FolderService(storagePaths, settings);
     final editor = MetadataEditor(clock: clock);
+    const calculator = CompositeCalculator();
+    final setService = SetService(repository, editor: editor, calculator: calculator);
+    final routeService = RouteService(repository, editor: editor, calculator: calculator);
+    final trackService = TrackService(repository, editor: editor, calculator: calculator);
+    final areaService = AreaService(repository, editor: editor, calculator: calculator);
     return LandmarkServices(
       creation: MarkerCreationService(repository, folders, clock: clock),
       waypoints: WaypointService(repository, editor: editor),
@@ -53,6 +82,18 @@ class LandmarkServices {
       folders: folders,
       icons: icons,
       repository: repository,
+      compositeCreation: CompositeCreationService(repository, folders, editor, calculator: calculator, clock: clock),
+      setService: setService,
+      routeService: routeService,
+      trackService: trackService,
+      areaService: areaService,
+      editMode: EditModeController(
+        setService: setService,
+        routeService: routeService,
+        trackService: trackService,
+        areaService: areaService,
+      ),
+      calculator: calculator,
     );
   }
 }

@@ -31,6 +31,29 @@ class MetadataEditor {
     return LandmarkMetadata(entries: entries, version: source.version + 1);
   }
 
+  /// Применяет [patch] как есть: удаления, затем установки, без версии и
+  /// отметок времени — для метаданных сегментов, многоугольников и для
+  /// правок, которые записываются позже одним сохранением.
+  LandmarkMetadata merge(LandmarkMetadata source, MetadataPatch patch) {
+    final entries = Map<String, dynamic>.of(source.entries)..removeWhere((key, _) => patch.remove.contains(key));
+    for (final MapEntry(:key, :value) in patch.set.entries) {
+      if (value == null) {
+        entries.remove(key);
+      } else {
+        _checkValue(key, value);
+        entries[key] = value;
+      }
+    }
+    return source.copyWith(entries: entries);
+  }
+
+  /// Новые метаданные версии 0 из [entries] с проверкой типов значений.
+  LandmarkMetadata validateAndBuild(Map<String, Object> entries) {
+    final metadata = LandmarkMetadata(entries: Map<String, dynamic>.of(entries));
+    validateEntries(metadata);
+    return metadata;
+  }
+
   /// Проверяет, что все значения можно записать в файл: bool, int,
   /// double, String, Uint8List. Иначе — [SerializationException].
   void validateEntries(LandmarkMetadata metadata) {
