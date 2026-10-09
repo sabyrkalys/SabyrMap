@@ -25,6 +25,10 @@ class AreaObject extends LandmarkObject {
   LandmarkType get type => LandmarkType.area;
 
   @override
+  AreaObject withUserMetadata(LandmarkMetadata userMetadata) =>
+      AreaObject(polygons: polygons, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
+
+  @override
   AreaObject withTechnicalMetadata(LandmarkMetadata technicalMetadata) =>
       AreaObject(polygons: polygons, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
 

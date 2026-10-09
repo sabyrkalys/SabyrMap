@@ -17,6 +17,12 @@ import 'package:collection/collection.dart';
 /// | `style`       | String | JSON-строка со стилем (сериализованный Map)|
 /// | `created_at`  | int    | Время создания, Unix ms                    |
 /// | `updated_at`  | int    | Время последней правки, Unix ms            |
+/// | `length_m`    | double | Длина трека/маршрута, метры                |
+/// | `duration_ms` | int    | Длительность трека, мс                     |
+/// | `elevation_gain_m` | double | Набор высоты, метры                   |
+/// | `area_m2`     | double | Площадь области, м²                        |
+/// | `activity`    | String | Вид активности (пешком, авто...)           |
+/// | `year`        | int    | Год, к которому относится объект           |
 ///
 /// Допустимые типы значений: [bool], [int] (64 бита), [double], [String],
 /// [Uint8List] (сырые байты). Любой другой тип — [SerializationException]
@@ -32,6 +38,12 @@ class LandmarkMetadata {
   static const String styleKey = 'style';
   static const String createdAtKey = 'created_at';
   static const String updatedAtKey = 'updated_at';
+  static const String lengthKey = 'length_m';
+  static const String durationKey = 'duration_ms';
+  static const String elevationGainKey = 'elevation_gain_m';
+  static const String areaKey = 'area_m2';
+  static const String activityKey = 'activity';
+  static const String yearKey = 'year';
 
   /// Записи метаданных; порядок ключей сохраняется при записи.
   final Map<String, dynamic> entries;

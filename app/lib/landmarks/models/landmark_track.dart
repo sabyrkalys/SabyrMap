@@ -28,6 +28,15 @@ class TrackObject extends LandmarkObject {
   LandmarkType get type => LandmarkType.track;
 
   @override
+  TrackObject withUserMetadata(LandmarkMetadata userMetadata) =>
+      TrackObject(
+    waypoints: waypoints,
+    segments: segments,
+    userMetadata: userMetadata,
+    technicalMetadata: technicalMetadata,
+  );
+
+  @override
   TrackObject withTechnicalMetadata(LandmarkMetadata technicalMetadata) => TrackObject(
     waypoints: waypoints,
     segments: segments,

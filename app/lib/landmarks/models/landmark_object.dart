@@ -15,4 +15,7 @@ abstract class LandmarkObject {
 
   /// Копия с другими служебными метаданными (тем же содержимым).
   LandmarkObject withTechnicalMetadata(LandmarkMetadata technicalMetadata);
+
+  /// Копия с другими пользовательскими метаданными (тем же содержимым).
+  LandmarkObject withUserMetadata(LandmarkMetadata userMetadata);
 }

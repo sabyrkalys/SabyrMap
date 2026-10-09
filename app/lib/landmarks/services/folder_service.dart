@@ -46,6 +46,34 @@ class FolderService {
     }
   }
 
+  /// Подпапки и файлы [directory] раздельно (без симлинков), абсолютные
+  /// пути по алфавиту. Нет папки — оба списка пусты.
+  Future<({List<String> folders, List<String> files})> listContents(String directory) async {
+    final dir = Directory(directory);
+    if (!await dir.exists()) return (folders: <String>[], files: <String>[]);
+    final folders = <String>[];
+    final files = <String>[];
+    try {
+      await for (final entity in dir.list(followLinks: false)) {
+        if (entity is Directory) {
+          folders.add(entity.path);
+        } else if (entity is File) {
+          files.add(entity.path);
+        }
+      }
+    } on FileSystemException catch (e) {
+      throw StorageException('Cannot list folder', path: directory, cause: e);
+    }
+    return (folders: folders..sort(), files: files..sort());
+  }
+
+  /// Есть ли папка [path] (симлинк на папку тоже считается).
+  Future<bool> folderExists(String path) => Directory(path).exists();
+
+  /// Лежит ли [child] где-то внутри [parent] (сама папка — нет).
+  /// Только по путям, без обращения к диску.
+  bool isDescendant(String parent, String child) => p.isWithin(p.normalize(parent), p.normalize(child));
+
   /// Создаёт папку со всеми родителями, если её нет.
   Future<void> ensureFolder(String path) async {
     try {

@@ -28,6 +28,10 @@ class WaypointObject extends LandmarkObject {
   LandmarkType get type => LandmarkType.waypoint;
 
   @override
+  WaypointObject withUserMetadata(LandmarkMetadata userMetadata) =>
+      WaypointObject(location: location, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
+
+  @override
   WaypointObject withTechnicalMetadata(LandmarkMetadata technicalMetadata) =>
       WaypointObject(location: location, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
 

@@ -25,6 +25,10 @@ class SetObject extends LandmarkObject {
   LandmarkType get type => LandmarkType.set;
 
   @override
+  SetObject withUserMetadata(LandmarkMetadata userMetadata) =>
+      SetObject(waypoints: waypoints, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
+
+  @override
   SetObject withTechnicalMetadata(LandmarkMetadata technicalMetadata) =>
       SetObject(waypoints: waypoints, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
 

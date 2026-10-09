@@ -25,6 +25,10 @@ class RouteObject extends LandmarkObject {
   LandmarkType get type => LandmarkType.route;
 
   @override
+  RouteObject withUserMetadata(LandmarkMetadata userMetadata) =>
+      RouteObject(waypoints: waypoints, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
+
+  @override
   RouteObject withTechnicalMetadata(LandmarkMetadata technicalMetadata) =>
       RouteObject(waypoints: waypoints, userMetadata: userMetadata, technicalMetadata: technicalMetadata);
 
