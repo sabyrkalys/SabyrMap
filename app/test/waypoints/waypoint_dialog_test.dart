@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:app/config/storage_paths.dart';
 import 'package:app/map/map_crosshair.dart';
+import 'package:app/waypoints/waypoint_color.dart';
 import 'package:app/waypoints/waypoint_dialog/coords_system.dart';
 import 'package:app/waypoints/waypoint_dialog/marker_group.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
@@ -109,100 +110,326 @@ void main() {
     expect(data.note, '');
   });
 
+  Future<void> openProperty(WidgetTester tester, String type) async {
+    await tester.tap(find.byKey(const Key('waypoint_dialog_more')));
+    await tester.pumpAndSettle();
+    final item = find.byKey(Key('waypoint_property_$type'));
+    await tester.ensureVisible(item);
+    await tester.pumpAndSettle();
+    await tester.tap(item);
+    await tester.pumpAndSettle();
+  }
+
   testWidgets('«ОК» returns the name and the description', (tester) async {
     final results = await open(tester);
     await tester.enterText(find.byKey(const Key('waypoint_dialog_name_field')), '  Родник ');
-
-    await tester.tap(find.byKey(const Key('waypoint_dialog_note')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('waypoint_dialog_note_field')), 'Холодная вода');
-    await tester.tap(find.byKey(const Key('waypoint_dialog_note_ok')));
-    await tester.pumpAndSettle();
+    await openProperty(tester, 'description');
+    await tester.enterText(find.byKey(const Key('waypoint_dialog_description')), 'Холодная вода');
     await ok(tester);
 
     final data = results.single!;
     expect(data.name, 'Родник');
     expect(data.note, 'Холодная вода');
+    expect(data.comment, isNull);
   });
 
-  testWidgets('the flag opens «Иконка»; the chosen icon shows on the button and goes into «ОК»', (tester) async {
+  Future<void> pickIcon(WidgetTester tester, Finder button, String category, String label) async {
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('icon_category_$category')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(label));
+    await tester.pumpAndSettle();
+  }
+
+  final flag = find.byKey(const Key('waypoint_dialog_icon'));
+  final preview = find.byKey(const Key('waypoint_dialog_icon_preview'));
+  final iconLabel = find.byKey(const Key('waypoint_dialog_icon_label'));
+  String labelText(WidgetTester tester) => tester.widget<TextField>(iconLabel).controller!.text;
+
+  testWidgets('choosing an icon swaps the flag for a row: its caption and the icon', (tester) async {
     final results = await open(tester);
-    await tester.tap(find.byKey(const Key('waypoint_dialog_icon')));
-    await tester.pumpAndSettle();
-    expect(find.text('Иконка'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('icon_category_tourism')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Camp'));
-    await tester.pumpAndSettle();
+    expect(iconLabel, findsNothing);
+    await pickIcon(tester, flag, 'structures', 'Bunker');
 
-    final button = find.byKey(const Key('waypoint_dialog_icon'));
-    expect(find.descendant(of: button, matching: find.byIcon(Icons.cabin)), findsOneWidget);
-    expect(find.descendant(of: button, matching: find.byIcon(Icons.flag_sharp)), findsNothing);
+    expect(flag, findsNothing);
+    expect(labelText(tester), 'Bunker');
+    expect(find.descendant(of: preview, matching: find.byIcon(Icons.shield)), findsOneWidget);
+    expect(tester.getSize(preview), const Size(56, 44));
+    // The row sits above the palette, which keeps palette, pencil and ЕЩЁ...
+    expect(
+      tester.getBottomLeft(iconLabel).dy,
+      lessThan(tester.getTopLeft(find.byKey(const Key('waypoint_dialog_color'))).dy),
+    );
+    for (final key in ['waypoint_dialog_color', 'waypoint_dialog_note', 'waypoint_dialog_more']) {
+      expect(find.byKey(Key(key)), findsOneWidget, reason: key);
+    }
+
     await ok(tester);
-    expect(results.single!.markerIconId, 'tourism-camp');
-    expect(results.single!.iconId, isNull);
+    expect(results.single!.markerIconId, 'struct-bunker');
+    expect(results.single!.iconLabel, 'Bunker');
+    // The caption is not the waypoint's name.
+    expect(results.single!.name, '');
   });
 
-  testWidgets('«Нет» in «Иконка» brings the flag back', (tester) async {
+  testWidgets('the icon on the right opens «Иконка» again; a new icon renames an untouched caption', (tester) async {
     await open(tester);
-    final button = find.byKey(const Key('waypoint_dialog_icon'));
-    await tester.tap(button);
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('icon_category_marker')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Star'));
-    await tester.pumpAndSettle();
-    await tester.tap(button);
+    await pickIcon(tester, flag, 'structures', 'Bunker');
+    await pickIcon(tester, preview, 'nature', 'Tree');
+
+    expect(labelText(tester), 'Tree');
+    expect(find.descendant(of: preview, matching: find.byIcon(Icons.park)), findsOneWidget);
+  });
+
+  testWidgets('a caption the user wrote survives choosing another icon', (tester) async {
+    final results = await open(tester);
+    await pickIcon(tester, flag, 'structures', 'Bunker');
+    await tester.enterText(iconLabel, 'Наш бункер');
+    await pickIcon(tester, preview, 'nature', 'Tree');
+
+    expect(labelText(tester), 'Наш бункер');
+    await ok(tester);
+    expect(results.single!.iconLabel, 'Наш бункер');
+    expect(results.single!.markerIconId, 'nature-tree');
+  });
+
+  testWidgets('an icon without a glyph shows a 14×14 filled circle', (tester) async {
+    await open(tester);
+    await pickIcon(tester, flag, 'structures', 'Man made');
+    final dot = find.descendant(of: preview, matching: find.byType(Container));
+    expect(tester.getSize(dot.last), const Size(14, 14));
+  });
+
+  testWidgets('«Нет» brings back the flag and drops the caption', (tester) async {
+    final results = await open(tester);
+    await pickIcon(tester, flag, 'marker', 'Star');
+    await tester.tap(preview);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('marker_icon_none')));
     await tester.pumpAndSettle();
 
-    expect(find.descendant(of: button, matching: find.byIcon(Icons.flag_sharp)), findsOneWidget);
+    expect(flag, findsOneWidget);
+    expect(iconLabel, findsNothing);
+    await ok(tester);
+    expect(results.single!.markerIconId, isNull);
+    expect(results.single!.iconLabel, isNull);
   });
 
-  testWidgets('the palette picks a colour and tints itself', (tester) async {
-    final results = await open(tester);
-    await tester.tap(find.byKey(const Key('waypoint_dialog_color')));
+  final paletteButton = find.byKey(const Key('waypoint_dialog_color'));
+  final hexField = find.byKey(const Key('waypoint_dialog_color_hex'));
+  final swatch = find.byKey(const Key('waypoint_dialog_color_swatch'));
+  String hexText(WidgetTester tester) => tester.widget<TextField>(hexField).controller!.text;
+  Color? swatchColor(WidgetTester tester) => (tester.widget<Container>(swatch).decoration! as BoxDecoration).color;
+
+  /// Picks the colour the picker opens on (the type's, #607D8B).
+  Future<void> pickColor(WidgetTester tester, Finder button) async {
+    await tester.tap(button);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('waypoint_color_picker_select_button')));
     await tester.pumpAndSettle();
-    await ok(tester);
+  }
 
-    // The picker opens on the type's colour (generic #607D8B).
+  testWidgets('a picked colour gets its own row, #AARRGGBB and a swatch; the palette button goes', (tester) async {
+    final results = await open(tester);
+    expect(hexField, findsNothing);
+    await pickColor(tester, paletteButton);
+
+    expect(hexText(tester), '#FF607D8B');
+    expect(swatchColor(tester), const Color(0xFF607D8B));
+    expect(tester.getSize(swatch), const Size(24, 24));
+    expect(paletteButton, findsNothing);
+    expect(flag, findsOneWidget);
+    expect(tester.getBottomLeft(hexField).dy, lessThan(tester.getTopLeft(flag).dy));
+
+    await ok(tester);
     expect(results.single!.colorValue, 0xFF607D8B);
     expect(results.single!.colorHex, '#607D8B');
   });
 
-  testWidgets('«ЕЩЁ...» lists every extra over the dialog; ОТМЕНА closes only the sheet', (tester) async {
+  testWidgets('icon and colour together: both rows, icon first, only the pencil and ЕЩЁ... below', (tester) async {
     await open(tester);
-    await tester.tap(find.byKey(const Key('waypoint_dialog_more')));
-    await tester.pumpAndSettle();
+    await pickIcon(tester, flag, 'structures', 'Bunker');
+    await pickColor(tester, paletteButton);
 
-    for (final label in [
-      'Цвет',
-      'Стиль',
-      'Изображение',
-      'Галерея',
-      'Аудио',
-      'Курс',
-      'Сайт',
-      'Ключевые слова',
-      'Описание',
-    ]) {
-      expect(find.text(label), findsOneWidget, reason: label);
-    }
-    await tester.tap(find.byKey(const Key('waypoint_more_cancel')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('waypoint_more_sheet')), findsNothing);
-    expect(find.byKey(const Key('waypoint_dialog')), findsOneWidget);
+    expect(iconLabel, findsOneWidget);
+    expect(hexField, findsOneWidget);
+    expect(tester.getTopLeft(iconLabel).dy, lessThan(tester.getTopLeft(hexField).dy));
+    expect(flag, findsNothing);
+    expect(paletteButton, findsNothing);
+    expect(find.byKey(const Key('waypoint_dialog_note')), findsOneWidget);
+    expect(find.byKey(const Key('waypoint_dialog_more')), findsOneWidget);
   });
 
-  testWidgets('«ЕЩЁ...» → «Стиль» sets the waypoint type', (tester) async {
+  testWidgets('typing a whole #AARRGGBB sets the colour; anything less keeps the last one', (tester) async {
+    final results = await open(tester);
+    await pickColor(tester, paletteButton);
+
+    await tester.enterText(hexField, '#FF62DF1F');
+    await tester.pump();
+    expect(swatchColor(tester), const Color(0xFF62DF1F));
+
+    await tester.enterText(hexField, '#FF62D');
+    await tester.pump();
+    expect(swatchColor(tester), const Color(0xFF62DF1F));
+    // Mid-typing the field is left as it is.
+    expect(hexText(tester), '#FF62D');
+
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    expect(hexText(tester), '#FF62DF1F');
+
+    await ok(tester);
+    expect(results.single!.colorValue, 0xFF62DF1F);
+  });
+
+  testWidgets('the swatch opens the picker again; the field shows the picked colour', (tester) async {
+    await open(tester);
+    await pickColor(tester, paletteButton);
+    await tester.enterText(hexField, '#FF62DF1F');
+    await tester.pump();
+
+    await pickColor(tester, find.byKey(const Key('waypoint_dialog_color_preview')));
+    // The picker opened on the colour typed in, and «Выбрать» keeps it.
+    expect(hexText(tester), '#FF62DF1F');
+    expect(swatchColor(tester), const Color(0xFF62DF1F));
+  });
+
+  testWidgets('clearing the HEX field drops the colour and brings the palette button back', (tester) async {
+    final results = await open(tester);
+    await pickColor(tester, paletteButton);
+    await tester.enterText(hexField, '');
+    await tester.pump();
+
+    expect(hexField, findsNothing);
+    expect(paletteButton, findsOneWidget);
+    await ok(tester);
+    expect(results.single!.colorValue, isNull);
+  });
+
+  testWidgets('«Сбросить» in the picker drops the colour too', (tester) async {
+    await open(tester);
+    await pickColor(tester, paletteButton);
+    await tester.tap(find.byKey(const Key('waypoint_dialog_color_preview')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('waypoint_color_picker_reset_button')));
+    await tester.pumpAndSettle();
+
+    expect(hexField, findsNothing);
+    expect(paletteButton, findsOneWidget);
+  });
+
+  test('argbHex / parseArgbHex: #AARRGGBB in capitals, eight hex digits or nothing', () {
+    expect(argbHex(0xFF62DF1F), '#FF62DF1F');
+    expect(argbHex(0x8012A0C4), '#8012A0C4');
+    expect(parseArgbHex('#ff62df1f'), 0xFF62DF1F);
+    expect(parseArgbHex('8012A0C4'), 0x8012A0C4);
+    expect(parseArgbHex('#62DF1F'), isNull);
+    expect(parseArgbHex('#FF62DF1G'), isNull);
+    expect(parseArgbHex(''), isNull);
+  });
+
+  final pencil = find.byKey(const Key('waypoint_dialog_note'));
+  final comment = find.byKey(const Key('waypoint_dialog_comment'));
+  final description = find.byKey(const Key('waypoint_dialog_description'));
+
+  testWidgets('«ЕЩЁ...» opens «Ещё...» with nine properties in order; ОТМЕНА changes nothing', (tester) async {
     final results = await open(tester);
     await tester.tap(find.byKey(const Key('waypoint_dialog_more')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('waypoint_more_style')));
+
+    expect(find.text('Ещё...'), findsOneWidget);
+    final titles = ['Иконка', 'Стиль', 'Изображение', 'Галерея', 'Аудио', 'Курс', 'Сайт', 'Ключевые слова', 'Описание'];
+    for (var i = 1; i < titles.length; i++) {
+      expect(
+        tester.getTopLeft(find.text(titles[i])).dy,
+        greaterThan(tester.getTopLeft(find.text(titles[i - 1])).dy),
+        reason: titles[i],
+      );
+    }
+    expect(find.text('Комментарий'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('more_properties_cancel')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('more_properties_sheet')), findsNothing);
+    expect(find.byKey(const Key('waypoint_dialog')), findsOneWidget);
+    expect(description, findsNothing);
+    await ok(tester);
+    expect(results.single!.note, '');
+  });
+
+  testWidgets('«Описание» shows a borderless five-line block with a label and a line under it', (tester) async {
+    await open(tester);
+    await openProperty(tester, 'description');
+
+    expect(find.byKey(const Key('more_properties_sheet')), findsNothing);
+    expect(find.text('Описание'), findsOneWidget);
+    final field = tester.widget<TextField>(description);
+    expect(field.minLines, 5);
+    expect(field.maxLines, isNull);
+    expect(field.decoration!.border, InputBorder.none);
+    expect(comment, findsNothing);
+    expect(pencil, findsNothing);
+    // The cursor moves from «Имя» into the new field.
+    final editable = tester.widget<EditableText>(find.descendant(of: description, matching: find.byType(EditableText)));
+    expect(editable.focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets('the pencil shows «Комментарий»: one line with an underline, and goes away', (tester) async {
+    final results = await open(tester);
+    await tester.tap(pencil);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Комментарий'), findsOneWidget);
+    expect(tester.widget<TextField>(comment).maxLines, 1);
+    expect(tester.widget<TextField>(comment).decoration!.enabledBorder, isA<UnderlineInputBorder>());
+    expect(pencil, findsNothing);
+    expect(description, findsNothing);
+    final editable = tester.widget<EditableText>(find.descendant(of: comment, matching: find.byType(EditableText)));
+    expect(editable.focusNode.hasFocus, isTrue);
+
+    await tester.enterText(comment, 'У ручья');
+    await ok(tester);
+    expect(results.single!.comment, 'У ручья');
+    expect(results.single!.note, '');
+  });
+
+  testWidgets('both fields at once, comment above description; ОК passes each on its own', (tester) async {
+    final results = await open(tester);
+    await tester.tap(pencil);
+    await tester.pumpAndSettle();
+    await openProperty(tester, 'description');
+
+    expect(tester.getTopLeft(comment).dy, lessThan(tester.getTopLeft(description).dy));
+    await tester.enterText(comment, 'У ручья');
+    await tester.enterText(description, 'Вода круглый год');
+    await ok(tester);
+    expect(results.single!.comment, 'У ручья');
+    expect(results.single!.note, 'Вода круглый год');
+  });
+
+  testWidgets('with icon, colour and a field chosen only ЕЩЁ... is left in the palette', (tester) async {
+    await open(tester);
+    await pickIcon(tester, flag, 'marker', 'Star');
+    await pickColor(tester, paletteButton);
+    await tester.tap(pencil);
+    await tester.pumpAndSettle();
+
+    for (final button in [flag, paletteButton, pencil]) {
+      expect(button, findsNothing);
+    }
+    expect(find.byKey(const Key('waypoint_dialog_more')), findsOneWidget);
+  });
+
+  testWidgets('«Ещё...» → «Иконка» opens the icon picker', (tester) async {
+    await open(tester);
+    await openProperty(tester, 'icon');
+    expect(find.text('Иконка'), findsOneWidget);
+    expect(find.byKey(const Key('marker_icon_none')), findsOneWidget);
+  });
+
+  testWidgets('«Ещё...» → «Стиль» sets the waypoint type', (tester) async {
+    final results = await open(tester);
+    await openProperty(tester, 'style');
     await tester.tap(find.byKey(const Key('waypoint_dialog_type_water')));
     await tester.pumpAndSettle();
     await ok(tester);
@@ -210,14 +437,12 @@ void main() {
     expect(results.single!.type, 'water');
   });
 
-  testWidgets('a stub extra closes the sheet and leaves the dialog as it was', (tester) async {
+  testWidgets('a stub property closes the sheet and leaves the dialog as it was', (tester) async {
     await open(tester);
-    await tester.tap(find.byKey(const Key('waypoint_dialog_more')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('waypoint_more_website')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('waypoint_more_sheet')), findsNothing);
+    await openProperty(tester, 'website');
+    expect(find.byKey(const Key('more_properties_sheet')), findsNothing);
     expect(find.byKey(const Key('waypoint_dialog')), findsOneWidget);
+    expect(pencil, findsOneWidget);
   });
 
   testWidgets('for a target the first point option names the target', (tester) async {

@@ -14,7 +14,8 @@ import 'action_button.dart';
 import 'coordinates_dialog.dart';
 import 'coords_system.dart';
 import 'marker_group.dart';
-import 'more_sheet.dart';
+import 'more_properties_sheet.dart';
+import 'waypoint_property.dart';
 import 'waypoint_data.dart';
 
 const Color _accent = Color(0xFF00A38E);
@@ -61,13 +62,47 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
   bool _groupExpanded = false;
   // The icon from «Иконка»; null is the standard marker.
   MarkerIcon? _icon;
+
+  // The chosen icon's caption, «Bunker» until the user rewrites it.
+  final _iconLabel = TextEditingController();
+  bool _iconLabelTouched = false;
+
+  // ARGB of the chosen colour; null keeps the type's colour.
   int? _colorValue;
+
+  // The chosen colour as #AARRGGBB, editable by hand.
+  final _hex = TextEditingController();
+  final _hexFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // Leaving the field with something that isn't a colour puts the colour back.
+    _hexFocus.addListener(() {
+      if (!_hexFocus.hasFocus) _restoreHex();
+    });
+  }
+
   String _type = defaultWaypointType;
-  String _note = '';
+
+  // «Комментарий» (the pencil) and «Описание» («Ещё...»), each shown on its own.
+  bool _commentVisible = false;
+  bool _descriptionVisible = false;
+  final _comment = TextEditingController();
+  final _description = TextEditingController();
+  final _commentFocus = FocusNode();
+  final _descriptionFocus = FocusNode();
 
   @override
   void dispose() {
     _name.dispose();
+    _iconLabel.dispose();
+    _hex.dispose();
+    _hexFocus.dispose();
+    _comment.dispose();
+    _description.dispose();
+    _commentFocus.dispose();
+    _descriptionFocus.dispose();
     super.dispose();
   }
 
@@ -77,20 +112,44 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
 
   Future<void> _pickIcon() async {
     final result = await showMarkerIconSheet(context, currentIconId: _icon?.id, scanner: widget.iconScanner);
-    if (result != null && mounted) setState(() => _icon = result.id == noneOption.id ? null : result);
+    if (result == null || !mounted) return;
+    setState(() {
+      if (result.id == noneOption.id) {
+        _icon = null;
+        _iconLabel.clear();
+        _iconLabelTouched = false;
+      } else {
+        _icon = result;
+        // A caption the user typed survives choosing another icon.
+        if (!_iconLabelTouched) _iconLabel.text = result.label;
+      }
+    });
   }
 
   Future<void> _pickColor() async {
     final pick = await showWaypointColorPicker(context, _effectiveColor);
-    if (pick != null && mounted) setState(() => _colorValue = pick.reset ? null : pick.color.toARGB32());
+    if (pick == null || !mounted) return;
+    setState(() {
+      _colorValue = pick.reset ? null : pick.color.toARGB32();
+      // The field shows the colour that was just picked.
+      _hex.text = _colorValue == null ? '' : argbHex(_colorValue!);
+    });
   }
 
-  Future<void> _editNote() async {
-    final note = await showDialog<String>(
-      context: context,
-      builder: (_) => _NoteDialog(initial: _note),
-    );
-    if (note != null && mounted) setState(() => _note = note);
+  /// Typing in the HEX field: a whole #AARRGGBB is the new colour,
+  /// anything else leaves the colour as it was; an empty field drops it.
+  void _onHexChanged(String text) {
+    if (text.trim().isEmpty) {
+      setState(() => _colorValue = null);
+      return;
+    }
+    final value = parseArgbHex(text);
+    if (value != null) setState(() => _colorValue = value);
+  }
+
+  void _restoreHex() {
+    final value = _colorValue;
+    if (value != null && parseArgbHex(_hex.text) != value) _hex.text = argbHex(value);
   }
 
   Future<void> _pickType() async {
@@ -118,24 +177,35 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
     if (type != null && mounted) setState(() => _type = type);
   }
 
-  Future<void> _more() async {
-    final extra = await showWaypointMoreSheet(context);
-    if (extra == null || !mounted) return;
-    switch (extra) {
-      case WaypointExtra.color:
-        await _pickColor();
-      case WaypointExtra.style:
+  /// Shows a field and puts the cursor in it. Autofocus alone won't do:
+  /// «Имя» already has the focus when the field appears.
+  void _show(VoidCallback reveal, FocusNode focus) {
+    setState(reveal);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) focus.requestFocus();
+    });
+  }
+
+  Future<void> _onMoreProperties() async {
+    final selected = await showMorePropertiesSheet(context);
+    if (selected == null || !mounted) return;
+    switch (selected) {
+      case WaypointPropertyType.icon:
+        await _pickIcon();
+      case WaypointPropertyType.style:
         await _pickType();
-      case WaypointExtra.description:
-        await _editNote();
-      case WaypointExtra.image ||
-          WaypointExtra.gallery ||
-          WaypointExtra.audio ||
-          WaypointExtra.course ||
-          WaypointExtra.website ||
-          WaypointExtra.keywords:
+      case WaypointPropertyType.description:
+        _show(() => _descriptionVisible = true, _descriptionFocus);
+      case WaypointPropertyType.comment:
+        _show(() => _commentVisible = true, _commentFocus);
+      case WaypointPropertyType.image ||
+          WaypointPropertyType.gallery ||
+          WaypointPropertyType.audio ||
+          WaypointPropertyType.course ||
+          WaypointPropertyType.website ||
+          WaypointPropertyType.keywords:
         // Not stored by the app or the server yet.
-        debugPrint('Waypoint extra: ${extra.name}');
+        debugPrint('Property selected: $selected');
     }
   }
 
@@ -309,6 +379,157 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
     );
   }
 
+  /// The chosen icon: its caption to edit, and the icon itself, which
+  /// opens «Иконка» again.
+  Widget _iconRow(MarkerIcon icon) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: TextField(
+            key: const Key('waypoint_dialog_icon_label'),
+            controller: _iconLabel,
+            onChanged: (_) => _iconLabelTouched = true,
+            style: const TextStyle(fontSize: 16, color: _textColor),
+            cursorColor: _accent,
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFBDBDBD))),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: _accent, width: 1.5)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Material(
+          color: const Color(0xFFE4E8ED),
+          borderRadius: BorderRadius.circular(6),
+          child: InkWell(
+            key: const Key('waypoint_dialog_icon_preview'),
+            onTap: _pickIcon,
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              width: 56,
+              height: 44,
+              child: Center(child: MarkerIconGlyph(icon: icon, size: 24, dotSize: 14)),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// The chosen colour: its #AARRGGBB to edit, and a swatch that opens
+  /// the colour picker again.
+  Widget _colorRow(Color color) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: TextField(
+            key: const Key('waypoint_dialog_color_hex'),
+            controller: _hex,
+            focusNode: _hexFocus,
+            onChanged: _onHexChanged,
+            onSubmitted: (_) => _restoreHex(),
+            style: const TextStyle(fontSize: 16, color: _textColor, fontWeight: FontWeight.w400),
+            cursorColor: _accent,
+            decoration: const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFBDBDBD))),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: _accent, width: 1.5)),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Material(
+          color: const Color(0xFFE4E8ED),
+          borderRadius: BorderRadius.circular(6),
+          child: InkWell(
+            key: const Key('waypoint_dialog_color_preview'),
+            onTap: _pickColor,
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              width: 56,
+              height: 44,
+              child: Center(
+                child: Container(
+                  key: const Key('waypoint_dialog_color_swatch'),
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: color,
+                    // A light colour would vanish on the grey.
+                    border: color.computeLuminance() > 0.8 ? Border.all(color: const Color(0xFFBDBDBD)) : null,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// «Комментарий»: one line under a label, an underline below.
+  Widget _commentField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('Комментарий', style: TextStyle(fontSize: 15, color: _textColor)),
+        TextField(
+          key: const Key('waypoint_dialog_comment'),
+          controller: _comment,
+          focusNode: _commentFocus,
+          maxLines: 1,
+          style: const TextStyle(fontSize: 16, color: _textColor),
+          cursorColor: _accent,
+          decoration: const InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 8),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFBDBDBD))),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: _accent, width: 1.5)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// «Описание»: a label over a borderless block of at least five lines,
+  /// a thin line under it.
+  Widget _descriptionField() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Описание', style: TextStyle(fontSize: 15, color: _textColor)),
+          TextField(
+            key: const Key('waypoint_dialog_description'),
+            controller: _description,
+            focusNode: _descriptionFocus,
+            minLines: 5,
+            maxLines: null,
+            maxLength: 500,
+            keyboardType: TextInputType.multiline,
+            textAlignVertical: TextAlignVertical.top,
+            style: const TextStyle(fontSize: 15, color: _textColor),
+            cursorColor: _accent,
+            decoration: const InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              counterText: '',
+              contentPadding: EdgeInsets.symmetric(vertical: 8),
+            ),
+          ),
+          const Divider(color: Color(0xFFBDBDBD), height: 1),
+        ],
+      ),
+    );
+  }
+
   void _ok() => Navigator.of(context).pop(
     WaypointData(
       name: _name.text.trim(),
@@ -316,9 +537,12 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
       groupId: _groupId,
       iconId: _icon?.fileName,
       markerIconId: _icon == null || _icon!.isFile ? null : _icon!.id,
+      iconLabel: _icon == null ? null : _iconLabel.text.trim(),
       colorValue: _colorValue,
       type: _type,
-      note: _note,
+      // «Описание» is the waypoint's note on the server.
+      note: _descriptionVisible ? _description.text.trim() : '',
+      comment: _commentVisible ? _comment.text.trim() : null,
     ),
   );
 
@@ -378,26 +602,36 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
             const SizedBox(height: 16),
             _groupSection(),
             const SizedBox(height: 24),
+            if (_icon case final icon?) ...[_iconRow(icon), const SizedBox(height: 16)],
+            if (_colorValue case final color?) ...[_colorRow(Color(color)), const SizedBox(height: 16)],
+            if (_commentVisible) ...[_commentField(), const SizedBox(height: 16)],
+            if (_descriptionVisible) ...[_descriptionField(), const SizedBox(height: 16)],
             Row(
               children: [
-                ActionButton(
-                  key: const Key('waypoint_dialog_icon'),
-                  icon: Icons.flag_sharp,
-                  onTap: _pickIcon,
-                  child: _icon == null ? null : MarkerIconGlyph(icon: _icon!, size: 24),
-                ),
-                const SizedBox(width: 8),
-                ActionButton(
-                  key: const Key('waypoint_dialog_color'),
-                  icon: Icons.palette_sharp,
-                  iconColor: _colorValue != null ? _effectiveColor : _iconColor,
-                  onTap: _pickColor,
-                ),
-                const SizedBox(width: 8),
-                ActionButton(key: const Key('waypoint_dialog_note'), icon: Icons.edit_sharp, onTap: _editNote),
-                const SizedBox(width: 8),
+                // A chosen icon or colour has its own row above instead of
+                // its button here.
+                if (_icon == null) ...[
+                  ActionButton(key: const Key('waypoint_dialog_icon'), icon: Icons.flag_sharp, onTap: _pickIcon),
+                  const SizedBox(width: 8),
+                ],
+                if (_colorValue == null) ...[
+                  ActionButton(key: const Key('waypoint_dialog_color'), icon: Icons.palette_sharp, onTap: _pickColor),
+                  const SizedBox(width: 8),
+                ],
+                if (!_commentVisible && !_descriptionVisible) ...[
+                  ActionButton(
+                    key: const Key('waypoint_dialog_note'),
+                    icon: Icons.edit_sharp,
+                    onTap: () => _show(() => _commentVisible = true, _commentFocus),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 Expanded(
-                  child: WideActionButton(key: const Key('waypoint_dialog_more'), label: 'ЕЩЁ...', onTap: _more),
+                  child: WideActionButton(
+                    key: const Key('waypoint_dialog_more'),
+                    label: 'ЕЩЁ...',
+                    onTap: _onMoreProperties,
+                  ),
                 ),
               ],
             ),
@@ -417,49 +651,6 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
           onPressed: _ok,
           style: TextButton.styleFrom(foregroundColor: _accent),
           child: const Text('ОК', style: buttonStyle),
-        ),
-      ],
-    );
-  }
-}
-
-/// «Описание»: the waypoint's note. Completes with the text on «ОК».
-class _NoteDialog extends StatefulWidget {
-  const _NoteDialog({required this.initial});
-
-  final String initial;
-
-  @override
-  State<_NoteDialog> createState() => _NoteDialogState();
-}
-
-class _NoteDialogState extends State<_NoteDialog> {
-  late final _controller = TextEditingController(text: widget.initial);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Описание'),
-      content: TextField(
-        key: const Key('waypoint_dialog_note_field'),
-        controller: _controller,
-        autofocus: true,
-        maxLength: 500,
-        maxLines: 4,
-        minLines: 1,
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('ОТМЕНА')),
-        TextButton(
-          key: const Key('waypoint_dialog_note_ok'),
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('ОК'),
         ),
       ],
     );

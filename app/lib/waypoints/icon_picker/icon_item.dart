@@ -9,10 +9,13 @@ const Color _iconColor = Color(0xFF333333);
 
 /// How [icon] looks: its glyph, its picture file, or a filled circle.
 class MarkerIconGlyph extends StatelessWidget {
-  const MarkerIconGlyph({super.key, required this.icon, this.size = 22});
+  const MarkerIconGlyph({super.key, required this.icon, this.size = 22, this.dotSize});
 
   final MarkerIcon icon;
   final double size;
+
+  /// Diameter of the filled circle; by default in scale with [size] (12 at 22).
+  final double? dotSize;
 
   @override
   Widget build(BuildContext context) {
@@ -34,9 +37,10 @@ class MarkerIconGlyph extends StatelessWidget {
     }
     final glyph = icon.icon;
     if (glyph != null) return Icon(glyph, size: size, color: _iconColor);
+    final dot = dotSize ?? size * 12 / 22;
     return Container(
-      width: size * 12 / 22,
-      height: size * 12 / 22,
+      width: dot,
+      height: dot,
       decoration: const BoxDecoration(shape: BoxShape.circle, color: _iconColor),
     );
   }

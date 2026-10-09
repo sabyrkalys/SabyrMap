@@ -13,9 +13,11 @@ class WaypointData {
     this.groupId = unsortedGroupId,
     this.iconId,
     this.markerIconId,
+    this.iconLabel,
     this.colorValue,
     this.type = defaultWaypointType,
     this.note = '',
+    this.comment,
   });
 
   /// «Несортированные метки», where waypoints go by default.
@@ -36,10 +38,18 @@ class WaypointData {
   /// yet: that comes with the real icon set.
   final String? markerIconId;
 
+  /// Caption of the chosen icon («Bunker», or what the user wrote instead);
+  /// null without an icon. Not stored by the server yet.
+  final String? iconLabel;
+
   /// ARGB of the chosen colour; null keeps the type's colour.
   final int? colorValue;
   final String type;
   final String note;
+
+  /// «Комментарий»: one line, not stored by the server yet; null when the
+  /// field was not opened.
+  final String? comment;
 
   /// [colorValue] as the API's `#RRGGBB`.
   String? get colorHex => colorValue == null ? null : colorToHex(Color(colorValue!));
