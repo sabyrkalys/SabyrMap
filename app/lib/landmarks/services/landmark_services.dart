@@ -12,6 +12,17 @@ import 'package:app/landmarks/import_export/registry/format_registry.dart';
 import 'package:app/landmarks/icons/icon_resolver.dart';
 import 'package:app/landmarks/repository/landmark_repository.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
+import 'package:app/navigation/follow_path/follow_path_controller.dart';
+import 'package:app/navigation/follow_path/follow_path_signal.dart';
+import 'package:app/navigation/measure/measure_controller.dart';
+import 'package:app/navigation/position/position_source.dart';
+import 'package:app/navigation/proximity/proximity_alert_controller.dart';
+import 'package:app/navigation/proximity/proximity_alert_signal.dart';
+import 'package:app/navigation/proximity/proximity_alert_store.dart';
+import 'package:app/navigation/settings/navigation_settings.dart';
+import 'package:app/navigation/signals/audio_signaler.dart';
+import 'package:app/navigation/signals/silent_signaler.dart';
+import 'package:app/navigation/target/target_controller.dart';
 import 'package:app/storage/storage_paths.dart';
 import 'package:app/storage/storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,6 +51,13 @@ class LandmarkServices {
     required this.formatRegistry,
     required this.importService,
     required this.exportService,
+    required this.positionSource,
+    required this.signaler,
+    required this.navigationSettings,
+    required this.targetController,
+    required this.followPathController,
+    required this.proximityController,
+    required this.measureController,
   });
 
   final MarkerCreationService creation;
@@ -63,6 +81,15 @@ class LandmarkServices {
   final ImportService importService;
   final ExportService exportService;
 
+  /// Положение устройства и звук; до платформенных реализаций — заглушки.
+  final PositionSource positionSource;
+  final AudioSignaler signaler;
+  final NavigationSettings navigationSettings;
+  final TargetController targetController;
+  final FollowPathController followPathController;
+  final ProximityAlertController proximityController;
+  final MeasureController measureController;
+
   /// Собирает сервисы: пути, базовые папки, репозиторий, настройки,
   /// реестр иконок (сразу просканированный), сервисы составных объектов
   /// и режим правки. [paths], [prefs] и [clock]
@@ -71,6 +98,8 @@ class LandmarkServices {
     StoragePaths? paths,
     SharedPreferences? prefs,
     DateTime Function()? clock,
+    PositionSource positionSource = const StubPositionSource(),
+    AudioSignaler signaler = const SilentSignaler(),
   }) async {
     final storagePaths = paths ?? await StoragePaths.resolve();
     final storage = StorageService(storagePaths);
@@ -87,9 +116,25 @@ class LandmarkServices {
     final trackService = TrackService(repository, editor: editor, calculator: calculator);
     final areaService = AreaService(repository, editor: editor, calculator: calculator);
     final formats = FormatRegistry.buildDefault();
+    final navigation = NavigationSettings(settings);
+    final waypoints = WaypointService(repository, editor: editor);
+    final target = TargetController(
+      positionSource,
+      waypoints: waypoints,
+      displayLine: navigation.targetDisplayLine,
+      displayInfoBox: navigation.targetDisplayInfoBox,
+    );
+    final proximity = ProximityAlertController(
+      ProximityAlertStore(settings),
+      positionSource,
+      signaler,
+      target,
+      emitter: ProximityAlertSignalEmitter(signaler, enabled: () => navigation.signalsEnabled),
+    );
+    await proximity.load(navigation.currentWorkspace);
     return LandmarkServices(
       creation: MarkerCreationService(repository, folders, clock: clock),
-      waypoints: WaypointService(repository, editor: editor),
+      waypoints: waypoints,
       editor: editor,
       folders: folders,
       icons: icons,
@@ -109,6 +154,18 @@ class LandmarkServices {
       formatRegistry: formats,
       importService: ImportService(repository, folders, formats, editor, calculator: calculator, clock: clock),
       exportService: ExportService(repository, folders, formats, clock: clock),
+      positionSource: positionSource,
+      signaler: signaler,
+      navigationSettings: navigation,
+      targetController: target,
+      followPathController: FollowPathController(
+        trackService,
+        positionSource,
+        signaler,
+        FollowPathSignalEmitter(signaler, enabled: () => navigation.signalsEnabled),
+      ),
+      proximityController: proximity,
+      measureController: MeasureController(),
     );
   }
 }

@@ -17,4 +17,22 @@ abstract final class SettingsKeys {
 
   /// Объекты на карте; дальше — id рабочего пространства. JSON-список путей.
   static const String displayedPrefix = 'explorer.displayed.';
+
+  /// Линия к цели.
+  static const String targetDisplayLine = 'navigation.target.display_line';
+
+  /// Окно сведений о цели.
+  static const String targetDisplayInfoBox = 'navigation.target.display_info_box';
+
+  /// Порог отклонения от трека, метры.
+  static const String followPathDeviationThreshold = 'navigation.follow_path.deviation_threshold';
+
+  /// Звуковые сигналы навигации.
+  static const String signalsEnabled = 'navigation.signals.enabled';
+
+  /// Оповещения о приближении; дальше — id рабочего пространства.
+  static const String proximityPrefix = 'navigation.proximity.';
+
+  /// Текущее рабочее пространство.
+  static const String currentWorkspace = 'navigation.current_workspace';
 }
