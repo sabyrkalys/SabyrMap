@@ -29,7 +29,7 @@ void main() {
     expect(subtitle(tester), 'Мои метки');
     expect(find.byKey(const Key('explorer_storage')), findsOneWidget);
     expect(find.text('1 файл. · 2 папки'), findsOneWidget);
-    expect(find.byKey(const Key('folder_row_imported')), findsOneWidget);
+    expect(find.byKey(const Key('folder_row_Несортированные метки')), findsOneWidget);
     expect(find.byKey(const Key('item_row_Bunker')), findsOneWidget);
     await h.dispose(tester);
   });
@@ -51,7 +51,7 @@ void main() {
     await h.pumpApp(tester, initialFolder: h.f.paths.recordedTracks);
     expect(find.byKey(const Key('explorer_empty')), findsOneWidget);
     expect(find.text('Папка пуста'), findsOneWidget);
-    expect(subtitle(tester), 'Мои метки / recorded_tracks');
+    expect(subtitle(tester), 'Мои метки / Записанные треки');
     await h.dispose(tester);
   });
 
@@ -66,7 +66,7 @@ void main() {
   testWidgets('tapping a folder opens it; back goes up', (tester) async {
     h = await ExplorerHarness.create(tester);
     await h.pumpApp(tester);
-    await h.tap(tester, find.byKey(const Key('folder_row_imported')));
+    await h.tap(tester, find.byKey(const Key('folder_row_Несортированные метки')));
     expect(h.f.services.explorerController.state.currentFolder, h.f.paths.importDefault);
     await tester.runAsync(() => tester.binding.handlePopRoute());
     await h.settle(tester);

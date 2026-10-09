@@ -1,7 +1,7 @@
 import 'package:app/landmarks/explorer/places/place_root.dart';
 import 'package:path/path.dart' as p;
 
-/// Путь текущей папки от корня места: «Мои метки / imported / 2026».
+/// Путь текущей папки от корня места: «Мои метки / Несортированные метки / 2026».
 abstract final class ExplorerBreadcrumbs {
   static String of(PlaceRoot? place, String? folder) {
     if (folder == null) return '';

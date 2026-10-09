@@ -179,4 +179,29 @@ void main() {
       expect((await permissions.verify()).granted, isTrue);
     });
   });
+
+  group('legacy folders', () {
+    test('old Latin folders are renamed to the Cyrillic ones', () async {
+      final fresh = StorageService(StoragePaths.forRoot(p.join(tmp.path, 'old')));
+      final old = p.join(tmp.path, 'old', 'landmarks', 'imported');
+      Directory(old).createSync(recursive: true);
+      File(p.join(old, 'a.wpt')).writeAsBytesSync([1]);
+      expect(await fresh.migrateLegacyFolders(), 1);
+      expect(Directory(old).existsSync(), isFalse);
+      expect(File(p.join(tmp.path, 'old', 'landmarks', 'Несортированные метки', 'a.wpt')).existsSync(), isTrue);
+      expect(await fresh.migrateLegacyFolders(), 0);
+    });
+
+    test('into an existing folder files are merged, taken names get _1', () async {
+      final old = p.join(paths.landmarks, 'recorded_tracks');
+      Directory(p.join(old, 'sub')).createSync(recursive: true);
+      File(p.join(old, 'a.trk')).writeAsBytesSync([1]);
+      File(p.join(paths.recordedTracks, 'a.trk')).writeAsBytesSync([2]);
+      expect(await service.migrateLegacyFolders(), 1);
+      expect(Directory(old).existsSync(), isFalse);
+      expect(File(p.join(paths.recordedTracks, 'a.trk')).readAsBytesSync(), [2]);
+      expect(File(p.join(paths.recordedTracks, 'a_1.trk')).readAsBytesSync(), [1]);
+      expect(Directory(p.join(paths.recordedTracks, 'sub')).existsSync(), isTrue);
+    });
+  });
 }

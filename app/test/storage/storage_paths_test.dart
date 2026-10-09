@@ -29,8 +29,8 @@ void main() {
       expect(path, isNot(contains(r'\')));
     }
     expect(paths.datastoreMaps, '$root/datastore/maps');
-    expect(paths.importDefault, '$root/landmarks/imported');
-    expect(paths.recordedTracks, '$root/landmarks/recorded_tracks');
+    expect(paths.importDefault, '$root/landmarks/Несортированные метки');
+    expect(paths.recordedTracks, '$root/landmarks/Записанные треки');
   });
 
   test('no path names a third-party product', () {
@@ -57,7 +57,7 @@ void main() {
     });
 
     test('keeps subfolders inside landmarks', () {
-      expect(paths.resolveInLandmarks('imported/a.trk'), '$root/landmarks/imported/a.trk');
+      expect(paths.resolveInLandmarks('Поход/a.trk'), '$root/landmarks/Поход/a.trk');
     });
 
     test('never escapes landmarks', () {

@@ -70,11 +70,21 @@ class StoragePaths {
   String get maps => _posix.join(_appRoot, 'maps');
   String get pictures => _posix.join(_appRoot, 'pictures');
 
-  /// Директория, куда импортируются внешние файлы по умолчанию.
-  String get importDefault => _posix.join(landmarks, 'imported');
+  /// «Несортированные метки» — общая папка меток по умолчанию: сюда же
+  /// импортируются внешние файлы.
+  String get importDefault => _posix.join(landmarks, unsortedFolderName);
 
-  /// Директория, куда рекордер пишет треки.
-  String get recordedTracks => _posix.join(landmarks, 'recorded_tracks');
+  /// «Записанные треки» — куда рекордер пишет треки.
+  String get recordedTracks => _posix.join(landmarks, recordedTracksFolderName);
+
+  static const String unsortedFolderName = 'Несортированные метки';
+  static const String recordedTracksFolderName = 'Записанные треки';
+
+  /// Прежние (латинские) имена папок меток → новые.
+  Map<String, String> get legacyFolders => {
+    _posix.join(landmarks, 'imported'): importDefault,
+    _posix.join(landmarks, 'recorded_tracks'): recordedTracks,
+  };
 
   /// Все базовые папки, которые создаёт [StorageService.ensureBaseFolders].
   List<String> get baseFolders => [
@@ -92,7 +102,7 @@ class StoragePaths {
 
   /// Абсолютный путь файла [filename] внутри [landmarks].
   ///
-  /// Decision: допускаются подпапки (`imported/a.wpt`), но путь, который
+  /// Decision: допускаются подпапки (`Поход/a.wpt`), но путь, который
   /// выходит за пределы [landmarks] (абсолютный или через `..`),
   /// сводится к одному имени файла в [landmarks]. Исключений не бросает.
   String resolveInLandmarks(String filename) {

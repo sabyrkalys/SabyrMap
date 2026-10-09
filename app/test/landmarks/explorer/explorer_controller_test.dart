@@ -64,7 +64,7 @@ void main() {
     await c.openFolder(f.paths.landmarks);
     expect(c.state.currentFolder, f.paths.landmarks);
     expect(c.state.isLoading, isFalse);
-    expect(names(), ['imported', 'recorded_tracks', 'alpha', 'Beta']);
+    expect(names(), ['Записанные треки', 'Несортированные метки', 'alpha', 'Beta']);
     expect(c.state.nodes.first, isA<ExplorerFolderNode>());
     expect(c.state.nodes.last, isA<ExplorerItemNode>());
   });

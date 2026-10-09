@@ -207,6 +207,7 @@ class LandmarkServices {
   }) async {
     final storagePaths = paths ?? await StoragePaths.resolve();
     final storage = StorageService(storagePaths);
+    await storage.migrateLegacyFolders();
     await storage.ensureBaseFolders();
     final repository = LandmarkRepository(storage, storagePaths, clock: clock);
     final settings = AppSettings(prefs ?? await SharedPreferences.getInstance());

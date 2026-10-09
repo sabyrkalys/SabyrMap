@@ -12,7 +12,7 @@ void main() {
   setUp(() async => f = await ServicesFixture.create());
   tearDown(() => f.dispose());
 
-  test('without a setting the default folder is landmarks/imported', () async {
+  test('without a setting the default folder is «Несортированные метки»', () async {
     expect(await f.services.folders.getDefaultFolder(), f.paths.importDefault);
   });
 
@@ -52,7 +52,7 @@ void main() {
     File(p.join(f.paths.landmarks, 'a.wpt')).writeAsBytesSync([0]);
     Link(p.join(f.paths.landmarks, 'link')).createSync(f.paths.maps);
     final subfolders = await f.services.folders.listSubfolders(f.paths.landmarks);
-    expect(subfolders, [f.paths.importDefault, f.paths.recordedTracks]);
+    expect(subfolders, [f.paths.recordedTracks, f.paths.importDefault]);
     expect(await f.services.folders.listSubfolders(p.join(f.paths.landmarks, 'none')), isEmpty);
   });
 

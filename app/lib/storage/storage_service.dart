@@ -47,6 +47,42 @@ class StorageService {
     return created;
   }
 
+  /// Переносит папки со старыми именами ([StoragePaths.legacyFolders]) в
+  /// новые: переименованием, а если новая уже есть — по одному элементу
+  /// (занятое имя получает `_1`, `_2`…); пустая старая папка удаляется.
+  /// Возвращает, сколько папок перенесено.
+  Future<int> migrateLegacyFolders() async {
+    var migrated = 0;
+    for (final MapEntry(key: from, value: to) in _paths.legacyFolders.entries) {
+      final old = Directory(from);
+      if (!await old.exists()) continue;
+      try {
+        if (!await Directory(to).exists()) {
+          await old.rename(to);
+        } else {
+          await for (final entity in old.list(followLinks: false)) {
+            await entity.rename(await _freeName(to, p.basename(entity.path)));
+          }
+          await old.delete();
+        }
+        migrated++;
+      } on FileSystemException catch (e) {
+        throw StorageException('Cannot move a folder to its new name', path: from, cause: e);
+      }
+    }
+    return migrated;
+  }
+
+  static Future<String> _freeName(String dir, String name) async {
+    final ext = p.extension(name);
+    final stem = p.basenameWithoutExtension(name);
+    var candidate = p.join(dir, name);
+    for (var i = 1; await FileSystemEntity.type(candidate, followLinks: false) != FileSystemEntityType.notFound; i++) {
+      candidate = p.join(dir, '${stem}_$i$ext');
+    }
+    return candidate;
+  }
+
   /// Проверяет, можно ли писать в [dir]: создаёт и удаляет `.write_check`.
   Future<WriteAccess> checkWriteAccess(String dir) async {
     if (!await Directory(dir).exists()) {

@@ -13,7 +13,7 @@ class FolderService {
   final StoragePaths _paths;
   final AppSettings _settings;
 
-  /// Папка по умолчанию из настроек или `<landmarks>/imported`. Если
+  /// Папка по умолчанию из настроек или «Несортированные метки». Если
   /// сохранённой папки больше нет, настройка сбрасывается.
   Future<String> getDefaultFolder() async =>
       await _existingOrReset(SettingsKeys.defaultFolder) ?? _paths.importDefault;
