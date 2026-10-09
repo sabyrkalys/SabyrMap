@@ -9,7 +9,11 @@ class WaypointPatch {
     this.iconId,
     this.longitude,
     this.latitude,
+    this.extra = const {},
   });
+
+  /// Прочие ключи метаданных: значение ставится, null — ключ удаляется.
+  final Map<String, Object?> extra;
 
   final String? name;
   final String? comment;
@@ -31,7 +35,8 @@ class WaypointPatch {
       colorValue == null &&
       iconId == null &&
       longitude == null &&
-      latitude == null;
+      latitude == null &&
+      extra.isEmpty;
 
   /// В правке есть координата.
   bool get hasLocation => longitude != null || latitude != null;

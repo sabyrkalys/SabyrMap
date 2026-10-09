@@ -28,6 +28,7 @@ class MarkerCreationService {
     final name = draft.name?.trim();
     final user = LandmarkMetadata(
       entries: {
+        ...draft.extraMetadata,
         if (name != null && name.isNotEmpty) LandmarkMetadata.nameKey: name,
         if (draft.comment?.trim().isNotEmpty ?? false) LandmarkMetadata.commentKey: draft.comment,
         if (draft.description?.trim().isNotEmpty ?? false) LandmarkMetadata.descriptionKey: draft.description,

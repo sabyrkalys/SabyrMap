@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'app/landmark_services_provider.dart';
 import 'home/home_shell.dart';
+import 'landmarks/services/landmark_services.dart';
 import 'licenses.dart';
 import 'net/trusted_certificates.dart';
 import 'system_ui.dart';
@@ -12,7 +14,22 @@ Future<void> main() async {
   await configureSystemUi();
   await installTrustedCertificates();
   registerThirdPartyLicenses();
-  runApp(const ProviderScope(child: SabyrMapApp()));
+  final services = await LandmarkServices.bootstrap();
+  runApp(
+    ProviderScope(
+      overrides: [
+        landmarkServicesProvider.overrideWithValue(services),
+        markerGroupFoldersProvider.overrideWithValue(
+          MarkerGroupFolders(
+            unsorted: await services.folders.getDefaultFolder(),
+            myMarkers: services.repository.storage.paths.landmarks,
+            appRoot: services.repository.storage.paths.appRoot,
+          ),
+        ),
+      ],
+      child: const SabyrMapApp(),
+    ),
+  );
 }
 
 class SabyrMapApp extends StatelessWidget {

@@ -14,6 +14,8 @@ abstract class WaypointsRepository {
     required String? color,
     required double lat,
     required double lng,
+    String? folder,
+    Map<String, Object> extra = const {},
   });
 
   Future<Waypoint> update(
@@ -51,6 +53,8 @@ class HttpWaypointsRepository implements WaypointsRepository {
     required String? color,
     required double lat,
     required double lng,
+    String? folder,
+    Map<String, Object> extra = const {},
   }) async {
     final response = await _client.post(
       '/waypoints',

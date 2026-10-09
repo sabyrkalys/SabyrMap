@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app/map/map_crosshair.dart';
+import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/waypoints/waypoint_create_action.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
@@ -23,6 +24,8 @@ class _SlowWaypointsRepository extends FakeWaypointsRepository {
     required String? color,
     required double lat,
     required double lng,
+    String? folder,
+    Map<String, Object> extra = const {},
   }) =>
       pending.future;
 }
@@ -39,6 +42,8 @@ class _RecordingWaypointsRepository extends FakeWaypointsRepository {
     required String? color,
     required double lat,
     required double lng,
+    String? folder,
+    Map<String, Object> extra = const {},
   }) async {
     created.add((name: name, lat: lat, lng: lng));
     return Waypoint(
@@ -196,5 +201,53 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('boom'), findsOneWidget);
+  });
+
+  testWidgets('«ОК» saves into the folder of the chosen group', (tester) async {
+    final repo = FakeWaypointsRepository()
+      ..createResult = Waypoint(
+        id: '/l/a.wpt',
+        orgId: '',
+        ownerId: '',
+        name: 'Родник',
+        type: 'generic',
+        note: null,
+        lat: 48,
+        lng: 37.8,
+        canEdit: true,
+        createdAt: DateTime(2026),
+      );
+    final container = ProviderContainer(
+      overrides: [
+        waypointsRepositoryProvider.overrideWithValue(repo),
+        markerGroupFoldersProvider.overrideWithValue(
+          const MarkerGroupFolders(unsorted: '/root/landmarks/imported', myMarkers: '/root/landmarks'),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: Consumer(
+              builder: (context, ref, _) => TextButton(
+                onPressed: () => createWaypointAtCrosshair(context, ref),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('go'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('waypoint_dialog_ok')));
+    await tester.pumpAndSettle();
+
+    expect(repo.lastCreateFolder, '/root/landmarks/imported');
   });
 }

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
+import '../app/landmark_services_provider.dart';
 import '../icons/icon_library_scanner.dart';
 import '../icons/waypoint_icon_assignments_controller.dart';
 import '../map/map_crosshair.dart';
+import 'waypoint_dialog/marker_group.dart';
 import 'waypoint_dialog/waypoint_data.dart';
 import 'waypoint_dialog/waypoint_dialog.dart';
 import 'waypoint_models.dart';
@@ -60,6 +62,11 @@ Future<void> saveWaypoint(
           color: data.colorHex,
           lat: at.latitude,
           lng: at.longitude,
+          folder: folderFor(container.read(markerGroupFoldersProvider), data.groupId),
+          extra: {
+            if (data.comment?.trim().isNotEmpty ?? false) 'comment': data.comment!.trim(),
+            'icon': ?data.markerIconId,
+          },
         );
     try {
       await container.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(created.id, data.iconId);

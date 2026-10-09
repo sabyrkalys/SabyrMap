@@ -83,6 +83,15 @@ class WaypointService {
     text(LandmarkMetadata.descriptionKey, patch.description);
     text(LandmarkMetadata.iconKey, patch.iconId);
     if (patch.colorValue != null) set[LandmarkMetadata.colorKey] = patch.colorValue;
+    for (final MapEntry(:key, :value) in patch.extra.entries) {
+      if (value == null) {
+        remove.add(key);
+        set.remove(key);
+      } else {
+        set[key] = value;
+        remove.remove(key);
+      }
+    }
     return MetadataPatch(set: set, remove: remove);
   }
 }

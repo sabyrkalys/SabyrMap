@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
+import '../../app/landmark_services_provider.dart';
 import '../../icons/icon_library_scanner.dart';
 import '../../map/map_crosshair.dart';
 import '../waypoint_color.dart';
@@ -317,7 +318,7 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
   /// The group row: a tap folds out a raised white panel of the groups
   /// with their storage paths, and folds it back in.
   Widget _groupSection() {
-    final groups = builtInMarkerGroups;
+    final groups = builtInMarkerGroups(ref.watch(markerGroupFoldersProvider));
     final selected = groups.firstWhere((g) => g.id == _groupId, orElse: () => groups.first);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

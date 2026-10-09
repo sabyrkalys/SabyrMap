@@ -17,6 +17,10 @@ class FakeWaypointsRepository implements WaypointsRepository {
   /// right color, masking a call site that dropped the argument).
   String? lastUpdateColor;
 
+  /// What the last [create] was asked to store besides the API fields.
+  String? lastCreateFolder;
+  Map<String, Object> lastCreateExtra = const {};
+
   @override
   Future<List<Waypoint>> list() async => List.of(items);
 
@@ -28,7 +32,11 @@ class FakeWaypointsRepository implements WaypointsRepository {
     required String? color,
     required double lat,
     required double lng,
+    String? folder,
+    Map<String, Object> extra = const {},
   }) async {
+    lastCreateFolder = folder;
+    lastCreateExtra = extra;
     if (createResult is WaypointException) throw createResult as WaypointException;
     return createResult as Waypoint;
   }

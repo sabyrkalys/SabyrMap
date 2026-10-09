@@ -13,6 +13,7 @@ class MarkerDraft {
     this.colorValue,
     this.iconId,
     this.targetFolder,
+    this.extraMetadata = const {},
   });
 
   final LandmarkType type;
@@ -35,6 +36,10 @@ class MarkerDraft {
   /// Папка сохранения; null — папка по умолчанию.
   final String? targetFolder;
 
+  /// Прочие ключи пользовательских метаданных (например, тип метки
+  /// приложения); значения — допустимые типы [LandmarkMetadata].
+  final Map<String, Object> extraMetadata;
+
   MarkerDraft copyWith({
     LandmarkType? type,
     String? name,
@@ -45,6 +50,7 @@ class MarkerDraft {
     double? longitude,
     double? latitude,
     String? targetFolder,
+    Map<String, Object>? extraMetadata,
   }) => MarkerDraft(
     type: type ?? this.type,
     name: name ?? this.name,
@@ -55,6 +61,7 @@ class MarkerDraft {
     longitude: longitude ?? this.longitude,
     latitude: latitude ?? this.latitude,
     targetFolder: targetFolder ?? this.targetFolder,
+    extraMetadata: extraMetadata ?? this.extraMetadata,
   );
 
   @override

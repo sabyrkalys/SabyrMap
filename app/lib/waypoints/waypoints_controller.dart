@@ -1,11 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/api_client_provider.dart';
+import '../app/landmark_services_provider.dart';
+import 'file_waypoints_repository.dart';
 import 'waypoint_models.dart';
 import 'waypoints_repository.dart';
 
+/// Путевые точки хранятся файлами на устройстве ([FileWaypointsRepository]);
+/// [HttpWaypointsRepository] остаётся для работы с сервером.
 final waypointsRepositoryProvider = Provider<WaypointsRepository>((ref) {
-  return HttpWaypointsRepository(ref.watch(apiClientProvider));
+  return FileWaypointsRepository(ref.watch(landmarkServicesProvider));
 });
 
 final waypointsControllerProvider = NotifierProvider<WaypointsController, List<Waypoint>>(WaypointsController.new);
@@ -33,6 +36,8 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     required double lat,
     required double lng,
     required String? color,
+    String? folder,
+    Map<String, Object> extra = const {},
   }) async {
     final tempId = 'temp-${DateTime.now().microsecondsSinceEpoch}';
     // ownerId is unknown client-side (single implicit user); the server
@@ -53,7 +58,16 @@ class WaypointsController extends Notifier<List<Waypoint>> {
     state = [...state, optimistic];
 
     try {
-      final created = await _repository.create(name: name, type: type, note: note, color: color, lat: lat, lng: lng);
+      final created = await _repository.create(
+        name: name,
+        type: type,
+        note: note,
+        color: color,
+        lat: lat,
+        lng: lng,
+        folder: folder,
+        extra: extra,
+      );
       state = [for (final w in state) if (w.id == tempId) created else w];
       return created;
     } on WaypointException {
