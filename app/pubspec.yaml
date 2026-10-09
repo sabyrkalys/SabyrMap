@@ -51,6 +51,8 @@ dependencies:
   path: ^1.9.1
   uuid: ^4.6.0
   shared_preferences: ^2.5.6
+  xml: ^7.0.1
+  csv: ^8.0.0
 
 dev_dependencies:
   flutter_test:

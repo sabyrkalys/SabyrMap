@@ -6,6 +6,9 @@ import 'package:app/landmarks/composite/services/set_service.dart';
 import 'package:app/landmarks/composite/services/track_service.dart';
 import 'package:app/landmarks/composite/statistics/composite_calculator.dart';
 import 'package:app/landmarks/icons/icon_registry.dart';
+import 'package:app/landmarks/import_export/export/export_service.dart';
+import 'package:app/landmarks/import_export/import/import_service.dart';
+import 'package:app/landmarks/import_export/registry/format_registry.dart';
 import 'package:app/landmarks/icons/icon_resolver.dart';
 import 'package:app/landmarks/repository/landmark_repository.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
@@ -34,6 +37,9 @@ class LandmarkServices {
     required this.areaService,
     required this.editMode,
     required this.calculator,
+    required this.formatRegistry,
+    required this.importService,
+    required this.exportService,
   });
 
   final MarkerCreationService creation;
@@ -51,6 +57,11 @@ class LandmarkServices {
   /// Режим правки составных объектов (один на приложение).
   final EditModeController editMode;
   final CompositeCalculator calculator;
+
+  /// Форматы импорта/экспорта и сервисы над ними.
+  final FormatRegistry formatRegistry;
+  final ImportService importService;
+  final ExportService exportService;
 
   /// Собирает сервисы: пути, базовые папки, репозиторий, настройки,
   /// реестр иконок (сразу просканированный), сервисы составных объектов
@@ -75,6 +86,7 @@ class LandmarkServices {
     final routeService = RouteService(repository, editor: editor, calculator: calculator);
     final trackService = TrackService(repository, editor: editor, calculator: calculator);
     final areaService = AreaService(repository, editor: editor, calculator: calculator);
+    final formats = FormatRegistry.buildDefault();
     return LandmarkServices(
       creation: MarkerCreationService(repository, folders, clock: clock),
       waypoints: WaypointService(repository, editor: editor),
@@ -94,6 +106,9 @@ class LandmarkServices {
         areaService: areaService,
       ),
       calculator: calculator,
+      formatRegistry: formats,
+      importService: ImportService(repository, folders, formats, editor, calculator: calculator, clock: clock),
+      exportService: ExportService(repository, folders, formats, clock: clock),
     );
   }
 }

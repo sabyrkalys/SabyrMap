@@ -21,6 +21,10 @@ class LandmarkRepository {
   final StoragePaths _paths;
   final DateTime Function() _clock;
 
+  /// Файловый слой, через который пишет репозиторий (для атомарной записи
+  /// файлов не-меток, например экспорта).
+  StorageService get storage => _service;
+
   /// Сохраняет новый объект и возвращает абсолютный путь файла.
   /// Все типы сохраняются сразу; режим правки — забота UI.
   /// [directory] по умолчанию — [StoragePaths.landmarks]. Ставит
