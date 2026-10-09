@@ -114,6 +114,7 @@ class LandmarkServices {
     required this.shareService,
     required this.paths,
     required this.storage,
+    required this.settings,
     required this.permissionService,
     required this.placesProvider,
     required this.explorerController,
@@ -181,6 +182,9 @@ class LandmarkServices {
   /// Пути и файлы хранилища.
   final StoragePaths paths;
   final StorageService storage;
+
+  /// Настройки приложения (сырые ключи).
+  final AppSettings settings;
 
   /// Доступ к папкам вне папки приложения.
   final PermissionService permissionService;
@@ -326,6 +330,7 @@ class LandmarkServices {
       shareService: shareService,
       paths: storagePaths,
       storage: storage,
+      settings: settings,
       permissionService: permissionService ?? WriteCheckPermissionService(storage),
       placesProvider: places,
       explorerController: ExplorerController(

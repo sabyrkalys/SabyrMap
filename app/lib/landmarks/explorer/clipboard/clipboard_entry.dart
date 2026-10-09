@@ -1,11 +1,18 @@
 import 'package:app/landmarks/models/landmark_type.dart';
 
-/// Файл метки в буфере проводника.
+/// Файл метки или папка в буфере проводника.
 class ClipboardEntry {
   const ClipboardEntry({required this.sourcePath, required this.type, required this.originalName});
 
+  /// Папка в буфере.
+  const ClipboardEntry.folder({required this.sourcePath, required this.originalName}) : type = null;
+
   final String sourcePath;
-  final LandmarkType type;
+
+  /// Тип файла метки; null — папка.
+  final LandmarkType? type;
+
+  bool get isFolder => type == null;
 
   /// Имя объекта на момент копирования.
   final String originalName;

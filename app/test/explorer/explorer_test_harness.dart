@@ -91,7 +91,7 @@ class ExplorerHarness {
   /// Даёт файловым операциям завершиться и перерисовывает экран. Всё —
   /// в настоящем времени: операции с диском, начатые в «фальшивом» времени
   /// теста, не завершаются.
-  Future<void> settle(WidgetTester tester, {int rounds = 6}) async {
+  Future<void> settle(WidgetTester tester, {int rounds = 12}) async {
     for (var i = 0; i < rounds; i++) {
       await tester.runAsync(() async {
         await tester.pump();

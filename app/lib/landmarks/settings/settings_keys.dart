@@ -71,4 +71,7 @@ abstract final class SettingsKeys {
 
   /// Калибровки изображений: путь → точки, JSON.
   static const String mapsCalibrations = 'maps.calibrations';
+
+  /// Закладки проводника: JSON-список путей папок.
+  static const String explorerBookmarks = 'explorer.bookmarks';
 }

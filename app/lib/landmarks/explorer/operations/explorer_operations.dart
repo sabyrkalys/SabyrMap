@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:app/exceptions/folder_exception.dart';
 import 'package:app/landmarks/drafts/metadata_patch.dart';
 import 'package:app/landmarks/explorer/clipboard/clipboard_entry.dart';
 import 'package:app/landmarks/explorer/clipboard/landmarks_clipboard.dart';
@@ -127,6 +128,7 @@ class ExplorerOperations {
   /// Decision: вырезанный файл, вставленный в свою же папку, остаётся на
   /// месте (это не ошибка); скопированный — получает копию с суффиксом.
   Future<void> _paste(String targetFolder, ClipboardEntry entry) async {
+    if (entry.isFolder) return _pasteFolder(targetFolder, entry);
     final source = entry.sourcePath;
     await _requireLandmarkFile(source);
     await Directory(targetFolder).create(recursive: true);
@@ -143,6 +145,38 @@ class ExplorerOperations {
     } else {
       final target = await FileNaming.resolveCollision(targetFolder, p.basename(source));
       await _storage.atomicWriteBytes(target, await _storage.readBytes(source));
+    }
+  }
+
+  /// Папка: вырезанная переносится (в свою же папку — остаётся на месте),
+  /// скопированная копируется со всем содержимым; занятое имя получает
+  /// `_1`, `_2`. Вставка папки в неё саму или внутрь неё — [FolderException].
+  Future<void> _pasteFolder(String targetFolder, ClipboardEntry entry) async {
+    final source = entry.sourcePath;
+    if (!await Directory(source).exists()) throw FileSystemException('folder not found', source);
+    if (p.equals(source, targetFolder) || p.isWithin(source, targetFolder)) {
+      throw FolderException('Нельзя вставить папку в саму себя', path: targetFolder);
+    }
+    await Directory(targetFolder).create(recursive: true);
+    if (_clipboard.isCut) {
+      if (!p.equals(p.dirname(source), targetFolder)) {
+        await Directory(source).rename(await FileNaming.resolveCollision(targetFolder, p.basename(source)));
+      }
+      _clipboard.removeOne(source);
+    } else {
+      await _copyDirectory(Directory(source), await FileNaming.resolveCollision(targetFolder, p.basename(source)));
+    }
+  }
+
+  static Future<void> _copyDirectory(Directory from, String to) async {
+    await Directory(to).create(recursive: true);
+    await for (final e in from.list(followLinks: false)) {
+      final target = p.join(to, p.basename(e.path));
+      if (e is Directory) {
+        await _copyDirectory(e, target);
+      } else if (e is File) {
+        await e.copy(target);
+      }
     }
   }
 

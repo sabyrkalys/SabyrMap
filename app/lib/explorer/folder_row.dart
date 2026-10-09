@@ -4,11 +4,14 @@ import 'folder_count_badge.dart';
 
 /// Строка папки: иконка, имя, «X папок · Y файл.».
 class FolderRow extends StatefulWidget {
-  const FolderRow({super.key, required this.path, required this.name, required this.onTap});
+  const FolderRow({super.key, required this.path, required this.name, required this.onTap, this.onLongPress});
 
   final String path;
   final String name;
   final VoidCallback onTap;
+
+  /// Долгое нажатие — меню папки.
+  final VoidCallback? onLongPress;
 
   @override
   State<FolderRow> createState() => _FolderRowState();
@@ -31,5 +34,6 @@ class _FolderRowState extends State<FolderRow> {
     subtitle: FutureBuilder<FolderCounts>(future: _counts, builder: (context, snap) => Text(snap.data?.label ?? ' ')),
     trailing: const Icon(Icons.chevron_right),
     onTap: widget.onTap,
+    onLongPress: widget.onLongPress,
   );
 }

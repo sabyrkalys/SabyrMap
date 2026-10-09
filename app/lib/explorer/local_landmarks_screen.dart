@@ -35,6 +35,8 @@ import 'explorer_create_sheet.dart';
 import 'explorer_dropdown_menu.dart';
 import 'explorer_providers.dart';
 import 'explorer_view_mode_switch.dart';
+import 'folder_context_actions.dart';
+import 'folder_context_menu.dart';
 import 'local_landmarks_drawer.dart';
 import 'local_landmarks_folder_list.dart';
 import 'local_landmarks_item_list.dart';
@@ -473,7 +475,9 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
         floatingActionButton: selection.isActive
             ? null
             : FloatingActionButton(key: const Key('explorer_fab'), onPressed: _create, child: const Icon(Icons.add)),
-        bottomNavigationBar: selection.isActive ? _selectionBar(theme, selection.count) : null,
+        bottomNavigationBar: selection.isActive
+            ? _selectionBar(theme, selection.count)
+            : (_explorer.clipboard.isEmpty ? null : _clipboardBar(theme)),
         body: Column(
           children: [
             MapsAppBar(
@@ -566,7 +570,11 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
       child: ListView(
         padding: EdgeInsets.only(bottom: MediaQuery.viewPaddingOf(context).bottom + 88),
         children: [
-          LocalLandmarksFolderList(folders: folders, onOpen: _explorer.openFolder),
+          LocalLandmarksFolderList(
+            folders: folders,
+            onOpen: _explorer.openFolder,
+            onMenu: (f) => FolderContextMenu.show(context, f),
+          ),
           if (folders.isNotEmpty && items.isNotEmpty) const Divider(height: 1),
           LocalLandmarksItemList(
             items: items,
@@ -577,6 +585,62 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
             onLongPress: _onItemLongPress,
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _toClipboard({required bool cut}) async {
+    final paths = _explorer.selection.snapshot();
+    final ops = _services.explorerOperations;
+    final result = cut ? await ops.cutSelected(paths) : await ops.copySelected(paths);
+    _explorer.selection.deactivate();
+    _snack('${cut ? 'Вырезано' : 'Скопировано'}: ${result.affectedCount}');
+  }
+
+  /// Вставка буфера в открытую папку (только внутри «Мои метки»).
+  Future<void> _paste() async {
+    final folder = _explorer.state.currentFolder;
+    if (folder == null) return;
+    final root = _services.paths.landmarks;
+    if (!p.equals(root, folder) && !p.isWithin(root, folder)) return _snack(FolderContextActions.unavailable);
+    final result = await _services.explorerOperations.pasteAll(folder);
+    await _changed();
+    _snack(result.success ? 'Вставлено: ${result.affectedCount}' : (result.errorMessage ?? 'Не всё вставлено'));
+  }
+
+  Widget _clipboardBar(ThemeData theme) {
+    final clipboard = _explorer.clipboard;
+    final entries = clipboard.entries;
+    final what = entries.length == 1 ? '«${entries.single.originalName}»' : '${entries.length} шт.';
+    return Material(
+      key: const Key('explorer_clipboard_bar'),
+      elevation: 8,
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            children: [
+              const SizedBox(width: 16),
+              Icon(clipboard.isCut ? Icons.content_cut : Icons.content_copy, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '${clipboard.isCut ? 'Вырезано' : 'Скопировано'}: $what',
+                  style: theme.textTheme.titleSmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton(key: const Key('clipboard_paste'), onPressed: _paste, child: const Text('ВСТАВИТЬ')),
+              TextButton(
+                key: const Key('clipboard_empty'),
+                onPressed: () => setState(clipboard.empty),
+                child: const Text('ОЧИСТИТЬ'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -592,6 +656,18 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
           children: [
             const SizedBox(width: 16),
             Expanded(child: Text('Выбрано: $count', style: theme.textTheme.titleSmall)),
+            IconButton(
+              key: const Key('selection_copy'),
+              tooltip: 'Копировать',
+              icon: const Icon(Icons.content_copy),
+              onPressed: count == 0 ? null : () => _toClipboard(cut: false),
+            ),
+            IconButton(
+              key: const Key('selection_cut'),
+              tooltip: 'Вырезать',
+              icon: const Icon(Icons.content_cut),
+              onPressed: count == 0 ? null : () => _toClipboard(cut: true),
+            ),
             IconButton(
               key: const Key('selection_delete'),
               tooltip: 'Удалить',

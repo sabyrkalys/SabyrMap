@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:app/exceptions/folder_exception.dart';
 import 'package:app/exceptions/storage_exception.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
 import 'package:app/landmarks/settings/settings_keys.dart';
@@ -74,6 +75,93 @@ class FolderService {
   /// Только по путям, без обращения к диску.
   bool isDescendant(String parent, String child) => p.isWithin(p.normalize(parent), p.normalize(child));
 
+  /// Можно ли менять папку (переименовать, удалить, вырезать): только
+  /// внутри «Мои метки», кроме служебных «Несортированные метки» и
+  /// «Записанные треки». Корень, его родители и разделы вроде загрузок —
+  /// нельзя.
+  bool isEditable(String path) {
+    final normalized = p.normalize(path);
+    if (!p.isWithin(_paths.landmarks, normalized)) return false;
+    return !p.equals(normalized, _paths.importDefault) && !p.equals(normalized, _paths.recordedTracks);
+  }
+
+  /// Создаёт подпапку [name] в [parent]. Неверное имя или такая папка уже
+  /// есть — [FolderException].
+  Future<String> createSubfolder(String parent, String name) async {
+    final clean = _checkName(name);
+    final path = p.join(parent, clean);
+    if (await FileSystemEntity.type(path, followLinks: false) != FileSystemEntityType.notFound) {
+      throw FolderException('уже существует', path: path);
+    }
+    await ensureFolder(path);
+    return path;
+  }
+
+  /// Переименовывает или переносит папку внутри «Мои метки». Защищённая
+  /// папка, цель снаружи «Мои метки», цель внутри самой папки или уже
+  /// существующая цель — [FolderException].
+  Future<void> rename(String oldPath, String newPath) async {
+    if (!isEditable(oldPath)) throw FolderException('Действие недоступно', path: oldPath);
+    if (!p.isWithin(_paths.landmarks, newPath)) throw FolderException('Нельзя вынести за пределы меток', path: newPath);
+    if (p.equals(oldPath, newPath) || isDescendant(oldPath, newPath)) {
+      throw FolderException('Нельзя переместить папку в саму себя', path: newPath);
+    }
+    if (await FileSystemEntity.type(newPath, followLinks: false) != FileSystemEntityType.notFound) {
+      throw FolderException('уже существует', path: newPath);
+    }
+    try {
+      await Directory(oldPath).rename(newPath);
+    } on FileSystemException catch (e) {
+      throw StorageException('Cannot rename folder', path: oldPath, cause: e);
+    }
+  }
+
+  /// Удаляет папку со всем содержимым, без возврата. Защищённая папка —
+  /// [FolderException].
+  Future<void> deleteRecursive(String path) async {
+    if (!isEditable(path)) throw FolderException('Действие недоступно', path: path);
+    try {
+      final dir = Directory(path);
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } on FileSystemException catch (e) {
+      throw StorageException('Cannot delete folder', path: path, cause: e);
+    }
+  }
+
+  /// Подпапки, файлы, размер и время последнего изменения папки (с
+  /// вложенными; симлинки не учитываются).
+  Future<FolderDetails> details(String path) async {
+    var folders = 0;
+    var files = 0;
+    var bytes = 0;
+    final dir = Directory(path);
+    var last = (await dir.stat()).modified.millisecondsSinceEpoch;
+    try {
+      await for (final e in dir.list(recursive: true, followLinks: false)) {
+        final stat = await e.stat();
+        if (stat.modified.millisecondsSinceEpoch > last) last = stat.modified.millisecondsSinceEpoch;
+        if (e is Directory) {
+          folders++;
+        } else if (e is File) {
+          files++;
+          bytes += stat.size;
+        }
+      }
+    } on FileSystemException catch (e) {
+      throw StorageException('Cannot read folder', path: path, cause: e);
+    }
+    return FolderDetails(path: path, folderCount: folders, fileCount: files, totalBytes: bytes, lastModifiedMs: last);
+  }
+
+  /// Имя папки без `/` и `\`, не пустое и не «.»/«..».
+  static String _checkName(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed == '.' || trimmed == '..' || trimmed.contains(RegExp(r'[/\\]'))) {
+      throw FolderException('Недопустимое имя «$name»');
+    }
+    return trimmed;
+  }
+
   /// Создаёт папку со всеми родителями, если её нет.
   Future<void> ensureFolder(String path) async {
     try {
@@ -95,4 +183,27 @@ class FolderService {
     if (path.trim().isEmpty) throw ArgumentError.value(path, 'path', 'must not be empty');
     return p.normalize(path);
   }
+}
+
+/// Сводка по папке.
+class FolderDetails {
+  const FolderDetails({
+    required this.path,
+    required this.folderCount,
+    required this.fileCount,
+    required this.totalBytes,
+    required this.lastModifiedMs,
+  });
+
+  final String path;
+
+  /// Вложенных папок на всех уровнях.
+  final int folderCount;
+
+  /// Файлов на всех уровнях.
+  final int fileCount;
+  final int totalBytes;
+
+  /// Unix ms самого свежего изменения внутри.
+  final int lastModifiedMs;
 }
