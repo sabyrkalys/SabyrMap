@@ -12,6 +12,20 @@ import 'package:app/landmarks/import_export/registry/format_registry.dart';
 import 'package:app/landmarks/icons/icon_resolver.dart';
 import 'package:app/landmarks/repository/landmark_repository.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
+import 'package:app/maps/calibration/calibration_controller.dart';
+import 'package:app/maps/color/erase_color_controller.dart';
+import 'package:app/maps/color/layer_color_controller.dart';
+import 'package:app/maps/dem/dem_manager.dart';
+import 'package:app/maps/favorite_sets/favorite_set_controller.dart';
+import 'package:app/maps/favorite_sets/favorite_set_store.dart';
+import 'package:app/maps/file_maps/file_map_scanner.dart';
+import 'package:app/maps/layer_stack/layer_stack_controller.dart';
+import 'package:app/maps/offline/offline_area_controller.dart';
+import 'package:app/maps/offline/offline_area_estimator.dart';
+import 'package:app/maps/on_demand/aqx_registry.dart';
+import 'package:app/maps/on_demand/aqx_store.dart';
+import 'package:app/maps/registry/map_source_registry.dart';
+import 'package:app/maps/settings/maps_settings.dart';
 import 'package:app/navigation/follow_path/follow_path_controller.dart';
 import 'package:app/navigation/follow_path/follow_path_signal.dart';
 import 'package:app/navigation/measure/measure_controller.dart';
@@ -58,6 +72,17 @@ class LandmarkServices {
     required this.followPathController,
     required this.proximityController,
     required this.measureController,
+    required this.mapSourceRegistry,
+    required this.mapsSettings,
+    required this.layerStack,
+    required this.colorController,
+    required this.eraseColorController,
+    required this.favoriteSets,
+    required this.fileMapScanner,
+    required this.aqxRegistry,
+    required this.calibrationController,
+    required this.demManager,
+    required this.offlineArea,
   });
 
   final MarkerCreationService creation;
@@ -89,6 +114,19 @@ class LandmarkServices {
   final FollowPathController followPathController;
   final ProximityAlertController proximityController;
   final MeasureController measureController;
+
+  /// Карты и слои.
+  final MapSourceRegistry mapSourceRegistry;
+  final MapsSettings mapsSettings;
+  final LayerStackController layerStack;
+  final LayerColorController colorController;
+  final EraseColorController eraseColorController;
+  final FavoriteSetController favoriteSets;
+  final FileMapScanner fileMapScanner;
+  final AqxRegistry aqxRegistry;
+  final CalibrationController calibrationController;
+  final DemManager demManager;
+  final OfflineAreaController offlineArea;
 
   /// Собирает сервисы: пути, базовые папки, репозиторий, настройки,
   /// реестр иконок (сразу просканированный), сервисы составных объектов
@@ -132,6 +170,19 @@ class LandmarkServices {
       emitter: ProximityAlertSignalEmitter(signaler, enabled: () => navigation.signalsEnabled),
     );
     await proximity.load(navigation.currentWorkspace);
+
+    final maps = MapsSettings(settings);
+    final mapSources = MapSourceRegistry.buildDefault();
+    final layers = LayerStackController(maps);
+    await layers.load();
+    final favorites = FavoriteSetController(FavoriteSetStore(settings), layers, clock: clock);
+    await favorites.loadAll();
+    final scanner = FileMapScanner(storagePaths, registry: mapSources);
+    await scanner.scanAll();
+    final aqx = AqxRegistry(storagePaths, store: AqxStore(settings));
+    await aqx.refresh();
+    final dem = DemManager(storagePaths, maps.demSettings, store: maps);
+    await dem.loadSettings();
     return LandmarkServices(
       creation: MarkerCreationService(repository, folders, clock: clock),
       waypoints: waypoints,
@@ -166,6 +217,17 @@ class LandmarkServices {
       ),
       proximityController: proximity,
       measureController: MeasureController(),
+      mapSourceRegistry: mapSources,
+      mapsSettings: maps,
+      layerStack: layers,
+      colorController: const LayerColorController(),
+      eraseColorController: const EraseColorController(),
+      favoriteSets: favorites,
+      fileMapScanner: scanner,
+      aqxRegistry: aqx,
+      calibrationController: CalibrationController(maps),
+      demManager: dem,
+      offlineArea: OfflineAreaController(const OfflineAreaEstimator(), storage),
     );
   }
 }

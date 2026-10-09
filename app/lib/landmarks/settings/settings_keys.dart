@@ -35,4 +35,40 @@ abstract final class SettingsKeys {
 
   /// Текущее рабочее пространство.
   static const String currentWorkspace = 'navigation.current_workspace';
+
+  /// Карты: только локальные данные, без сети.
+  static const String mapsUseOnlyLocalStorage = 'maps.use_only_local_storage';
+
+  /// Карты: показывать покрытие локальных данных.
+  static const String mapsShowLocalCoverage = 'maps.show_local_coverage';
+
+  /// Карты: подкачивать данные высот автоматически.
+  static const String mapsAutoDownloadElevation = 'maps.auto_download_elevation';
+
+  /// Карты: окно сведений о карте.
+  static const String mapsInformationBox = 'maps.information_box';
+
+  /// Стек слоёв карты, JSON.
+  static const String mapsLayerStack = 'maps.layer_stack';
+
+  /// Избранные наборы слоёв, JSON.
+  static const String mapsFavoriteSets = 'maps.favorite_sets';
+
+  /// Описания онлайн-карт (AQX), JSON.
+  static const String mapsAqxDescriptors = 'maps.aqx_descriptors';
+
+  /// Текущий источник карты (id).
+  static const String mapsCurrentSource = 'maps.current_source';
+
+  /// Ширина диапазона стирания цвета по умолчанию.
+  static const String mapsColorRangesWidth = 'maps.color_ranges_width';
+
+  /// Настройки данных высот, JSON.
+  static const String mapsDemSettings = 'maps.dem.settings';
+
+  /// Сколько дней хранить кэш тайлов.
+  static const String mapsOfflineKeepCacheDays = 'maps.offline.keep_cache_days';
+
+  /// Калибровки изображений: путь → точки, JSON.
+  static const String mapsCalibrations = 'maps.calibrations';
 }

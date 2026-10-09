@@ -15,6 +15,9 @@ class StorageService {
 
   final StoragePaths _paths;
 
+  /// Пути хранилища, с которыми работает сервис.
+  StoragePaths get paths => _paths;
+
   /// Вызывается между записью временного файла и переименованием —
   /// тесты бросают здесь исключение, имитируя сбой посреди записи.
   final Future<void> Function(String tempPath)? _beforeCommit;
@@ -92,6 +95,16 @@ class StorageService {
     } on FileSystemException catch (e) {
       if (!await File(absolutePath).exists()) return;
       throw StorageException('Cannot delete file', path: absolutePath, cause: e);
+    }
+  }
+
+  /// Удаляет папку со всем содержимым. Нет папки — ничего не делает.
+  Future<void> deleteDirectory(String absolutePath) async {
+    final dir = Directory(absolutePath);
+    try {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    } on FileSystemException catch (e) {
+      throw StorageException('Cannot delete folder', path: absolutePath, cause: e);
     }
   }
 
