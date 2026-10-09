@@ -1,13 +1,18 @@
 import 'package:app/derived_export/details_renderer.dart';
 import 'package:app/landmarks/explorer/explorer_controller.dart';
+import 'package:app/landmarks/explorer/explorer_state.dart';
 import 'package:app/landmarks/explorer/explorer_node.dart';
 import 'package:app/landmarks/explorer/explorer_view_mode.dart';
 import 'package:app/landmarks/explorer/listing/filter_options.dart';
 import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:app/landmarks/explorer/listing/sort_options.dart';
 import 'package:app/landmarks/explorer/places/place_root.dart';
+import 'package:app/landmarks/composite/drafts/area_draft.dart';
+import 'package:app/landmarks/composite/drafts/route_draft.dart';
+import 'package:app/landmarks/composite/drafts/set_draft.dart';
+import 'package:app/landmarks/composite/drafts/track_draft.dart';
 import 'package:app/landmarks/explorer/statistics/statistics_calculator.dart';
-import 'package:app/landmarks/models/landmark_type.dart';
+import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -16,16 +21,20 @@ import 'package:path/path.dart' as p;
 
 import '../app/landmark_services_provider.dart';
 import '../dialogs/confirm_dialog.dart';
+import '../map/map_crosshair.dart';
 import '../map/screens/available_maps/available_maps_models.dart';
+import '../map/screens/available_maps/maps_app_bar.dart';
+import '../map/screens/available_maps/storage_bar.dart';
+import '../waypoints/new_marker/marker_type.dart';
+import '../waypoints/new_marker/new_marker_sheet.dart';
 import '../waypoints/waypoint_actions.dart';
 import '../waypoints/waypoint_create_action.dart';
 import '../waypoints/waypoints_controller.dart';
 import 'explorer_breadcrumbs.dart';
-import 'explorer_fab_menu.dart';
+import 'explorer_create_sheet.dart';
+import 'explorer_dropdown_menu.dart';
 import 'explorer_providers.dart';
-import 'explorer_style.dart';
 import 'explorer_view_mode_switch.dart';
-import 'local_landmarks_app_bar.dart';
 import 'local_landmarks_drawer.dart';
 import 'local_landmarks_folder_list.dart';
 import 'local_landmarks_item_list.dart';
@@ -49,6 +58,11 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
 
   List<PlaceRoot> _places = const [];
   StorageUsage? _deviceUsage;
+
+  /// Память раздела с текущей папкой.
+  StorageUsage? _folderUsage;
+  bool _drawerOpen = false;
+  bool _menuOpen = false;
   String? _shownError;
   String? _accessFolder;
   bool _hasAccess = true;
@@ -75,13 +89,15 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     final state = _explorer.state;
     final folder = state.currentFolder;
     final root = state.currentPlace?.path;
-    if (_explorer.selection.state.isActive) return false;
+    if (_drawerOpen || _menuOpen || _explorer.selection.state.isActive) return false;
     return folder == null || root == null || !p.isWithin(root, folder);
   }
 
   void _onBack(bool didPop, Object? _) {
     if (didPop) return;
-    if (_explorer.selection.state.isActive) {
+    if (_drawerOpen || _menuOpen) {
+      setState(() => _drawerOpen = _menuOpen = false);
+    } else if (_explorer.selection.state.isActive) {
       _explorer.selection.deactivate();
     } else {
       _explorer.goUp();
@@ -125,6 +141,9 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
       _services.permissionService.hasAccess(folder).then((ok) {
         if (mounted && _accessFolder == folder) setState(() => _hasAccess = ok);
       });
+      _usageOf(folder).then((usage) {
+        if (mounted && _accessFolder == folder) setState(() => _folderUsage = usage);
+      });
     }
     setState(() {});
   }
@@ -146,7 +165,7 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
   }
 
   Future<void> _onPlace(PlaceRoot place) async {
-    Navigator.of(context).pop();
+    setState(() => _drawerOpen = false);
     await _explorer.openPlace(place);
   }
 
@@ -213,46 +232,105 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.errorMessage ?? 'Не всё удалено')));
   }
 
-  Future<void> _onFab(ExplorerFabAction action) async {
+  Future<void> _create() async {
+    final type = await showExplorerCreateSheet(context);
+    if (type == null || !mounted) return;
     final folder = _explorer.state.currentFolder;
-    switch (action) {
-      case ExplorerFabAction.newFolder:
-        if (folder == null) return;
-        final name = await _askFolderName();
+    if (folder == null) return;
+    switch (type.id) {
+      case ExplorerCreateIds.folder:
+        final name = await _askName('Новая папка');
         if (name == null) return;
-        try {
-          await _services.folders.ensureFolder(p.join(folder, name));
-          await _explorer.refresh();
-        } on Exception catch (e) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Не удалось создать: $e')));
-        }
-      case ExplorerFabAction.newMarker:
-        await createWaypointAtCrosshair(context, ref);
-        await _changed();
-      case ExplorerFabAction.importFile:
-        final picked = await FilePicker.pickFiles();
-        final path = picked?.files.firstOrNull?.path;
-        if (path == null) return;
-        final result = await _services.importService.importFromFile(path, targetFolder: folder);
-        await _changed();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result.success ? 'Импортировано: ${result.importedCount}' : (result.errorMessage ?? 'Импорт не удался'),
+        await _guard(() => _services.folders.ensureFolder(p.join(folder, name)));
+        await _explorer.refresh();
+      case ExplorerCreateIds.landmarkFile:
+        final name = await _askName('Новый файл меток');
+        if (name == null) return;
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await _guard(
+          () => _services.repository.save(
+            LandmarkFile.of(
+              SetObject(
+                userMetadata: LandmarkMetadata(
+                  entries: {
+                    LandmarkMetadata.nameKey: name,
+                    LandmarkMetadata.createdAtKey: now,
+                    LandmarkMetadata.updatedAtKey: now,
+                  },
+                ),
+              ),
             ),
+            directory: folder,
           ),
         );
+        await _explorer.refresh();
+      case ExplorerCreateIds.import:
+        await _import(folder);
+      case MarkerTypeIds.waypoint:
+        await createWaypointAtCrosshair(context, ref, folder: folder);
+        await _changed();
+      case 'waypoint_set' || 'route' || 'path' || 'area':
+        await _createComposite(type, folder);
+      default:
+        _snack('«${type.title}» пока нельзя создать: формат меток этого не поддерживает');
     }
   }
 
-  Future<String?> _askFolderName() async {
-    final name = await showDialog<String>(context: context, builder: (_) => const _NewFolderDialog());
+  /// Набор, маршрут, путь или область с первой точкой у прицела карты.
+  Future<void> _createComposite(MarkerType type, String folder) async {
+    final at = ref.read(mapCrosshairProvider);
+    if (at == null) return _snack('Карта ещё не готова');
+    final name = await _askName(type.title);
+    if (name == null) return;
+    final anchor = LandmarkLocation(latitude: at.latitude, longitude: at.longitude);
+    final creation = _services.compositeCreation;
+    await _guard(() async {
+      switch (type.id) {
+        case 'waypoint_set':
+          await creation.createSet(SetDraft(name: name, targetFolder: folder), anchor);
+        case 'route':
+          await creation.createRoute(RouteDraft(name: name, targetFolder: folder), anchor);
+        case 'path':
+          await creation.createTrack(TrackDraft(name: name, targetFolder: folder, initialLocations: [anchor]), anchor);
+        case 'area':
+          await creation.createArea(AreaDraft(name: name, targetFolder: folder, isClosed: false), anchor);
+      }
+    });
+    await _explorer.refresh();
+  }
+
+  Future<void> _import(String folder) async {
+    final picked = await FilePicker.pickFiles();
+    final path = picked?.files.firstOrNull?.path;
+    if (path == null) return;
+    final result = await _services.importService.importFromFile(path, targetFolder: folder);
+    await _changed();
+    _snack(result.success ? 'Импортировано: ${result.importedCount}' : (result.errorMessage ?? 'Импорт не удался'));
+  }
+
+  Future<void> _guard(Future<void> Function() action) async {
+    try {
+      await action();
+    } on Exception catch (e) {
+      _snack('Не удалось создать: $e');
+    }
+  }
+
+  void _snack(String text) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<String?> _askName(String title) async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => _NameDialog(title: title),
+    );
     final trimmed = name?.trim().replaceAll(RegExp(r'[\\/:*?"<>|]'), '');
     return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 
   Future<void> _onMenu(ExplorerMenuAction action) async {
+    setState(() => _menuOpen = false);
     switch (action) {
       case ExplorerMenuAction.sort:
         final sort = await _pickSort(_explorer.state.sort);
@@ -273,7 +351,7 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
 
   Future<SortOptions?> _pickSort(SortOptions current) => showModalBottomSheet<SortOptions>(
     context: context,
-    backgroundColor: ExplorerStyle.drawerBackground,
+    backgroundColor: NewMarkerSheet.background,
     builder: (context) {
       const labels = {
         SortField.name: 'По имени',
@@ -295,7 +373,7 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
                 trailing: field == current.field
                     ? Icon(
                         current.direction == SortDirection.ascending ? Icons.arrow_upward : Icons.arrow_downward,
-                        color: ExplorerStyle.accent,
+                        color: Theme.of(context).colorScheme.primary,
                       )
                     : null,
                 onTap: () => Navigator.pop(
@@ -317,7 +395,7 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
 
   Future<ItemFilter?> _pickFilter(ItemFilter current) => showModalBottomSheet<ItemFilter>(
     context: context,
-    backgroundColor: ExplorerStyle.drawerBackground,
+    backgroundColor: NewMarkerSheet.background,
     builder: (context) {
       const labels = {
         null: 'Все типы',
@@ -335,7 +413,7 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
               ListTile(
                 key: Key('filter_${type?.extension ?? 'all'}'),
                 title: Text(label),
-                trailing: current.onlyType == type ? const Icon(Icons.check, color: ExplorerStyle.accent) : null,
+                trailing: current.onlyType == type ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary) : null,
                 onTap: () => Navigator.pop(context, current.copyWith(onlyType: type)),
               ),
           ],
@@ -376,115 +454,173 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     final folders = state.nodes.whereType<ExplorerFolderNode>().toList();
     final items = state.nodes.whereType<ExplorerItemNode>().toList();
     final place = state.currentPlace;
+    final theme = Theme.of(context);
+    final subtitle = ExplorerBreadcrumbs.of(
+      place == null
+          ? null
+          : PlaceRoot(
+              id: place.id,
+              title: LocalLandmarksDrawer.titleOf(place, _deviceUsage),
+              path: place.path,
+              kind: place.kind,
+            ),
+      state.currentFolder,
+    );
     return PopScope(
       canPop: _canPop,
       onPopInvokedWithResult: _onBack,
       child: Scaffold(
-        backgroundColor: ExplorerStyle.background,
-        appBar: LocalLandmarksAppBar(
-          subtitle: ExplorerBreadcrumbs.of(
-            place == null
-                ? null
-                : PlaceRoot(
-                    id: place.id,
-                    title: LocalLandmarksDrawer.titleOf(place, _deviceUsage),
-                    path: place.path,
-                    kind: place.kind,
-                  ),
-            state.currentFolder,
-          ),
-          viewMode: state.viewMode,
-          onMenuAction: _onMenu,
-        ),
-        drawer: LocalLandmarksDrawer(
-          places: _places,
-          currentPlace: place,
-          deviceUsage: _deviceUsage,
-          onPlace: _onPlace,
-        ),
-        floatingActionButton: selection.isActive ? null : ExplorerFabMenu(onAction: _onFab),
-        bottomNavigationBar: selection.isActive
-            ? SafeArea(
-                child: Container(
-                  key: const Key('explorer_selection_bar'),
-                  height: 56,
-                  decoration: const BoxDecoration(
-                    color: ExplorerStyle.drawerBackground,
-                    border: Border(top: BorderSide(color: ExplorerStyle.divider)),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 16),
-                      Expanded(child: Text('Выбрано: ${selection.count}', style: ExplorerStyle.rowTitle)),
-                      IconButton(
-                        key: const Key('selection_delete'),
-                        tooltip: 'Удалить',
-                        icon: const Icon(Icons.delete_outline, color: ExplorerStyle.icon),
-                        onPressed: selection.count == 0 ? null : _deleteSelected,
-                      ),
-                      TextButton(
-                        key: const Key('selection_cancel'),
-                        onPressed: _explorer.selection.deactivate,
-                        child: const Text('ОТМЕНА'),
-                      ),
-                    ],
-                  ),
-                ),
-              )
-            : null,
+        floatingActionButton: selection.isActive
+            ? null
+            : FloatingActionButton(key: const Key('explorer_fab'), onPressed: _create, child: const Icon(Icons.add)),
+        bottomNavigationBar: selection.isActive ? _selectionBar(theme, selection.count) : null,
         body: Column(
           children: [
-            if (!_hasAccess) PermissionBanner(onActivate: _activate),
+            MapsAppBar(
+              title: 'Локальные метки',
+              subtitle: subtitle,
+              onMenu: () => setState(() {
+                _menuOpen = false;
+                _drawerOpen = !_drawerOpen;
+              }),
+              onClose: () => Navigator.of(context).maybePop(),
+              onMore: () => setState(() {
+                _drawerOpen = false;
+                _menuOpen = !_menuOpen;
+              }),
+            ),
             Expanded(
-              child: state.isLoading || state.currentFolder == null
-                  ? const Center(child: CircularProgressIndicator(key: Key('explorer_loading')))
-                  : state.nodes.isEmpty
-                  ? const Center(
-                      key: Key('explorer_empty'),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.folder_open, size: 48, color: ExplorerStyle.emptyIcon),
-                          SizedBox(height: 8),
-                          Text('Папка пуста', style: TextStyle(fontSize: 14, color: ExplorerStyle.secondary)),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _explorer.refresh,
-                      child: ListView(
-                        padding: const EdgeInsets.only(bottom: 88),
-                        children: [
-                          LocalLandmarksFolderList(folders: folders, onOpen: _explorer.openFolder),
-                          if (folders.isNotEmpty && items.isNotEmpty) ExplorerStyle.divider1,
-                          LocalLandmarksItemList(
-                            items: items,
-                            selecting: selection.isActive,
-                            isSelected: selection.contains,
-                            dense: state.viewMode == ExplorerViewMode.list,
-                            onTap: _onItemTap,
-                            onLongPress: _onItemLongPress,
-                          ),
-                        ],
-                      ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Column(
+                      children: [
+                        StorageBar(
+                          key: const Key('explorer_storage'),
+                          usage: _folderUsage,
+                          caption: '${_explorer.allItems.length} файл. · ${foldersCaption(folders.length)}',
+                        ),
+                        const Divider(height: 1),
+                        if (!_hasAccess) PermissionBanner(onActivate: _activate),
+                        Expanded(child: _list(state, selection.isActive, folders, items)),
+                      ],
                     ),
+                  ),
+                  Positioned.fill(
+                    child: LocalLandmarksDrawer(
+                      isOpen: _drawerOpen,
+                      places: _places,
+                      currentPlace: place,
+                      deviceUsage: _deviceUsage,
+                      onPlace: _onPlace,
+                      onClose: () => setState(() => _drawerOpen = false),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: ExplorerDropdownMenu(
+                      isOpen: _menuOpen,
+                      viewMode: state.viewMode,
+                      onSelected: _onMenu,
+                      onDismiss: () => setState(() => _menuOpen = false),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  /// «1 папка», «3 папки», «5 папок».
+  static String foldersCaption(int n) {
+    final mod10 = n % 10;
+    final mod100 = n % 100;
+    final word = mod10 == 1 && mod100 != 11
+        ? 'папка'
+        : (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? 'папки' : 'папок');
+    return '$n $word';
+  }
+
+  Widget _list(ExplorerState state, bool selecting, List<ExplorerFolderNode> folders, List<ExplorerItemNode> items) {
+    if (state.isLoading || state.currentFolder == null) {
+      return const Center(child: CircularProgressIndicator(key: Key('explorer_loading')));
+    }
+    if (state.nodes.isEmpty) {
+      final theme = Theme.of(context);
+      return Center(
+        key: const Key('explorer_empty'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.folder_open, size: 48, color: theme.colorScheme.outlineVariant),
+            const SizedBox(height: 8),
+            Text('Папка пуста', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _explorer.refresh,
+      child: ListView(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewPaddingOf(context).bottom + 88),
+        children: [
+          LocalLandmarksFolderList(folders: folders, onOpen: _explorer.openFolder),
+          if (folders.isNotEmpty && items.isNotEmpty) const Divider(height: 1),
+          LocalLandmarksItemList(
+            items: items,
+            selecting: selecting,
+            isSelected: _explorer.selection.contains,
+            dense: state.viewMode == ExplorerViewMode.list,
+            onTap: _onItemTap,
+            onLongPress: _onItemLongPress,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _selectionBar(ThemeData theme, int count) => Material(
+    key: const Key('explorer_selection_bar'),
+    elevation: 8,
+    color: theme.colorScheme.surface,
+    child: SafeArea(
+      child: SizedBox(
+        height: 56,
+        child: Row(
+          children: [
+            const SizedBox(width: 16),
+            Expanded(child: Text('Выбрано: $count', style: theme.textTheme.titleSmall)),
+            IconButton(
+              key: const Key('selection_delete'),
+              tooltip: 'Удалить',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: count == 0 ? null : _deleteSelected,
+            ),
+            TextButton(
+              key: const Key('selection_cancel'),
+              onPressed: _explorer.selection.deactivate,
+              child: const Text('ОТМЕНА'),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
-/// Имя новой папки; поле живёт столько же, сколько диалог.
-class _NewFolderDialog extends StatefulWidget {
-  const _NewFolderDialog();
+/// Имя новой папки или файла; поле живёт столько же, сколько диалог.
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({required this.title});
+
+  final String title;
 
   @override
-  State<_NewFolderDialog> createState() => _NewFolderDialogState();
+  State<_NameDialog> createState() => _NameDialogState();
 }
 
-class _NewFolderDialogState extends State<_NewFolderDialog> {
+class _NameDialogState extends State<_NameDialog> {
   final TextEditingController _name = TextEditingController();
 
   @override
@@ -495,7 +631,7 @@ class _NewFolderDialogState extends State<_NewFolderDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Новая папка'),
+    title: Text(widget.title),
     content: TextField(
       key: const Key('new_folder_name'),
       controller: _name,

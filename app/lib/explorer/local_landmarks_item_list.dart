@@ -2,7 +2,6 @@ import 'package:app/landmarks/explorer/explorer_node.dart';
 import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:flutter/material.dart';
 
-import 'explorer_style.dart';
 import 'item_row.dart';
 
 /// Файлы меток текущей папки.
@@ -27,8 +26,7 @@ class LocalLandmarksItemList extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      for (final (i, node) in items.indexed) ...[
-        if (i > 0) const Padding(padding: EdgeInsets.only(left: 56), child: ExplorerStyle.divider1),
+      for (final node in items)
         ItemRow(
           item: node.item,
           selecting: selecting,
@@ -37,7 +35,6 @@ class LocalLandmarksItemList extends StatelessWidget {
           onTap: () => onTap(node.item),
           onLongPress: () => onLongPress(node.item),
         ),
-      ],
     ],
   );
 }

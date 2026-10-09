@@ -1,7 +1,6 @@
 import 'package:app/landmarks/explorer/explorer_node.dart';
 import 'package:flutter/material.dart';
 
-import 'explorer_style.dart';
 import 'folder_row.dart';
 
 /// Папки текущей папки.
@@ -13,11 +12,6 @@ class LocalLandmarksFolderList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-    children: [
-      for (final (i, f) in folders.indexed) ...[
-        if (i > 0) const Padding(padding: EdgeInsets.only(left: 56), child: ExplorerStyle.divider1),
-        FolderRow(path: f.path, name: f.name, onTap: () => onOpen(f.path)),
-      ],
-    ],
+    children: [for (final f in folders) FolderRow(path: f.path, name: f.name, onTap: () => onOpen(f.path))],
   );
 }

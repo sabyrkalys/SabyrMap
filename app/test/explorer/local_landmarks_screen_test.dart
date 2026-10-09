@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:app/landmarks/drafts/marker_draft.dart';
 import 'package:app/landmarks/models/landmark_type.dart';
+import 'package:app/map/screens/available_maps/maps_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -10,6 +11,9 @@ import 'explorer_test_harness.dart';
 
 void main() {
   late ExplorerHarness h;
+
+  /// Подзаголовок шапки (текущая папка).
+  String? subtitle(WidgetTester tester) => tester.widget<MapsAppBar>(find.byType(MapsAppBar)).subtitle;
 
   Future<void> addWaypoint(String name, {String? folder}) => h.f.services.creation.create(
     MarkerDraft(type: LandmarkType.waypoint, longitude: 30, latitude: 50, name: name, targetFolder: folder),
@@ -22,8 +26,9 @@ void main() {
 
     expect(h.f.services.explorerController.state.currentFolder, h.f.paths.landmarks);
     expect(find.text('Локальные метки'), findsOneWidget);
-    expect(find.byKey(const Key('explorer_subtitle')), findsOneWidget);
-    expect(tester.widget<Text>(find.byKey(const Key('explorer_subtitle'))).data, 'Мои метки');
+    expect(subtitle(tester), 'Мои метки');
+    expect(find.byKey(const Key('explorer_storage')), findsOneWidget);
+    expect(find.text('1 файл. · 2 папки'), findsOneWidget);
     expect(find.byKey(const Key('folder_row_imported')), findsOneWidget);
     expect(find.byKey(const Key('item_row_Bunker')), findsOneWidget);
     await h.dispose(tester);
@@ -46,7 +51,7 @@ void main() {
     await h.pumpApp(tester, initialFolder: h.f.paths.recordedTracks);
     expect(find.byKey(const Key('explorer_empty')), findsOneWidget);
     expect(find.text('Папка пуста'), findsOneWidget);
-    expect(tester.widget<Text>(find.byKey(const Key('explorer_subtitle'))).data, 'Мои метки / recorded_tracks');
+    expect(subtitle(tester), 'Мои метки / recorded_tracks');
     await h.dispose(tester);
   });
 
@@ -94,7 +99,9 @@ void main() {
     await h.pumpApp(tester);
     await h.tap(tester, find.byKey(const Key('explorer_fab')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('fab_newFolder')));
+    expect(find.text('Папки и файлы'.toUpperCase()), findsOneWidget);
+    expect(find.byKey(const Key('marker_type_route')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('marker_type_folder')));
     await h.settle(tester);
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('new_folder_name')), 'Поход');
@@ -111,19 +118,50 @@ void main() {
       await addWaypoint('B', folder: h.f.paths.landmarks);
     });
     await h.pumpApp(tester);
-    await tester.tap(find.byKey(const Key('explorer_overflow')));
+    await tester.tap(find.byKey(const Key('maps_more_button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Выбрать всё'));
+    await tester.tap(find.byKey(const Key('explorer_menu_selectAll')));
     await tester.pumpAndSettle();
     expect(find.text('Выбрано: 2'), findsOneWidget);
     await tester.tap(find.byKey(const Key('selection_cancel')));
     await tester.pump();
 
-    await tester.tap(find.byKey(const Key('explorer_overflow')));
+    await tester.tap(find.byKey(const Key('maps_more_button')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Статистика…'));
+    await tester.tap(find.byKey(const Key('explorer_menu_statistics')));
     await tester.pumpAndSettle();
     expect(find.text('Файлов: 2'), findsOneWidget);
+    await h.dispose(tester);
+  });
+
+  testWidgets('«+» → «Файл меток» creates an empty set here', (tester) async {
+    h = await ExplorerHarness.create(tester);
+    await h.pumpApp(tester);
+    await h.tap(tester, find.byKey(const Key('explorer_fab')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('marker_type_landmark_file')));
+    await h.settle(tester);
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('new_folder_name')), 'Посты');
+    await h.tap(tester, find.byKey(const Key('new_folder_ok')));
+    expect(find.byKey(const Key('item_row_Посты')), findsOneWidget);
+    expect(find.text('Набор точек', findRichText: true), findsNothing);
+    await h.dispose(tester);
+  });
+
+  testWidgets('«+» → an unsupported kind explains itself', (tester) async {
+    h = await ExplorerHarness.create(tester);
+    await h.pumpApp(tester);
+    await h.tap(tester, find.byKey(const Key('explorer_fab')));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('marker_type_text')),
+      200,
+      scrollable: find.descendant(of: find.byKey(const Key('explorer_create_sheet')), matching: find.byType(Scrollable)),
+    );
+    await tester.tap(find.byKey(const Key('marker_type_text')));
+    await h.settle(tester);
+    expect(find.textContaining('«Текст» пока нельзя создать'), findsOneWidget);
     await h.dispose(tester);
   });
 }

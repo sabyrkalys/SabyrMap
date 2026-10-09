@@ -63,7 +63,7 @@ class SideDrawer extends StatelessWidget {
                   child: ListView(
                     padding: EdgeInsets.zero,
                     children: [
-                      const _Header('ОНЛАЙН-КАРТЫ'),
+                      const SideDrawerHeader('ОНЛАЙН-КАРТЫ'),
                       for (final section in MapsSection.values)
                         ListTile(
                           key: Key('drawer_section_${section.name}'),
@@ -72,7 +72,7 @@ class SideDrawer extends StatelessWidget {
                           onTap: () => onSectionSelected(section),
                         ),
                       const Divider(),
-                      const _Header('КАРТЫ НА УСТРОЙСТВЕ'),
+                      const SideDrawerHeader('КАРТЫ НА УСТРОЙСТВЕ'),
                       StorageBar(usage: storage, showPath: true),
                       for (final folder in folders)
                         ListTile(
@@ -95,20 +95,25 @@ class SideDrawer extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header(this.text);
+/// Заголовок раздела боковой панели (цвет акцента, жирный).
+class SideDrawerHeader extends StatelessWidget {
+  const SideDrawerHeader(this.text, {super.key, this.trailing});
 
   final String text;
+
+  /// Кнопка справа от заголовка.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final label = Text(
+      text,
+      style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        text,
-        style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w700),
-      ),
+      padding: EdgeInsets.fromLTRB(16, 16, trailing == null ? 16 : 4, 8),
+      child: trailing == null ? label : Row(children: [Expanded(child: label), trailing!]),
     );
   }
 }

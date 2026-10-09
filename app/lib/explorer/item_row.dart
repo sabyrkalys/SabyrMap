@@ -2,10 +2,8 @@ import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:flutter/material.dart';
 
-import 'explorer_style.dart';
-
-/// Строка файла метки: иконка по типу, имя, подпись; в режиме выбора —
-/// флажок.
+/// Строка файла метки: иконка по типу в цвете метки, имя, подпись; в
+/// режиме выбора — флажок.
 class ItemRow extends StatelessWidget {
   const ItemRow({
     super.key,
@@ -26,28 +24,31 @@ class ItemRow extends StatelessWidget {
   /// Компактный вид списка.
   final bool dense;
 
+  /// Иконки — как на листе «Новая метка».
   static IconData iconFor(LandmarkType type) => switch (type) {
-    LandmarkType.waypoint => Icons.place_outlined,
-    LandmarkType.set => Icons.scatter_plot_outlined,
-    LandmarkType.route => Icons.route_outlined,
-    LandmarkType.track => Icons.timeline,
-    LandmarkType.area => Icons.crop_square,
+    LandmarkType.waypoint => Icons.location_on_sharp,
+    LandmarkType.set => Icons.share_location_sharp,
+    LandmarkType.route => Icons.route_sharp,
+    LandmarkType.track => Icons.polyline_sharp,
+    LandmarkType.area => Icons.pentagon_outlined,
   };
 
-  /// Подпись: длина/площадь для составных, иначе тип и дата.
+  static String kindOf(LandmarkType type) => switch (type) {
+    LandmarkType.waypoint => 'Путевая точка',
+    LandmarkType.set => 'Набор точек',
+    LandmarkType.route => 'Маршрут',
+    LandmarkType.track => 'Путь',
+    LandmarkType.area => 'Область',
+  };
+
+  /// Подпись: вид, длина или площадь, дата.
   static String subtitleFor(LandmarkItem item) {
     final date = DateTime.fromMillisecondsSinceEpoch(item.createdAt);
     String two(int v) => v.toString().padLeft(2, '0');
     final when = '${two(date.day)}.${two(date.month)}.${date.year}';
     final length = item.lengthMeters;
     final area = item.areaSquareMeters;
-    final kind = switch (item.type) {
-      LandmarkType.waypoint => 'Путевая точка',
-      LandmarkType.set => 'Набор точек',
-      LandmarkType.route => 'Маршрут',
-      LandmarkType.track => 'Трек',
-      LandmarkType.area => 'Область',
-    };
+    final kind = kindOf(item.type);
     if (length != null && length > 0) {
       final l = length >= 1000 ? '${(length / 1000).toStringAsFixed(2)} км' : '${length.round()} м';
       return '$kind · $l · $when';
@@ -60,33 +61,16 @@ class ItemRow extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => InkWell(
+  Widget build(BuildContext context) => ListTile(
     key: Key('item_row_${item.name}'),
+    dense: dense,
+    leading: selecting
+        ? Checkbox(value: selected, onChanged: (_) => onTap())
+        : Icon(iconFor(item.type), color: Color(item.colorValue | 0xFF000000)),
+    title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+    subtitle: Text(subtitleFor(item), maxLines: 1),
+    selected: selected,
     onTap: onTap,
     onLongPress: onLongPress,
-    child: SizedBox(
-      height: dense ? 52 : 64,
-      child: Row(
-        children: [
-          const SizedBox(width: 16),
-          if (selecting)
-            Checkbox(value: selected, onChanged: (_) => onTap(), activeColor: ExplorerStyle.accent)
-          else
-            Icon(iconFor(item.type), size: 24, color: Color(item.colorValue | 0xFF000000)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: ExplorerStyle.rowTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                if (!dense) Text(subtitleFor(item), style: ExplorerStyle.subtitle, maxLines: 1),
-              ],
-            ),
-          ),
-          const SizedBox(width: 16),
-        ],
-      ),
-    ),
   );
 }

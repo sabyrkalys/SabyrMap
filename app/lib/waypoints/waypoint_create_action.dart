@@ -12,6 +12,9 @@ import 'waypoint_dialog/waypoint_dialog.dart';
 import 'waypoint_models.dart';
 import 'waypoints_controller.dart';
 
+/// [folder] — папка проводника, куда кладётся точка с группой по
+/// умолчанию.
+///
 /// Opens the «Путевая точка» dialog and creates the waypoint at the map's
 /// crosshair, or at [at] (the «Задать цель» target), or at the coordinates
 /// typed in the dialog. Shared by the crosshair menu, the «Новая метка» sheet and the МЕТКИ panel.
@@ -24,6 +27,7 @@ Future<void> createWaypointAtCrosshair(
   WidgetRef ref, {
   IconLibraryScanner? iconScanner,
   LatLng? at,
+  String? folder,
 }) async {
   final container = ProviderScope.containerOf(context, listen: false);
   final messenger = ScaffoldMessenger.of(context);
@@ -41,7 +45,7 @@ Future<void> createWaypointAtCrosshair(
   if (data == null) return;
   // The crosshair as it is now: the map may have moved while the dialog was open.
   final point = data.point ?? at ?? container.read(mapCrosshairProvider) ?? coordinates;
-  await saveWaypoint(container, messenger, data, point);
+  await saveWaypoint(container, messenger, data, point, folder: folder);
 }
 
 /// Creates [data] at [at]. An empty name becomes the next «Путевая точка N».
@@ -49,8 +53,9 @@ Future<void> saveWaypoint(
   ProviderContainer container,
   ScaffoldMessengerState messenger,
   WaypointData data,
-  LatLng at,
-) async {
+  LatLng at, {
+  String? folder,
+}) async {
   final name = data.name.trim().isNotEmpty
       ? data.name.trim()
       : nextWaypointName(container.read(waypointsControllerProvider).map((w) => w.name));
@@ -62,7 +67,11 @@ Future<void> saveWaypoint(
           color: data.colorHex,
           lat: at.latitude,
           lng: at.longitude,
-          folder: folderFor(container.read(markerGroupFoldersProvider), data.groupId),
+          // Decision: из проводника точка ложится в открытую там папку, если
+          // в диалоге осталась группа по умолчанию.
+          folder: folder != null && data.groupId == WaypointData.unsortedGroupId
+              ? folder
+              : folderFor(container.read(markerGroupFoldersProvider), data.groupId),
           extra: {
             if (data.comment?.trim().isNotEmpty ?? false) 'comment': data.comment!.trim(),
             'icon': ?data.markerIconId,
