@@ -118,4 +118,31 @@ void main() {
     expect(r, lessThan(50));
     expect(b, lessThan(50));
   });
+
+  test('svg margins are trimmed: a small drawing on a big canvas fills the square', () async {
+    // A 100×100 square in the corner of a 1000×1000 canvas.
+    final file = File('${tempDir.path}/corner.svg')
+      ..writeAsStringSync(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000">'
+        '<rect x="50" y="50" width="100" height="100" fill="black"/></svg>',
+      );
+    final icon = IconFile(path: file.path, fileName: 'corner.svg', displayName: 'corner', format: IconFileFormat.svg);
+
+    final image = await _decode(await renderIconBytes(icon, '#FF0000', size: 130));
+    expect(image.width, 130);
+    expect(image.height, 130);
+    final pixels = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+    int alpha(int x, int y) => pixels.getUint8((y * 130 + x) * 4 + 3);
+    // The square now spans the canvas, less a thin margin.
+    expect(alpha(65, 65), 255);
+    expect(alpha(10, 10), 255);
+    expect(alpha(120, 120), 255);
+    expect(alpha(1, 1), 0);
+  });
+
+  test('the bitmap side follows the screen pixel ratio', () {
+    expect(iconCanvasPixels(1), 48);
+    expect(iconCanvasPixels(3.25), 130);
+    expect(iconCanvasPixels(20), 512);
+  });
 }

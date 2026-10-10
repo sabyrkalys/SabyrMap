@@ -19,6 +19,7 @@ import 'map_camera_store.dart';
 import 'map_crosshair.dart';
 import 'map_overlays.dart';
 import 'map_scale.dart';
+import '../icons/icon_renderer.dart';
 import 'map_focus.dart';
 import 'map_target.dart';
 import 'point_info_sheet.dart';
@@ -105,6 +106,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (controller == null) return;
       await controller.addImage(name, bytes);
     },
+    // Rendered in physical pixels for this screen (see kIconLogicalSize).
+    render: (icon, colorHex) =>
+        renderIconBytes(icon, colorHex, size: iconCanvasPixels(View.of(context).devicePixelRatio)),
   );
   final IconLibraryScanner _iconLibraryScanner = IconLibraryScanner();
   // Cached so _syncSymbols (which can run many times per second while a
@@ -617,9 +621,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final options = SymbolOptions(
         geometry: LatLng(waypoint.lat, waypoint.lng),
         iconImage: imageName,
-        // Every rendered icon bitmap is normalized to the same fixed canvas
-        // (kIconCanvasSize), so a single constant scale is correct for all of
-        // them -- no per-waypoint sizing needed.
+        // Every rendered icon bitmap is the same square (kIconLogicalSize at
+        // the screen's pixel ratio), so a single constant scale is correct
+        // for all of them -- no per-waypoint sizing needed.
         iconSize: 1,
       );
       if (existing == null) {
