@@ -142,7 +142,7 @@ void main() {
 
   test('the bitmap side follows the screen pixel ratio', () {
     expect(iconCanvasPixels(1), 48);
-    expect(iconCanvasPixels(3.25), 130);
-    expect(iconCanvasPixels(20), 512);
+    expect(iconCanvasPixels(3.25), 78);
+    expect(iconCanvasPixels(30), 512);
   });
 }

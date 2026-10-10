@@ -18,7 +18,7 @@ const int kIconCanvasSize = 48;
 /// is rendered at this times the screen's pixel ratio: MapLibre draws the
 /// registered image pixel for pixel, so a fixed 48 px bitmap was only
 /// ~15 dp (about 2 mm) on a 3.25× screen.
-const double kIconLogicalSize = 40;
+const double kIconLogicalSize = 24;
 
 /// Bitmap side, in physical pixels, for a screen with [devicePixelRatio].
 int iconCanvasPixels(double devicePixelRatio) => (kIconLogicalSize * devicePixelRatio).round().clamp(kIconCanvasSize, 512);
