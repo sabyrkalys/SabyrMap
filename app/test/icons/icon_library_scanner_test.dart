@@ -67,5 +67,18 @@ void main() {
       expect(result[0].format, IconFileFormat.svg);
       expect(result[1].format, IconFileFormat.raster);
     });
+
+    test('subfolders are categories; names are relative paths', () async {
+      final fs = MemoryFileSystem();
+      const base = '/base/mediafile/custom-types';
+      for (final name in ['flag.svg', 'БЛА/СТ 1.svg', 'Техника/СТ 1.svg', 'Техника/колёсная/БТР.png', 'БЛА/readme.txt']) {
+        fs.file('$base/$name').createSync(recursive: true);
+      }
+      final result = await IconLibraryScanner(fileSystem: fs, baseDirectoryPath: base).scan();
+
+      expect(result.map((f) => f.fileName), ['flag.svg', 'БЛА/СТ 1.svg', 'Техника/СТ 1.svg', 'Техника/колёсная/БТР.png']);
+      expect(result.map((f) => f.category), [null, 'БЛА', 'Техника', 'Техника']);
+      expect(result.map((f) => f.displayName), ['flag', 'СТ 1', 'СТ 1', 'БТР']);
+    });
   });
 }

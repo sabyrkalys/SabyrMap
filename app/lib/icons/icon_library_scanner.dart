@@ -7,12 +7,25 @@ import '../mediafile/mediafile_subfolders.dart';
 enum IconFileFormat { svg, raster }
 
 class IconFile {
-  const IconFile({required this.path, required this.fileName, required this.displayName, required this.format});
+  const IconFile({
+    required this.path,
+    required this.fileName,
+    required this.displayName,
+    required this.format,
+    this.category,
+  });
 
   final String path;
+
+  /// Path relative to the icon folder, with `/`: «flag.svg» at the top
+  /// level, «БЛА/СТ 1.svg» in a subfolder. Waypoints store it, so files with
+  /// the same name in different subfolders stay distinct.
   final String fileName;
   final String displayName;
   final IconFileFormat format;
+
+  /// The top-level subfolder the file is in («БЛА»); null at the top level.
+  final String? category;
 }
 
 /// Pure classification of a file path's extension. Extracted as a top-level
@@ -52,15 +65,27 @@ class IconLibraryScanner {
       dir.createSync(recursive: true);
     }
 
+    // Subfolders are categories (any depth; the top-level one names it).
     final entries = <IconFile>[];
-    for (final entity in dir.listSync()) {
+    final context = _fileSystem.path;
+    for (final entity in dir.listSync(recursive: true, followLinks: false)) {
       if (entity is! File) continue;
       final format = iconFileFormatForPath(entity.path);
       if (format == null) continue;
-      final fileName = entity.basename;
-      final dot = fileName.lastIndexOf('.');
-      final displayName = dot > 0 ? fileName.substring(0, dot) : fileName;
-      entries.add(IconFile(path: entity.path, fileName: fileName, displayName: displayName, format: format));
+      final parts = context.split(context.relative(entity.path, from: dir.path));
+      final fileName = parts.join('/');
+      final base = parts.last;
+      final dot = base.lastIndexOf('.');
+      final displayName = dot > 0 ? base.substring(0, dot) : base;
+      entries.add(
+        IconFile(
+          path: entity.path,
+          fileName: fileName,
+          displayName: displayName,
+          format: format,
+          category: parts.length > 1 ? parts.first : null,
+        ),
+      );
     }
     entries.sort((a, b) => a.fileName.compareTo(b.fileName));
     return entries;

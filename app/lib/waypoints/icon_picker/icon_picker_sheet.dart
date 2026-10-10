@@ -6,7 +6,8 @@ import 'marker_icon.dart';
 
 /// Opens the «Иконка» sheet. Completes with the chosen icon, [noneOption]
 /// for «Нет», or null on «ОТМЕНА». The user's own icon files (from
-/// [scanner]) are the last category, «СВОИ ИКОНКИ».
+/// [scanner]) follow the built-in categories: each subfolder of the icon
+/// folder is a category of its own, top-level files are «СВОИ ИКОНКИ».
 Future<MarkerIcon?> showMarkerIconSheet(
   BuildContext context, {
   String? currentIconId,
@@ -40,7 +41,7 @@ class IconPickerSheet extends StatefulWidget {
 
 class _IconPickerSheetState extends State<IconPickerSheet> {
   final Set<String> _expandedCategoryIds = {};
-  List<MarkerIcon> _ownIcons = const [];
+  List<IconCategory> _ownCategories = const [];
 
   static const ownCategoryId = 'own';
 
@@ -56,15 +57,23 @@ class _IconPickerSheetState extends State<IconPickerSheet> {
     try {
       final files = await scanner.scan();
       if (!mounted) return;
+      final byCategory = <String?, List<MarkerIcon>>{};
+      for (final file in files) {
+        (byCategory[file.category] ??= []).add(
+          MarkerIcon(
+            id: '${MarkerIcon.filePrefix}${file.fileName}',
+            label: file.displayName,
+            assetPath: file.path,
+            fileName: file.fileName,
+          ),
+        );
+      }
+      final folders = byCategory.keys.whereType<String>().toList()..sort();
       setState(() {
-        _ownIcons = [
-          for (final file in files)
-            MarkerIcon(
-              id: '${MarkerIcon.filePrefix}${file.fileName}',
-              label: file.displayName,
-              assetPath: file.path,
-              fileName: file.fileName,
-            ),
+        _ownCategories = [
+          for (final folder in folders)
+            IconCategory(id: '$ownCategoryId:$folder', title: folder.toUpperCase(), icons: byCategory[folder]!),
+          if (byCategory[null] case final top?) IconCategory(id: ownCategoryId, title: 'СВОИ ИКОНКИ', icons: top),
         ];
       });
     } catch (_) {
@@ -80,7 +89,7 @@ class _IconPickerSheetState extends State<IconPickerSheet> {
   Widget build(BuildContext context) {
     final categories = [
       ...widget.categories,
-      if (_ownIcons.isNotEmpty) IconCategory(id: ownCategoryId, title: 'СВОИ ИКОНКИ', icons: _ownIcons),
+      ..._ownCategories,
     ];
     // A fixed height: opening a category doesn't make the sheet grow and
     // move the header that was just tapped.

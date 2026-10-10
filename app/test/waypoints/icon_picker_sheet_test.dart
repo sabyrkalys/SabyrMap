@@ -12,7 +12,7 @@ void main() {
     final fs = MemoryFileSystem();
     final dir = fs.directory('/base')..createSync(recursive: true);
     for (final name in files) {
-      dir.childFile(name).createSync();
+      dir.childFile(name).createSync(recursive: true);
     }
     return IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
   }
@@ -159,6 +159,19 @@ void main() {
     await tester.pumpAndSettle();
     expect(results.single?.fileName, 'tent.png');
     expect(results.single?.isFile, isTrue);
+  });
+
+  testWidgets('each subfolder of the icon folder is a category of its own', (tester) async {
+    final results = await open(tester, scanner: scannerWith(['БЛА/СТ 1.svg', 'Техника/СТ 1.svg', 'Техника/БМП.svg']));
+    await scrollTo(tester, find.text('ТЕХНИКА'));
+    expect(find.text('БЛА'), findsOneWidget);
+    expect(find.text('СВОИ ИКОНКИ'), findsNothing);
+    await scrollTo(tester, find.byKey(const Key('icon_category_own:Техника')));
+    await toggle(tester, 'own:Техника');
+    await scrollTo(tester, find.text('СТ 1'));
+    await tester.tap(find.text('СТ 1'));
+    await tester.pumpAndSettle();
+    expect(results.single?.fileName, 'Техника/СТ 1.svg');
   });
 
   testWidgets('no own icons, no «СВОИ ИКОНКИ»', (tester) async {
