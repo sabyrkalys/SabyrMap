@@ -142,7 +142,30 @@ void main() {
 
   test('the bitmap side follows the screen pixel ratio', () {
     expect(iconCanvasPixels(1), 48);
-    expect(iconCanvasPixels(3.25), 78);
+    expect(iconCanvasPixels(3.25), 91);
     expect(iconCanvasPixels(30), 512);
+  });
+
+  test('glow: a light white halo around the drawing, which leaves it room', () async {
+    final file = File('${tempDir.path}/bar.svg')
+      ..writeAsStringSync(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">'
+        '<rect x="0" y="45" width="100" height="10" fill="black"/></svg>',
+      );
+    final icon = IconFile(path: file.path, fileName: 'bar.svg', displayName: 'bar', format: IconFileFormat.svg);
+
+    final image = await _decode(await renderIconBytes(icon, '#000000', size: 100, glow: true));
+    final pixels = (await image.toByteData(format: ui.ImageByteFormat.rawStraightRgba))!;
+    List<int> at(int x, int y) => [for (var c = 0; c < 4; c++) pixels.getUint8((y * 100 + x) * 4 + c)];
+
+    // The bar itself, black, inside the glow margin.
+    expect(at(50, 50), [0, 0, 0, 255]);
+    expect(at(5, 50)[3], lessThan(255));
+    // Just above the bar: white, partly transparent.
+    final halo = at(50, 42);
+    expect(halo[0], greaterThan(200));
+    expect(halo[3], inExclusiveRange(20, 255));
+    // Far from the bar: nothing.
+    expect(at(50, 5)[3], 0);
   });
 }

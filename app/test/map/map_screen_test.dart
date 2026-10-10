@@ -416,6 +416,18 @@ void main() {
           createdAt: DateTime.utc(2026, 8, 22),
         );
 
+    test('the halo is a larger, soft, white circle at the same point', () {
+      final waypoint = waypointWith(ownerId: 'u1', type: 'not-a-real-type');
+      final dot = circleOptionsForWaypoint(waypoint);
+      final halo = haloOptionsForWaypoint(waypoint);
+
+      expect(halo.geometry, dot.geometry);
+      expect(halo.circleColor, '#FFFFFF');
+      expect(halo.circleRadius!, greaterThan(dot.circleRadius!));
+      expect(halo.circleOpacity!, inExclusiveRange(0, 1));
+      expect(halo.circleBlur!, greaterThan(0));
+    });
+
     test('falls back to the default type color for an unrecognized type', () {
       final waypoint = waypointWith(ownerId: 'u1', type: 'not-a-real-type');
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -18,7 +19,7 @@ const int kIconCanvasSize = 48;
 /// is rendered at this times the screen's pixel ratio: MapLibre draws the
 /// registered image pixel for pixel, so a fixed 48 px bitmap was only
 /// ~15 dp (about 2 mm) on a 3.25× screen.
-const double kIconLogicalSize = 24;
+const double kIconLogicalSize = 28;
 
 /// Bitmap side, in physical pixels, for a screen with [devicePixelRatio].
 int iconCanvasPixels(double devicePixelRatio) => (kIconLogicalSize * devicePixelRatio).round().clamp(kIconCanvasSize, 512);
@@ -29,33 +30,69 @@ int iconCanvasPixels(double devicePixelRatio) => (kIconLogicalSize * devicePixel
 /// null) -- correct only for monochrome glyph-style SVGs, which is what this
 /// feature targets -- and its empty margins are trimmed, so the drawing
 /// itself fills the square (map symbols often sit in a large blank canvas).
-Future<Uint8List> renderIconBytes(IconFile icon, String? colorHex, {int size = kIconCanvasSize}) {
-  if (icon.format == IconFileFormat.raster) return _renderRaster(icon, size);
-  return _renderSvg(icon, colorHex, size);
+///
+/// [glow] adds a light white glow around the drawing so it stays visible on
+/// a dark or busy map; the drawing shrinks a little to leave it room.
+Future<Uint8List> renderIconBytes(IconFile icon, String? colorHex, {int size = kIconCanvasSize, bool glow = false}) {
+  if (icon.format == IconFileFormat.raster) return _renderRaster(icon, size, glow);
+  return _renderSvg(icon, colorHex, size, glow);
 }
 
-Future<Uint8List> _renderRaster(IconFile icon, int size) async {
+/// Share of the side kept free around the drawing for the glow.
+const double kIconGlowMargin = 0.12;
+
+/// Draws [src] from [image] into [dst]; with [glow], a blurred white copy of
+/// its outline first.
+void _drawWithGlow(ui.Canvas canvas, ui.Image image, Rect src, Rect dst, int size, bool glow) {
+  final paint = ui.Paint()..filterQuality = ui.FilterQuality.high;
+  if (glow) {
+    // A soft white rim: the outline drawn white many times around the
+    // drawing, on three rings with fading opacity -- a hand-made blur.
+    // Decision: no layer blur/colour filters; the device's renderer drops
+    // a saveLayer that has both, and the glow vanished on the phone.
+    final spread = size * 0.05;
+    for (final (ring, alpha) in [(1.0, 0x40), (0.66, 0x55), (0.33, 0x70)]) {
+      final ringPaint = ui.Paint()
+        ..filterQuality = ui.FilterQuality.high
+        ..colorFilter = ui.ColorFilter.mode(Color.fromARGB(alpha, 255, 255, 255), ui.BlendMode.srcIn);
+      for (var i = 0; i < 16; i++) {
+        final angle = i * math.pi / 8;
+        final r = spread * ring;
+        canvas.drawImageRect(image, src, dst.shift(Offset(r * math.cos(angle), r * math.sin(angle))), ringPaint);
+      }
+    }
+  }
+  canvas.drawImageRect(image, src, dst, paint);
+}
+
+Future<Uint8List> _renderRaster(IconFile icon, int size, bool glow) async {
   final bytes = await File(icon.path).readAsBytes();
   final codec = await ui.instantiateImageCodec(bytes);
   final frame = await codec.getNextFrame();
   final image = frame.image;
 
+  final inner = glow ? size * (1 - 2 * kIconGlowMargin) : size.toDouble();
   final longestSide = image.width > image.height ? image.width : image.height;
-  final scale = size / longestSide;
-  final dx = (size - image.width * scale) / 2;
-  final dy = (size - image.height * scale) / 2;
+  final scale = inner / longestSide;
+  final w = image.width * scale;
+  final h = image.height * scale;
 
   final recorder = ui.PictureRecorder();
   final canvas = ui.Canvas(recorder, Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble()));
-  canvas.translate(dx, dy);
-  canvas.scale(scale);
-  canvas.drawImage(image, Offset.zero, ui.Paint());
+  _drawWithGlow(
+    canvas,
+    image,
+    Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+    Rect.fromLTWH((size - w) / 2, (size - h) / 2, w, h),
+    size,
+    glow,
+  );
   image.dispose();
 
   return _encode(recorder, size);
 }
 
-Future<Uint8List> _renderSvg(IconFile icon, String? colorHex, int size) async {
+Future<Uint8List> _renderSvg(IconFile icon, String? colorHex, int size, bool glow) async {
   final svgString = await File(icon.path).readAsString();
   final tint = colorFromHex(colorHex ?? '#000000');
   final pictureInfo = await vg.loadPicture(SvgStringLoader(svgString), null);
@@ -82,17 +119,19 @@ Future<Uint8List> _renderSvg(IconFile icon, String? colorHex, int size) async {
   final full = await recorder.endRecording().toImage(work, work);
 
   final bounds = await _drawnBounds(full) ?? Rect.fromLTWH(0, 0, work.toDouble(), work.toDouble());
-  // A thin margin so antialiased edges are not cut.
-  final margin = size * 0.03;
+  // A thin margin so antialiased edges are not cut; a wider one for the glow.
+  final margin = size * (glow ? kIconGlowMargin : 0.03);
   final fit = (size - 2 * margin) / (bounds.width > bounds.height ? bounds.width : bounds.height);
   final dstW = bounds.width * fit;
   final dstH = bounds.height * fit;
   final out = ui.PictureRecorder();
-  ui.Canvas(out, Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble())).drawImageRect(
+  _drawWithGlow(
+    ui.Canvas(out, Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble())),
     full,
     bounds,
     Rect.fromLTWH((size - dstW) / 2, (size - dstH) / 2, dstW, dstH),
-    ui.Paint()..filterQuality = ui.FilterQuality.high,
+    size,
+    glow,
   );
   full.dispose();
   return _encode(out, size);

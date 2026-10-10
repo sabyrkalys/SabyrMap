@@ -56,6 +56,19 @@ CircleOptions circleOptionsForWaypoint(Waypoint waypoint) {
   );
 }
 
+/// A light white glow under a waypoint dot so it stays visible on a dark
+/// or busy map: a larger, blurred, half-transparent white circle drawn
+/// beneath [circleOptionsForWaypoint]'s dot.
+CircleOptions haloOptionsForWaypoint(Waypoint waypoint) {
+  return CircleOptions(
+    geometry: LatLng(waypoint.lat, waypoint.lng),
+    circleRadius: 14,
+    circleColor: '#FFFFFF',
+    circleOpacity: 0.55,
+    circleBlur: 0.7,
+  );
+}
+
 enum WaypointRenderMode { circle, symbol }
 
 /// Pure routing decision: a waypoint with a locally-assigned icon renders as
@@ -83,6 +96,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _prefetchConfigured = false;
   static const _mapChannel = MethodChannel('sabyrmap/map');
   final Map<String, Circle> _circlesByWaypointId = {};
+
+  /// The glow under each waypoint dot (see [haloOptionsForWaypoint]); kept
+  /// in step with [_circlesByWaypointId].
+  final Map<String, Circle> _haloCirclesByWaypointId = {};
   final Map<String, Line> _linesByTrackId = {};
   // Caches a cheap "did this actually change" key per circle/line id so
   // _syncCircles/_syncLines only issue an updateCircle/updateLine platform
@@ -108,7 +125,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     },
     // Rendered in physical pixels for this screen (see kIconLogicalSize).
     render: (icon, colorHex) =>
-        renderIconBytes(icon, colorHex, size: iconCanvasPixels(View.of(context).devicePixelRatio)),
+        renderIconBytes(icon, colorHex, size: iconCanvasPixels(View.of(context).devicePixelRatio), glow: true),
   );
   final IconLibraryScanner _iconLibraryScanner = IconLibraryScanner();
   // Cached so _syncSymbols (which can run many times per second while a
@@ -446,6 +463,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // tracking too so the next sync re-adds every circle/line from scratch
     // instead of trying to update ids the new manager doesn't know about.
     _circlesByWaypointId.clear();
+    _haloCirclesByWaypointId.clear();
     _linesByTrackId.clear();
     _appliedCircleKeys.clear();
     _appliedLineKeys.clear();
@@ -535,6 +553,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       if (stale) _appliedCircleKeys.remove(id);
       return stale;
     });
+    _haloCirclesByWaypointId.removeWhere((id, halo) => !liveCircleIds.contains(halo.id));
 
     // Waypoints with a locally-assigned icon are rendered by _syncSymbols
     // instead, so they're excluded here. Because the exclusion happens before
@@ -552,6 +571,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         _appliedCircleKeys.remove(id);
       }
     }
+    for (final id in _haloCirclesByWaypointId.keys.toList()) {
+      if (!currentIds.contains(id)) await controller.removeCircle(_haloCirclesByWaypointId.remove(id)!);
+    }
 
     for (final waypoint in circleModeWaypoints) {
       // circleOptionsForWaypoint is a pure function of (waypoint.type,
@@ -559,6 +581,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       // waypoint id — so this key cheaply captures "would the rendered
       // options change".
       final key = '${waypoint.type}|${waypoint.color ?? ''}';
+      // The glow goes first so the dot is drawn on top of it; a dot that is
+      // re-added after a stale reconcile gets its glow back too.
+      if (!_haloCirclesByWaypointId.containsKey(waypoint.id)) {
+        final existingDot = _circlesByWaypointId.remove(waypoint.id);
+        if (existingDot != null) {
+          await controller.removeCircle(existingDot);
+          _appliedCircleKeys.remove(waypoint.id);
+        }
+        _haloCirclesByWaypointId[waypoint.id] = await controller.addCircle(haloOptionsForWaypoint(waypoint), {
+          'waypointId': waypoint.id,
+        });
+      }
       final existing = _circlesByWaypointId[waypoint.id];
       if (existing == null) {
         final options = circleOptionsForWaypoint(waypoint);
