@@ -25,7 +25,8 @@ class FormatDescriptor {
   bool get canImport => importAdapter != null;
   bool get canExport => exportAdapter != null;
 
-  bool supports(FormatCapability cap) => capabilities.contains(cap);
+  /// null (тип без своей возможности) не поддерживается ни одним форматом.
+  bool supports(FormatCapability? cap) => cap != null && capabilities.contains(cap);
 
   /// `.GPX` → `gpx`.
   static String normalizeExtension(String ext) => (ext.startsWith('.') ? ext.substring(1) : ext).toLowerCase();

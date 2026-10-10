@@ -4,7 +4,11 @@ enum LandmarkType {
   set(extension: 'set', magic: 0x50500B),
   route(extension: 'rte', magic: 0x50500C),
   area(extension: 'are', magic: 0x50500D),
-  track(extension: 'trk', magic: 0x50500E);
+  track(extension: 'trk', magic: 0x50500E),
+
+  /// Файл меток: контейнер для объектов разных типов. Единственный
+  /// формат, который создаётся из UI; прочие форматы — импорт и экспорт.
+  ldkFile(extension: 'ldk', magic: 0x50500F);
 
   const LandmarkType({required this.extension, required this.magic});
 

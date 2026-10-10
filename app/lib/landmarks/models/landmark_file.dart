@@ -2,6 +2,7 @@ import 'landmark_object.dart';
 import 'landmark_type.dart';
 
 export 'landmark_area.dart';
+export 'landmark_ldk.dart';
 export 'landmark_location.dart';
 export 'landmark_metadata.dart';
 export 'landmark_object.dart';

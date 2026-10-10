@@ -9,6 +9,7 @@ import '../format_bytes.dart';
 import '../waypoints/waypoints_controller.dart';
 import 'dialogs/rename_folder_dialog.dart';
 import 'folder_context_actions.dart';
+import 'sheet_menu.dart';
 
 /// Меню папки по долгому нажатию: «Открыть», «Закладка», «Детали»; БУФЕР
 /// ОБМЕНА — «Копировать», «Вырезать»; ИЗМЕНИТЬ — «Переименовать»,
@@ -107,7 +108,7 @@ class FolderContextMenu extends ConsumerWidget {
                 if (!screen.mounted) return;
                 await FolderDetailsSheet.show(screen, folder.path, services.folders);
               }),
-              const _SectionDivider('Буфер обмена'),
+              const SheetMenuSection('Буфер обмена'),
               item('copy', Icons.content_copy, _clipboard, 'Копировать', () async {
                 navigator.pop();
                 say(FolderContextActions.copy(services, folder));
@@ -118,7 +119,7 @@ class FolderContextMenu extends ConsumerWidget {
                 say(FolderContextActions.cut(services, folder));
                 await explorer.refresh();
               }),
-              const _SectionDivider('Изменить'),
+              const SheetMenuSection('Изменить'),
               item('rename', Icons.drive_file_rename_outline, _edit, 'Переименовать', () async {
                 navigator.pop();
                 if (!services.folders.isEditable(folder.path)) return say(FolderContextActions.unavailable);
@@ -163,31 +164,6 @@ class FolderContextMenu extends ConsumerWidget {
       ),
     );
   }
-}
-
-/// Линия с подписью раздела: «— БУФЕР ОБМЕНА ——».
-class _SectionDivider extends StatelessWidget {
-  const _SectionDivider(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(
-      children: [
-        const SizedBox(width: 24, child: Divider(color: Color(0xFFBDBDBD), height: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Text(
-            label.toUpperCase(),
-            style: const TextStyle(fontSize: 12, color: Color(0xFF757575), letterSpacing: 0.5),
-          ),
-        ),
-        const Expanded(child: Divider(color: Color(0xFFBDBDBD), height: 1)),
-      ],
-    ),
-  );
 }
 
 /// Сведения о папке: путь, подпапки, файлы, размер, последнее изменение.

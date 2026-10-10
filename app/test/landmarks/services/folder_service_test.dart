@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:app/exceptions/folder_exception.dart';
 import 'package:app/landmarks/settings/settings_keys.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
@@ -65,5 +66,22 @@ void main() {
 
   test('an empty folder path is rejected', () async {
     expect(() => f.services.folders.setDefaultFolder('  '), throwsArgumentError);
+  });
+
+  test('renameFile keeps the extension and the folder; a taken name gets a suffix', () async {
+    final dir = f.paths.landmarks;
+    final a = File(p.join(dir, 'a.ldk'))..createSync(recursive: true);
+    final b = File(p.join(dir, 'b.ldk'))..createSync();
+    final renamed = await f.services.folders.renameFile(a.path, 'поход');
+    expect(renamed, p.join(dir, 'поход.ldk'));
+    expect(a.existsSync(), isFalse);
+    expect(await f.services.folders.renameFile(b.path, 'поход.ldk'), p.join(dir, 'поход_1.ldk'));
+    expect(await f.services.folders.renameFile(renamed, 'поход'), renamed);
+  });
+
+  test('renameFile rejects names with separators', () async {
+    final file = File(p.join(f.paths.landmarks, 'a.ldk'))..createSync(recursive: true);
+    expect(() => f.services.folders.renameFile(file.path, 'x/y'), throwsA(isA<FolderException>()));
+    expect(file.existsSync(), isTrue);
   });
 }

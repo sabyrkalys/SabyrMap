@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:app/exceptions/folder_exception.dart';
 import 'package:app/exceptions/storage_exception.dart';
+import 'package:app/landmarks/repository/file_naming.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
 import 'package:app/landmarks/settings/settings_keys.dart';
 import 'package:app/storage/storage_paths.dart';
@@ -151,6 +152,48 @@ class FolderService {
       throw StorageException('Cannot read folder', path: path, cause: e);
     }
     return FolderDetails(path: path, folderCount: folders, fileCount: files, totalBytes: bytes, lastModifiedMs: last);
+  }
+
+  /// Переименовывает файл в его же папке и возвращает новый путь.
+  /// [newName] — имя без расширения (оно сохраняется); занятое имя
+  /// получает `_1`, `_2`, ... Недопустимое имя — [FolderException].
+  Future<String> renameFile(String oldPath, String newName) async {
+    final ext = p.extension(oldPath);
+    var name = _checkName(newName);
+    if (ext.isNotEmpty && p.extension(name).toLowerCase() == ext.toLowerCase()) {
+      name = p.basenameWithoutExtension(name);
+    }
+    if (name == p.basenameWithoutExtension(oldPath)) return oldPath;
+    if (!await File(oldPath).exists()) throw StorageException('File to rename does not exist', path: oldPath);
+    final target = await FileNaming.resolveCollision(p.dirname(oldPath), '$name$ext');
+    try {
+      await File(oldPath).rename(target);
+    } on FileSystemException catch (e) {
+      throw StorageException('Cannot rename file', path: oldPath, cause: e);
+    }
+    return target;
+  }
+
+  /// Удаляет файл без возврата; отсутствующий файл — не ошибка.
+  Future<void> deleteFile(String path) async {
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } on FileSystemException catch (e) {
+      throw StorageException('Cannot delete file', path: path, cause: e);
+    }
+  }
+
+  /// Размер файла в байтах.
+  Future<int> fileSize(String path) async => (await _statFile(path)).size;
+
+  /// Время последнего изменения файла, Unix ms.
+  Future<int> fileModifiedMs(String path) async => (await _statFile(path)).modified.millisecondsSinceEpoch;
+
+  static Future<FileStat> _statFile(String path) async {
+    final stat = await FileStat.stat(path);
+    if (stat.type != FileSystemEntityType.file) throw StorageException('File does not exist', path: path);
+    return stat;
   }
 
   /// Имя папки без `/` и `\`, не пустое и не «.»/«..».

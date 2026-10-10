@@ -24,6 +24,7 @@ import 'metadata_codec.dart';
 ///     route    → Waypoints
 ///     area     → AreaPolygons
 ///     track    → Waypoints, TrackSegments
+///     ldkFile  → пусто (вложенные объекты — отдельный слой)
 ///
 /// Waypoints     = int count + Waypoint * count
 /// Waypoint      = Metadata user + Location
@@ -76,6 +77,8 @@ abstract final class LandmarkCodec {
           MetadataCodec.write(w, segment.userMetadata);
           LocationCodec.writeList(w, segment.locations);
         }
+      case LdkFileObject():
+        break;
       default:
         throw SerializationException('Unsupported landmark object ${file.content.runtimeType}');
     }
@@ -104,6 +107,7 @@ abstract final class LandmarkCodec {
         userMetadata: user,
         technicalMetadata: technical,
       ),
+      LandmarkType.ldkFile => LdkFileObject(userMetadata: user, technicalMetadata: technical),
     };
     if (r.remaining != 0) {
       throw SerializationException('${r.remaining} unexpected trailing byte(s)', position: r.position);

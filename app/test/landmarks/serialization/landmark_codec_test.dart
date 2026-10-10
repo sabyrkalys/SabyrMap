@@ -75,6 +75,12 @@ void main() {
         ],
       ),
     ),
+    LandmarkFile.of(
+      LdkFileObject(
+        userMetadata: const LandmarkMetadata(entries: {'name': 'Поход', 'comment': 'Весна'}),
+        technicalMetadata: technical,
+      ),
+    ),
   ];
 
   for (final sample in samples) {
@@ -87,6 +93,7 @@ void main() {
     for (final empty in <LandmarkObject>[
       const WaypointObject(location: LandmarkLocation(longitude: 0, latitude: 0)),
       const SetObject(),
+      const LdkFileObject(),
       const RouteObject(),
       const AreaObject(),
       const AreaObject(polygons: [AreaPolygon()]),

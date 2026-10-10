@@ -6,7 +6,7 @@ import 'package:app/landmarks/validation/waypoint_validator.dart';
 
 import 'folder_service.dart';
 
-/// Создание объектов из черновика. В этом спринте — только путевые точки.
+/// Создание объектов из черновика: путевые точки и файлы меток (`.ldk`).
 ///
 /// Decision: вместо [StoragePaths] принимает [FolderService] — папка по
 /// умолчанию берётся из него (с учётом настройки).
@@ -21,7 +21,9 @@ class MarkerCreationService {
   /// Проверяет черновик, сохраняет объект и возвращает абсолютный путь.
   /// Неверный черновик — [ValidationException], файл не создаётся.
   Future<String> create(MarkerDraft draft) async {
-    final result = WaypointValidator.validate(draft);
+    final isFile = draft.type == LandmarkType.ldkFile;
+    // Файл меток проверяется как точка (длины полей), но без координат.
+    final result = WaypointValidator.validate(isFile ? draft.copyWith(type: LandmarkType.waypoint) : draft);
     if (!result.isValid) throw ValidationException(result.errors);
 
     final now = _clock().millisecondsSinceEpoch;
@@ -38,11 +40,13 @@ class MarkerCreationService {
         LandmarkMetadata.updatedAtKey: now,
       },
     );
-    final waypoint = WaypointObject(
-      location: LandmarkLocation(longitude: draft.longitude, latitude: draft.latitude),
-      userMetadata: user,
-    );
+    final LandmarkObject object = isFile
+        ? LdkFileObject(userMetadata: user)
+        : WaypointObject(
+            location: LandmarkLocation(longitude: draft.longitude, latitude: draft.latitude),
+            userMetadata: user,
+          );
     final directory = draft.targetFolder ?? await _folders.getDefaultFolder();
-    return _repository.save(LandmarkFile.of(waypoint), directory: directory);
+    return _repository.save(LandmarkFile.of(object), directory: directory);
   }
 }

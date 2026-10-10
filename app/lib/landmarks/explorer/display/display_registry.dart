@@ -23,6 +23,14 @@ class DisplayRegistry extends ChangeNotifier {
     _set(DisplayState(displayedPaths: Set.unmodifiable(_state.displayedPaths.where((p) => !remove.contains(p)).toSet())));
   }
 
+  /// Показывает скрытый файл и скрывает показанный; возвращает, показан
+  /// ли он теперь.
+  bool toggle(String path) {
+    final shown = !isDisplayed(path);
+    shown ? display(path) : undisplay(path);
+    return shown;
+  }
+
   void clear() => _set(const DisplayState());
 
   bool isDisplayed(String path) => _state.isDisplayed(path);

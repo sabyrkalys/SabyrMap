@@ -31,6 +31,7 @@ class ItemRow extends StatelessWidget {
     LandmarkType.route => Icons.route_sharp,
     LandmarkType.track => Icons.polyline_sharp,
     LandmarkType.area => Icons.pentagon_outlined,
+    LandmarkType.ldkFile => Icons.description_outlined,
   };
 
   static String kindOf(LandmarkType type) => switch (type) {
@@ -39,6 +40,7 @@ class ItemRow extends StatelessWidget {
     LandmarkType.route => 'Маршрут',
     LandmarkType.track => 'Путь',
     LandmarkType.area => 'Область',
+    LandmarkType.ldkFile => 'Файл меток',
   };
 
   /// Подпись: вид, длина или площадь, дата.

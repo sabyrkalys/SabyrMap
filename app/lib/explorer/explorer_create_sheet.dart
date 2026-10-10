@@ -24,7 +24,7 @@ const List<MarkerType> explorerFileTypes = [
   MarkerType(
     id: ExplorerCreateIds.landmarkFile,
     title: 'Файл меток',
-    subtitle: 'Создать пустой файл для набора меток.',
+    subtitle: 'Создать файл меток .ldk: только имя, формат подставляется сам.',
     icon: Icons.note_add_outlined,
     category: MarkerCategory.local,
   ),

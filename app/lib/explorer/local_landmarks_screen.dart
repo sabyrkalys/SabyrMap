@@ -14,7 +14,6 @@ import 'package:app/landmarks/composite/drafts/track_draft.dart';
 import 'package:app/landmarks/explorer/statistics/statistics_calculator.dart';
 import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -37,6 +36,11 @@ import 'explorer_providers.dart';
 import 'explorer_view_mode_switch.dart';
 import 'folder_context_actions.dart';
 import 'folder_context_menu.dart';
+import 'ldk/ldk_context_menu.dart';
+import 'ldk/ldk_create_dialog.dart';
+import 'ldk/ldk_details_screen.dart';
+import 'ldk/ldk_import_flow.dart';
+import 'ldk/ldk_section.dart';
 import 'local_landmarks_drawer.dart';
 import 'local_landmarks_folder_list.dart';
 import 'local_landmarks_item_list.dart';
@@ -255,26 +259,7 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
         await _guard(() => _services.folders.ensureFolder(p.join(folder, name)));
         await _explorer.refresh();
       case ExplorerCreateIds.landmarkFile:
-        final name = await _askName('Новый файл меток');
-        if (name == null) return;
-        final now = DateTime.now().millisecondsSinceEpoch;
-        await _guard(
-          () => _services.repository.save(
-            LandmarkFile.of(
-              SetObject(
-                userMetadata: LandmarkMetadata(
-                  entries: {
-                    LandmarkMetadata.nameKey: name,
-                    LandmarkMetadata.createdAtKey: now,
-                    LandmarkMetadata.updatedAtKey: now,
-                  },
-                ),
-              ),
-            ),
-            directory: folder,
-          ),
-        );
-        await _explorer.refresh();
+        await _createLdk(folder);
       case ExplorerCreateIds.import:
         await _import(folder);
       case MarkerTypeIds.waypoint:
@@ -311,12 +296,49 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
   }
 
   Future<void> _import(String folder) async {
-    final picked = await FilePicker.pickFiles();
-    final path = picked?.files.firstOrNull?.path;
-    if (path == null) return;
-    final result = await _services.importService.importFromFile(path, targetFolder: folder);
-    await _changed();
-    _snack(result.success ? 'Импортировано: ${result.importedCount}' : (result.errorMessage ?? 'Импорт не удался'));
+    final result = await LdkImportFlow.start(context, _services, folder);
+    if (result != null) await _changed();
+  }
+
+  /// Новый файл меток (`.ldk`) в [folder].
+  Future<void> _createLdk(String folder) async {
+    final at = ref.read(mapCrosshairProvider);
+    await LdkCreateDialog.createIn(
+      context,
+      _services,
+      folder,
+      at: at == null ? null : LandmarkLocation(latitude: at.latitude, longitude: at.longitude),
+    );
+  }
+
+  /// Детализация файла меток; ☰ в ней открывает боковую панель здесь.
+  Future<void> _openLdk(String path) async {
+    final openDrawer = await LdkDetailsScreen.open(context, path);
+    if (openDrawer && mounted) setState(() => _drawerOpen = true);
+  }
+
+  void _onLdkTap(LandmarkItem item) {
+    final selection = _explorer.selection;
+    if (selection.state.isActive) return selection.toggle(item.path);
+    _openLdk(item.path);
+  }
+
+  Future<void> _ldkMenu(LandmarkItem item) => LdkContextMenu.show(context, item.path, onOpen: _openLdk);
+
+  Future<void> _ldkSectionMenu(List<ExplorerItemNode> files) async {
+    final action = await LdkSection.showMenu(context);
+    final folder = _explorer.state.currentFolder;
+    if (!mounted || folder == null) return;
+    switch (action) {
+      case LdkSectionAction.create:
+        await _createLdk(folder);
+      case LdkSectionAction.selectAll:
+        _explorer.selection
+          ..activate()
+          ..selectAll([for (final n in files) n.path]);
+      case null:
+        return;
+    }
   }
 
   Future<void> _guard(Future<void> Function() action) async {
@@ -415,6 +437,7 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
         LandmarkType.route: 'Маршруты',
         LandmarkType.track: 'Треки',
         LandmarkType.area: 'Области',
+        LandmarkType.ldkFile: 'Файлы меток',
       };
       return SafeArea(
         child: ListView(
@@ -564,6 +587,15 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     if (state.isLoading || state.currentFolder == null) {
       return const Center(child: CircularProgressIndicator(key: Key('explorer_loading')));
     }
+    // Файлы меток — своей секцией после остальных меток.
+    final files = [
+      for (final n in items)
+        if (n.item.type == LandmarkType.ldkFile) n,
+    ];
+    final marks = [
+      for (final n in items)
+        if (n.item.type != LandmarkType.ldkFile) n,
+    ];
     if (state.nodes.isEmpty) {
       final theme = Theme.of(context);
       return Center(
@@ -588,18 +620,36 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
             onOpen: _explorer.openFolder,
             onMenu: (f) => FolderContextMenu.show(context, f),
           ),
-          if (folders.isNotEmpty && items.isNotEmpty) const Divider(height: 1),
+          if (folders.isNotEmpty && marks.isNotEmpty) const Divider(height: 1),
           LocalLandmarksItemList(
-            items: items,
+            items: marks,
             selecting: selecting,
             isSelected: _explorer.selection.contains,
             dense: state.viewMode == ExplorerViewMode.list,
             onTap: _onItemTap,
             onLongPress: _onItemLongPress,
           ),
+          LdkSection(
+            items: [for (final n in files) n.item],
+            groupName: _groupName(state),
+            selecting: selecting,
+            isSelected: _explorer.selection.contains,
+            onTap: _onLdkTap,
+            onLongPress: _ldkMenu,
+            onMenu: _ldkMenu,
+            onSectionMenu: () => _ldkSectionMenu(files),
+          ),
         ],
       ),
     );
+  }
+
+  /// Имя открытой папки для карточек: название места в его корне.
+  String _groupName(ExplorerState state) {
+    final folder = state.currentFolder ?? '';
+    final place = state.currentPlace;
+    if (place != null && p.equals(place.path, folder)) return LocalLandmarksDrawer.titleOf(place, _deviceUsage);
+    return p.basename(folder);
   }
 
   Future<void> _toClipboard({required bool cut}) async {

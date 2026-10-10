@@ -18,21 +18,24 @@ enum FormatCapability {
   supportsStyle,
   multiObjectPerFile;
 
-  /// Возможность импортировать объекты типа [type].
-  static FormatCapability importOf(LandmarkType type) => switch (type) {
+  /// Возможность импортировать объекты типа [type]. null — у типа нет
+  /// своей возможности: файл меток — контейнер, переносятся его объекты.
+  static FormatCapability? importOf(LandmarkType type) => switch (type) {
     LandmarkType.waypoint => importWaypoint,
     LandmarkType.set => importSet,
     LandmarkType.route => importRoute,
     LandmarkType.track => importTrack,
     LandmarkType.area => importArea,
+    LandmarkType.ldkFile => null,
   };
 
-  /// Возможность экспортировать объекты типа [type].
-  static FormatCapability exportOf(LandmarkType type) => switch (type) {
+  /// Возможность экспортировать объекты типа [type]; null — см. [importOf].
+  static FormatCapability? exportOf(LandmarkType type) => switch (type) {
     LandmarkType.waypoint => exportWaypoint,
     LandmarkType.set => exportSet,
     LandmarkType.route => exportRoute,
     LandmarkType.track => exportTrack,
     LandmarkType.area => exportArea,
+    LandmarkType.ldkFile => null,
   };
 }

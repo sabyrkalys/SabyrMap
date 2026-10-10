@@ -134,7 +134,7 @@ void main() {
     await h.dispose(tester);
   });
 
-  testWidgets('«+» → «Файл меток» creates an empty set here', (tester) async {
+  testWidgets('«+» → «Файл меток» creates an .ldk file here', (tester) async {
     h = await ExplorerHarness.create(tester);
     await h.pumpApp(tester);
     await h.tap(tester, find.byKey(const Key('explorer_fab')));
@@ -142,10 +142,13 @@ void main() {
     await tester.tap(find.byKey(const Key('marker_type_landmark_file')));
     await h.settle(tester);
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('new_folder_name')), 'Посты');
-    await h.tap(tester, find.byKey(const Key('new_folder_ok')));
-    expect(find.byKey(const Key('item_row_Посты')), findsOneWidget);
-    expect(find.text('Набор точек', findRichText: true), findsNothing);
+    await tester.enterText(find.byKey(const Key('ldk_create_name')), 'Посты');
+    await h.tap(tester, find.byKey(const Key('ldk_create_ok')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ldk_section')), findsOneWidget);
+    expect(find.text('Посты'), findsOneWidget);
+    final files = await tester.runAsync(() => h.f.services.repository.listIn(h.f.paths.landmarks));
+    expect(files!.single, endsWith('.ldk'));
     await h.dispose(tester);
   });
 
