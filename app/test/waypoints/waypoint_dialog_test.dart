@@ -8,9 +8,12 @@ import 'package:app/waypoints/waypoint_dialog/coords_system.dart';
 import 'package:app/waypoints/waypoint_dialog/marker_group.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_dialog.dart';
+import 'package:app/waypoints/icon_picker/marker_icon.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'sample_icon_categories.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 void main() {
@@ -27,7 +30,10 @@ void main() {
     final results = <WaypointData?>[];
     openedAllMarkers = 0;
     container = ProviderContainer(
-      overrides: [allMarkersOpenerProvider.overrideWithValue((_) => openedAllMarkers++)],
+      overrides: [
+        allMarkersOpenerProvider.overrideWithValue((_) => openedAllMarkers++),
+        builtInIconCategoriesProvider.overrideWithValue(sampleCategories),
+      ],
     );
     addTearDown(container.dispose);
     if (crosshair != null) container.read(mapCrosshairProvider.notifier).set(crosshair);

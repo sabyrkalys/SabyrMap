@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../icons/icon_library_scanner.dart';
 import 'icon_category_section.dart';
@@ -12,8 +13,9 @@ Future<MarkerIcon?> showMarkerIconSheet(
   BuildContext context, {
   String? currentIconId,
   IconLibraryScanner? scanner,
-  List<IconCategory> categories = sampleCategories,
+  List<IconCategory>? categories,
 }) {
+  final List<IconCategory> builtIn = categories ?? ProviderScope.containerOf(context, listen: false).read(builtInIconCategoriesProvider);
   return showModalBottomSheet<MarkerIcon>(
     context: context,
     isScrollControlled: true,
@@ -21,13 +23,13 @@ Future<MarkerIcon?> showMarkerIconSheet(
     backgroundColor: IconPickerSheet.background,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: (_) =>
-        IconPickerSheet(currentIconId: currentIconId, scanner: scanner ?? IconLibraryScanner(), categories: categories),
+        IconPickerSheet(currentIconId: currentIconId, scanner: scanner ?? IconLibraryScanner(), categories: builtIn),
   );
 }
 
 /// «Иконка»: «Нет», then the categories as accordions, any number open.
 class IconPickerSheet extends StatefulWidget {
-  const IconPickerSheet({super.key, this.currentIconId, this.scanner, this.categories = sampleCategories});
+  const IconPickerSheet({super.key, this.currentIconId, this.scanner, this.categories = const []});
 
   static const Color background = Color(0xFFEEF1F5);
 

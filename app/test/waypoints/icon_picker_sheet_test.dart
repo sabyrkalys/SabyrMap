@@ -6,6 +6,8 @@ import 'package:file/memory.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'sample_icon_categories.dart';
+
 void main() {
   /// A scanner over an empty icon folder, or one with [files].
   IconLibraryScanner scannerWith([List<String> files = const []]) {
@@ -26,7 +28,12 @@ void main() {
           builder: (context) => Scaffold(
             body: TextButton(
               onPressed: () async => results.add(
-                await showMarkerIconSheet(context, scanner: scanner ?? scannerWith(), currentIconId: currentIconId),
+                await showMarkerIconSheet(
+                  context,
+                  scanner: scanner ?? scannerWith(),
+                  currentIconId: currentIconId,
+                  categories: sampleCategories,
+                ),
               ),
               child: const Text('open'),
             ),
