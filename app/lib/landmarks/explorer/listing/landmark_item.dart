@@ -19,6 +19,7 @@ class LandmarkItem {
     this.durationMs,
     this.elevationGainMeters,
     this.elevationLossMeters,
+    this.maxElevationMeters,
     this.areaSquareMeters,
     this.activity,
     this.year,
@@ -50,6 +51,9 @@ class LandmarkItem {
   final int? durationMs;
   final double? elevationGainMeters;
   final double? elevationLossMeters;
+
+  /// Наибольшая высота, м.
+  final double? maxElevationMeters;
   final double? areaSquareMeters;
   final String? activity;
   final int? year;
@@ -77,6 +81,7 @@ class LandmarkItem {
     Object? durationMs = _keep,
     Object? elevationGainMeters = _keep,
     Object? elevationLossMeters = _keep,
+    Object? maxElevationMeters = _keep,
     Object? areaSquareMeters = _keep,
     Object? activity = _keep,
     Object? year = _keep,
@@ -96,6 +101,7 @@ class LandmarkItem {
     durationMs: identical(durationMs, _keep) ? this.durationMs : durationMs as int?,
     elevationGainMeters: identical(elevationGainMeters, _keep) ? this.elevationGainMeters : elevationGainMeters as double?,
     elevationLossMeters: identical(elevationLossMeters, _keep) ? this.elevationLossMeters : elevationLossMeters as double?,
+    maxElevationMeters: identical(maxElevationMeters, _keep) ? this.maxElevationMeters : maxElevationMeters as double?,
     areaSquareMeters: identical(areaSquareMeters, _keep) ? this.areaSquareMeters : areaSquareMeters as double?,
     activity: identical(activity, _keep) ? this.activity : activity as String?,
     year: identical(year, _keep) ? this.year : year as int?,
@@ -119,6 +125,7 @@ class LandmarkItem {
       other.durationMs == durationMs &&
       other.elevationGainMeters == elevationGainMeters &&
       other.elevationLossMeters == elevationLossMeters &&
+      other.maxElevationMeters == maxElevationMeters &&
       other.areaSquareMeters == areaSquareMeters &&
       other.activity == activity &&
       other.year == year;
@@ -140,6 +147,7 @@ class LandmarkItem {
     durationMs,
     elevationGainMeters,
     elevationLossMeters,
+    maxElevationMeters,
     areaSquareMeters,
     activity,
     year,

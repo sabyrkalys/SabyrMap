@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:app/explorer/ldk/ldk_export_flow.dart';
+import 'package:app/explorer/export/landmark_export_flow.dart';
 import 'package:app/landmarks/import_export/export/export_options.dart';
 import 'package:app/landmarks/import_export/export/export_options_schema.dart';
 import 'package:app/landmarks/import_export/export/export_result.dart';
@@ -16,7 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../../landmarks/services/fixture.dart';
-import 'ldk_test_helpers.dart';
+import '../landmark_test_helpers.dart';
 
 /// Простой текстовый формат без параметров: имена объектов по строкам.
 class _NamesAdapter extends ExportAdapter {
@@ -52,7 +52,7 @@ void main() {
     });
     await tester.pumpWidget(
       hostApp(f.services, (context) async {
-        result = await LdkExportFlow.start(context, path);
+        result = await LandmarkExportFlow.start(context, path);
         finished = true;
       }),
     );
@@ -81,8 +81,8 @@ void main() {
   testWidgets('an empty .ldk → «Формат не поддерживает содержимое файла»', (tester) async {
     await start(tester, () => createLdk(f.services, 'Поход'));
     await tester.tap(find.byKey(const Key('ldk_export_format_gpx')));
-    await pumpUntil(tester, find.text(LdkExportFlow.unsupported));
-    expect(find.text(LdkExportFlow.unsupported), findsOneWidget);
+    await pumpUntil(tester, find.text(LandmarkExportFlow.unsupported));
+    expect(find.text(LandmarkExportFlow.unsupported), findsOneWidget);
     expect(find.byKey(const Key('ldk_export_options')), findsNothing);
     expect(result, isNull);
     await dispose(tester);

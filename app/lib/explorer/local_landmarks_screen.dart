@@ -1,4 +1,3 @@
-import 'package:app/derived_export/details_renderer.dart';
 import 'package:app/landmarks/explorer/explorer_controller.dart';
 import 'package:app/landmarks/explorer/explorer_state.dart';
 import 'package:app/landmarks/explorer/explorer_node.dart';
@@ -26,7 +25,6 @@ import '../map/screens/available_maps/maps_app_bar.dart';
 import '../map/screens/available_maps/storage_bar.dart';
 import '../waypoints/new_marker/marker_type.dart';
 import '../waypoints/new_marker/new_marker_sheet.dart';
-import '../waypoints/waypoint_actions.dart';
 import '../waypoints/waypoint_create_action.dart';
 import '../waypoints/waypoints_controller.dart';
 import 'explorer_breadcrumbs.dart';
@@ -36,14 +34,18 @@ import 'explorer_providers.dart';
 import 'explorer_view_mode_switch.dart';
 import 'folder_context_actions.dart';
 import 'folder_context_menu.dart';
-import 'ldk/ldk_context_menu.dart';
+import 'descriptors/descriptor_registry.dart';
+import 'descriptors/landmark_type_descriptor.dart';
+import 'details/landmark_details_screen.dart';
+import 'item_menu/item_context_menu.dart';
+import 'item_menu/item_hooks.dart';
+import 'landmark_type_section.dart';
+import 'section_menu/section_actions.dart';
+import 'section_menu/section_context_menu.dart';
 import 'ldk/ldk_create_dialog.dart';
-import 'ldk/ldk_details_screen.dart';
 import 'ldk/ldk_import_flow.dart';
-import 'ldk/ldk_section.dart';
 import 'local_landmarks_drawer.dart';
 import 'local_landmarks_folder_list.dart';
-import 'local_landmarks_item_list.dart';
 import 'permission_banner.dart';
 
 /// «Локальные метки»: папки и файлы меток на устройстве, разделы в боковом
@@ -72,6 +74,9 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
   String? _shownError;
   String? _accessFolder;
   bool _hasAccess = true;
+
+  /// Контекст под [ItemHooks] — для меню элементов и секций.
+  BuildContext? _hooksContext;
 
   @override
   void initState() {
@@ -184,50 +189,29 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     await _explorer.openPlace(place);
   }
 
+  /// Короткое нажатие: в режиме выбора — отметка, иначе — детализация.
   Future<void> _onItemTap(LandmarkItem item) async {
     final selection = _explorer.selection;
     if (selection.state.isActive) {
       selection.toggle(item.path);
       return;
     }
-    if (item.type == LandmarkType.waypoint) {
-      final waypoint = ref.read(waypointsControllerProvider).where((w) => w.id == item.path).firstOrNull;
-      if (waypoint != null) {
-        await showWaypointDetails(context, ref, waypoint);
-        await _explorer.refresh();
-        return;
-      }
-    }
-    await _showDetails(item);
+    await _openDetails(item.path);
   }
 
-  void _onItemLongPress(LandmarkItem item) {
+  /// Долгое нажатие: в режиме выбора — отметка, иначе — меню элемента.
+  Future<void> _onItemLongPress(LandmarkItem item) async {
     final selection = _explorer.selection;
-    if (!selection.state.isActive) selection.activate();
-    selection.toggle(item.path);
+    if (selection.state.isActive) return selection.toggle(item.path);
+    await ItemContextMenu.show(_hooksContext ?? context, item);
   }
 
-  Future<void> _showDetails(LandmarkItem item) async {
-    String text;
-    try {
-      final object = (await _services.repository.load(item.path)).content;
-      text = DetailsRenderer.render(
-        object,
-        _services.calculator.forObject(object),
-        locale: _services.appSettingsController.model.locale,
-      );
-    } on Exception catch (e) {
-      text = 'Не удалось прочитать файл: $e';
-    }
+  /// Детализация метки; ☰ в ней открывает боковую панель здесь.
+  Future<void> _openDetails(String path) async {
+    final openDrawer = await LandmarkDetailsScreen.open(context, path);
     if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(item.name),
-        content: SingleChildScrollView(child: SelectableText(text)),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('ЗАКРЫТЬ'))],
-      ),
-    );
+    if (openDrawer) setState(() => _drawerOpen = true);
+    await _changed();
   }
 
   Future<void> _deleteSelected() async {
@@ -311,36 +295,6 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     );
   }
 
-  /// Детализация файла меток; ☰ в ней открывает боковую панель здесь.
-  Future<void> _openLdk(String path) async {
-    final openDrawer = await LdkDetailsScreen.open(context, path);
-    if (openDrawer && mounted) setState(() => _drawerOpen = true);
-  }
-
-  void _onLdkTap(LandmarkItem item) {
-    final selection = _explorer.selection;
-    if (selection.state.isActive) return selection.toggle(item.path);
-    _openLdk(item.path);
-  }
-
-  Future<void> _ldkMenu(LandmarkItem item) => LdkContextMenu.show(context, item.path, onOpen: _openLdk);
-
-  Future<void> _ldkSectionMenu(List<ExplorerItemNode> files) async {
-    final action = await LdkSection.showMenu(context);
-    final folder = _explorer.state.currentFolder;
-    if (!mounted || folder == null) return;
-    switch (action) {
-      case LdkSectionAction.create:
-        await _createLdk(folder);
-      case LdkSectionAction.selectAll:
-        _explorer.selection
-          ..activate()
-          ..selectAll([for (final n in files) n.path]);
-      case null:
-        return;
-    }
-  }
-
   Future<void> _guard(Future<void> Function() action) async {
     try {
       await action();
@@ -394,6 +348,10 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
         SortField.duration: 'По длительности',
         SortField.elevationGain: 'По набору высоты',
         SortField.area: 'По площади',
+        SortField.maxElevation: 'По высоте',
+        SortField.slope: 'По среднему уклону',
+        SortField.speed: 'По скорости',
+        SortField.calories: 'По калориям',
       };
       return SafeArea(
         child: ListView(
@@ -505,7 +463,13 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     return PopScope(
       canPop: _canPop,
       onPopInvokedWithResult: _onBack,
-      child: Scaffold(
+      child: ItemHooks(
+        onOpen: _openDetails,
+        child: Builder(
+          builder: (hooksContext) {
+            // Меню открываются от контекста под хуками: действия находят их.
+            _hooksContext = hooksContext;
+            return Scaffold(
         floatingActionButton: selection.isActive
             ? null
             : FloatingActionButton(key: const Key('explorer_fab'), onPressed: _create, child: const Icon(Icons.add)),
@@ -569,6 +533,9 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
             ),
           ],
         ),
+      );
+          },
+        ),
       ),
     );
   }
@@ -587,15 +554,6 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     if (state.isLoading || state.currentFolder == null) {
       return const Center(child: CircularProgressIndicator(key: Key('explorer_loading')));
     }
-    // Файлы меток — своей секцией после остальных меток.
-    final files = [
-      for (final n in items)
-        if (n.item.type == LandmarkType.ldkFile) n,
-    ];
-    final marks = [
-      for (final n in items)
-        if (n.item.type != LandmarkType.ldkFile) n,
-    ];
     if (state.nodes.isEmpty) {
       final theme = Theme.of(context);
       return Center(
@@ -620,28 +578,34 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
             onOpen: _explorer.openFolder,
             onMenu: (f) => FolderContextMenu.show(context, f),
           ),
-          if (folders.isNotEmpty && marks.isNotEmpty) const Divider(height: 1),
-          LocalLandmarksItemList(
-            items: marks,
-            selecting: selecting,
-            isSelected: _explorer.selection.contains,
-            dense: state.viewMode == ExplorerViewMode.list,
-            onTap: _onItemTap,
-            onLongPress: _onItemLongPress,
-          ),
-          LdkSection(
-            items: [for (final n in files) n.item],
-            groupName: _groupName(state),
-            selecting: selecting,
-            isSelected: _explorer.selection.contains,
-            onTap: _onLdkTap,
-            onLongPress: _ldkMenu,
-            onMenu: _ldkMenu,
-            onSectionMenu: () => _ldkSectionMenu(files),
-          ),
+          for (final d in ref.read(descriptorRegistryProvider).all)
+            LandmarkTypeSection(
+              descriptor: d,
+              items: _sectionItems(d, items),
+              viewMode: SectionActions.viewModeOf(_services, d),
+              groupName: _groupName(state),
+              dense: state.viewMode == ExplorerViewMode.list,
+              selecting: selecting,
+              isSelected: _explorer.selection.contains,
+              onTap: _onItemTap,
+              onLongPress: _onItemLongPress,
+              onSectionMenu: () => SectionContextMenu.show(_hooksContext ?? context, d.type),
+            ),
         ],
       ),
     );
+  }
+
+  /// Элементы секции [d] в её сортировке (не задана — порядок списка).
+  List<LandmarkItem> _sectionItems(LandmarkTypeDescriptor d, List<ExplorerItemNode> items) {
+    final list = [
+      for (final n in items)
+        if (n.item.type == d.type) n.item,
+    ];
+    final sort = SectionActions.sortOf(_services, d.type);
+    if (sort == null) return list;
+    final at = ref.read(mapCrosshairProvider);
+    return sort.apply(list, center: at == null ? null : (latitude: at.latitude, longitude: at.longitude));
   }
 
   /// Имя открытой папки для карточек: название места в его корне.

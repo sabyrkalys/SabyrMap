@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../../landmarks/services/fixture.dart';
-import 'ldk_test_helpers.dart';
+import '../landmark_test_helpers.dart';
 
 const _gpx = '''<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="test" xmlns="http://www.topografix.com/GPX/1/1">

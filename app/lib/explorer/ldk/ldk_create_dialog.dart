@@ -4,7 +4,7 @@ import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:flutter/material.dart';
 
 import '../sheet_menu.dart';
-import 'ldk_properties_dialog.dart';
+import '../dialogs/landmark_properties_dialog.dart';
 
 /// «Файл»: новый файл меток. Пользователь вводит только имя (остальные
 /// свойства — через «Ещё...»); формат всегда `.ldk`, выбора нет.
@@ -14,8 +14,8 @@ class LdkCreateDialog extends StatefulWidget {
 
   static const int maxNameLength = 200;
 
-  static Future<LdkProperties?> show(BuildContext context) =>
-      showDialog<LdkProperties>(
+  static Future<LandmarkProperties?> show(BuildContext context) =>
+      showDialog<LandmarkProperties>(
         context: context,
         builder: (_) => const LdkCreateDialog(),
       );
@@ -69,9 +69,9 @@ class _LdkCreateDialogState extends State<LdkCreateDialog> {
   }
 
   Future<void> _more() async {
-    final props = await LdkPropertiesDialog.show(
+    final props = await LandmarkPropertiesDialog.show(
       context,
-      initial: LdkProperties(
+      initial: LandmarkProperties(
         name: _name.text,
         comment: _comment,
         description: _description,
@@ -192,7 +192,7 @@ class _LdkCreateDialogState extends State<LdkCreateDialog> {
                     key: const Key('ldk_create_ok'),
                     onPressed: () => Navigator.pop(
                       context,
-                      LdkProperties(
+                      LandmarkProperties(
                         name: _name.text.trim(),
                         comment: _comment,
                         description: _description,

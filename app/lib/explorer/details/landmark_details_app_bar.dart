@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../map/screens/available_maps/maps_app_bar.dart';
 
 /// Шапка детализации — как у «Локальных меток»: ☰ | «Локальные метки» над
-/// именем файла | ✕, ⋮.
-class LdkDetailsAppBar extends StatelessWidget {
-  const LdkDetailsAppBar({
+/// именем | ✕, ⋮.
+class LandmarkDetailsAppBar extends StatelessWidget {
+  const LandmarkDetailsAppBar({
     super.key,
     required this.displayName,
     required this.onMenu,
@@ -19,7 +19,7 @@ class LdkDetailsAppBar extends StatelessWidget {
   final VoidCallback onMenu;
   final VoidCallback onClose;
 
-  /// ⋮ — краткое меню файла.
+  /// ⋮ — краткое меню элемента.
   final VoidCallback onMore;
 
   @override

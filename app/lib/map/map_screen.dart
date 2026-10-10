@@ -19,6 +19,7 @@ import 'map_camera_store.dart';
 import 'map_crosshair.dart';
 import 'map_overlays.dart';
 import 'map_scale.dart';
+import 'map_focus.dart';
 import 'map_target.dart';
 import 'point_info_sheet.dart';
 import 'prefetch/neighbor_prefetcher.dart';
@@ -807,6 +808,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _requestSync();
     });
 
+    ref.listen<MapFocusRequest?>(mapFocusProvider, (previous, next) {
+      if (next != null) _controller?.animateCamera(CameraUpdate.newLatLng(next.point));
+    });
     ref.listen<MapTargetState>(mapTargetProvider, (previous, next) {
       _liveCenter = next.point == null ? null : _controller?.cameraPosition?.target;
       _syncTarget();

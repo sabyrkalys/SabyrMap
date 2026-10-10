@@ -1,16 +1,16 @@
 import 'package:app/explorer/ldk/ldk_create_dialog.dart';
-import 'package:app/explorer/ldk/ldk_properties_dialog.dart';
+import 'package:app/explorer/dialogs/landmark_properties_dialog.dart';
 import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import '../../landmarks/services/fixture.dart';
-import 'ldk_test_helpers.dart';
+import '../landmark_test_helpers.dart';
 
 void main() {
   late ServicesFixture f;
-  LdkProperties? result;
+  LandmarkProperties? result;
   var closed = false;
 
   Future<void> openDialog(WidgetTester tester) async {
@@ -61,7 +61,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('ldk_create_ok')));
     await tester.pumpAndSettle();
-    expect(result, const LdkProperties(name: 'Поход', description: 'Три дня'));
+    expect(result, const LandmarkProperties(name: 'Поход', description: 'Три дня'));
     await dispose(tester);
   });
 

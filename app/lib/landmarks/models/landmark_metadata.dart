@@ -44,6 +44,7 @@ class LandmarkMetadata {
   static const String durationKey = 'duration_ms';
   static const String elevationGainKey = 'elevation_gain_m';
   static const String elevationLossKey = 'elevation_loss_m';
+  static const String maxElevationKey = 'max_elevation_m';
   static const String areaKey = 'area_m2';
   static const String activityKey = 'activity';
   static const String yearKey = 'year';

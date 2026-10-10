@@ -74,14 +74,20 @@ void main() {
     await h.dispose(tester);
   });
 
-  testWidgets('long press selects; delete removes the file after confirmation', (tester) async {
+  testWidgets('long press → «Выбрать» selects; delete removes the file after confirmation', (tester) async {
     h = await ExplorerHarness.create(tester);
     await tester.runAsync(() => addWaypoint('Bunker', folder: h.f.paths.landmarks));
     await h.pumpApp(tester);
     final file = h.f.services.explorerController.allItems.single.path;
 
     await tester.longPress(find.byKey(const Key('item_row_Bunker')));
-    await tester.pump();
+    await h.settle(tester);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('item_context_menu')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('item_menu_select')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('item_menu_select')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('explorer_selection_bar')), findsOneWidget);
     expect(find.text('Выбрано: 1'), findsOneWidget);
 
@@ -145,7 +151,7 @@ void main() {
     await tester.enterText(find.byKey(const Key('ldk_create_name')), 'Посты');
     await h.tap(tester, find.byKey(const Key('ldk_create_ok')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('ldk_section')), findsOneWidget);
+    expect(find.byKey(const Key('section_ldk')), findsOneWidget);
     expect(find.text('Посты'), findsOneWidget);
     final files = await tester.runAsync(() => h.f.services.repository.listIn(h.f.paths.landmarks));
     expect(files!.single, endsWith('.ldk'));

@@ -1,4 +1,5 @@
 import 'package:app/landmarks/composite/distance/haversine.dart';
+import 'package:app/landmarks/composite/statistics/energy_estimate.dart';
 
 import 'landmark_item.dart';
 import 'sort_direction.dart';
@@ -6,7 +7,27 @@ import 'sort_direction.dart';
 export 'sort_direction.dart';
 
 /// По чему сортируется список.
-enum SortField { name, date, distanceFromScreenCenter, length, duration, elevationGain, area }
+enum SortField {
+  name,
+  date,
+  distanceFromScreenCenter,
+  length,
+  duration,
+  elevationGain,
+  area,
+
+  /// Наибольшая высота.
+  maxElevation,
+
+  /// Средний уклон: (подъём + спуск) / длина.
+  slope,
+
+  /// Средняя скорость: длина / время.
+  speed,
+
+  /// Оценка калорий по длине и подъёму ([EnergyEstimate]).
+  calories,
+}
 
 /// Сортировка списка проводника.
 ///
@@ -72,7 +93,27 @@ class SortOptions {
     SortField.duration => item.durationMs,
     SortField.elevationGain => item.elevationGainMeters,
     SortField.area => item.areaSquareMeters,
+    SortField.maxElevation => item.maxElevationMeters,
+    SortField.slope => _slope(item),
+    SortField.speed => _speed(item),
+    SortField.calories => item.lengthMeters == null
+        ? null
+        : EnergyEstimate.kcal(item.lengthMeters!, gainMeters: item.elevationGainMeters ?? 0),
   };
+
+  static double? _slope(LandmarkItem item) {
+    final length = item.lengthMeters;
+    final gain = item.elevationGainMeters;
+    if (length == null || length <= 0 || gain == null) return null;
+    return (gain + (item.elevationLossMeters ?? 0)) / length;
+  }
+
+  static double? _speed(LandmarkItem item) {
+    final length = item.lengthMeters;
+    final duration = item.durationMs;
+    if (length == null || duration == null || duration <= 0) return null;
+    return length / (duration / 1000);
+  }
 
   static int _tieBreak(LandmarkItem a, LandmarkItem b) {
     final byName = a.name.toLowerCase().compareTo(b.name.toLowerCase());

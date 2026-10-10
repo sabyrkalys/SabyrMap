@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../sheet_menu.dart';
 
 /// Имя, комментарий и описание файла меток.
-class LdkProperties {
-  const LdkProperties({
+class LandmarkProperties {
+  const LandmarkProperties({
     this.name = '',
     this.comment = '',
     this.description = '',
@@ -16,7 +16,7 @@ class LdkProperties {
 
   @override
   bool operator ==(Object other) =>
-      other is LdkProperties &&
+      other is LandmarkProperties &&
       other.name == name &&
       other.comment == comment &&
       other.description == description;
@@ -26,24 +26,24 @@ class LdkProperties {
 }
 
 /// «Свойства»: имя, комментарий, описание; null — «ОТМЕНА».
-class LdkPropertiesDialog extends StatefulWidget {
-  const LdkPropertiesDialog({super.key, this.initial = const LdkProperties()});
+class LandmarkPropertiesDialog extends StatefulWidget {
+  const LandmarkPropertiesDialog({super.key, this.initial = const LandmarkProperties()});
 
-  final LdkProperties initial;
+  final LandmarkProperties initial;
 
-  static Future<LdkProperties?> show(
+  static Future<LandmarkProperties?> show(
     BuildContext context, {
-    LdkProperties initial = const LdkProperties(),
-  }) => showDialog<LdkProperties>(
+    LandmarkProperties initial = const LandmarkProperties(),
+  }) => showDialog<LandmarkProperties>(
     context: context,
-    builder: (_) => LdkPropertiesDialog(initial: initial),
+    builder: (_) => LandmarkPropertiesDialog(initial: initial),
   );
 
   @override
-  State<LdkPropertiesDialog> createState() => _LdkPropertiesDialogState();
+  State<LandmarkPropertiesDialog> createState() => _LandmarkPropertiesDialogState();
 }
 
-class _LdkPropertiesDialogState extends State<LdkPropertiesDialog> {
+class _LandmarkPropertiesDialogState extends State<LandmarkPropertiesDialog> {
   late final TextEditingController _name = TextEditingController(
     text: widget.initial.name,
   );
@@ -127,7 +127,7 @@ class _LdkPropertiesDialogState extends State<LdkPropertiesDialog> {
           key: const Key('ldk_props_ok'),
           onPressed: () => Navigator.pop(
             context,
-            LdkProperties(
+            LandmarkProperties(
               name: _name.text.trim(),
               comment: _comment.text,
               description: _description.text,

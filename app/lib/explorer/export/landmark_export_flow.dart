@@ -13,11 +13,11 @@ import 'package:path/path.dart' as p;
 import '../../app/landmark_services_provider.dart';
 import '../dialogs/folder_picker_dialog.dart';
 import '../sheet_menu.dart';
-import 'ldk_context_actions.dart';
+import '../item_menu/item_actions.dart';
 
 /// «Экспортировать как...»: формат → его параметры → папка → экспорт →
 /// итог с путём. Сам экспорт — [ExportService].
-abstract final class LdkExportFlow {
+abstract final class LandmarkExportFlow {
   static const String unsupported = 'Формат не поддерживает содержимое файла';
 
   /// Объекты файла для экспорта. Файл меток пока не хранит вложенных
@@ -30,7 +30,12 @@ abstract final class LdkExportFlow {
 
   /// Запускает экспорт файла [path]; результат — итог или null (отмена,
   /// нечего экспортировать).
-  static Future<ExportResult?> start(BuildContext context, String path) async {
+  static Future<ExportResult?> start(BuildContext context, String path) => startMany(context, [path]);
+
+  /// Экспорт нескольких файлов в один файл формата (секция целиком).
+  /// [name] — имя файла, если объектов несколько.
+  static Future<ExportResult?> startMany(BuildContext context, List<String> paths, {String? name}) async {
+    if (paths.isEmpty) return null;
     final services = ProviderScope.containerOf(
       context,
       listen: false,
@@ -39,9 +44,11 @@ abstract final class LdkExportFlow {
     void say(String text) =>
         messenger.showSnackBar(SnackBar(content: Text(text)));
 
-    final LandmarkFile file;
+    final files = <(String, LandmarkFile)>[];
     try {
-      file = await services.repository.load(path);
+      for (final path in paths) {
+        files.add((path, await services.repository.load(path)));
+      }
     } on Exception catch (e) {
       say('Не удалось прочитать файл: $e');
       return null;
@@ -51,8 +58,9 @@ abstract final class LdkExportFlow {
     final format = await pickFormat(context, services.formatRegistry.exporters);
     if (format == null || !context.mounted) return null;
     final objects = [
-      for (final o in objectsOf(file))
-        if (format.supports(FormatCapability.exportOf(o.type))) o,
+      for (final (_, file) in files)
+        for (final o in objectsOf(file))
+          if (format.supports(FormatCapability.exportOf(o.type))) o,
     ];
     if (objects.isEmpty) {
       say(unsupported);
@@ -69,7 +77,7 @@ abstract final class LdkExportFlow {
       context,
       folders: services.folders,
       root: root,
-      initial: p.dirname(path),
+      initial: p.dirname(paths.first),
     );
     if (folder == null || !context.mounted) return null;
 
@@ -81,7 +89,7 @@ abstract final class LdkExportFlow {
         targetFolder: folder,
         preferredFilename: objects.length == 1
             ? null
-            : LdkContextActions.displayName(file, path),
+            : name ?? ItemActions.displayName(files.first.$2, files.first.$1),
       ),
     );
     await services.explorerController.refresh();
@@ -175,7 +183,7 @@ abstract final class LdkExportFlow {
             key: const Key('ldk_export_share'),
             onPressed: () async {
               Navigator.pop(dialog);
-              final text = await LdkContextActions.share(services, filePath);
+              final text = await ItemActions.share(services, filePath);
               if (text != null) {
                 messenger.showSnackBar(SnackBar(content: Text(text)));
               }
