@@ -47,3 +47,6 @@ app.*.map.json
 # Сертификаты серверов кладутся при сборке под конкретный стенд (certs/README.md).
 /certs/*.pem
 /certs/*.crt
+
+# Знаки и ортофотопланы, встраиваемые в APK (SeedFiles.kt): большие файлы, в git не храним.
+/android/app/src/main/assets/seed/

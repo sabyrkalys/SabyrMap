@@ -72,6 +72,24 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        // Map symbols and orthophotos shipped in the APK, put into mediafile
+        // before the app first reads it (installSeedFiles in Dart).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "sabyrmap/seed").setMethodCallHandler { call, result ->
+            if (call.method != "install") {
+                result.notImplemented()
+                return@setMethodCallHandler
+            }
+            tileCacheThread.execute {
+                val outcome = try {
+                    Result.success(SeedFiles.install(applicationContext))
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
+                runOnUiThread {
+                    outcome.fold({ result.success(it) }, { result.error("seed_failed", it.message, null) })
+                }
+            }
+        }
         // Tile range and zooms of a local .mbtiles (orthophotos in Dart:
         // only the files around the screen are put on the map).
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "sabyrmap/mbtiles").setMethodCallHandler { call, result ->

@@ -6,6 +6,7 @@ import 'explorer/local_landmarks_screen.dart';
 import 'home/home_shell.dart';
 import 'landmarks/services/landmark_services.dart';
 import 'licenses.dart';
+import 'mediafile/seed_files.dart';
 import 'net/trusted_certificates.dart';
 import 'system_ui.dart';
 import 'theme/app_theme.dart';
@@ -15,6 +16,7 @@ Future<void> main() async {
   await configureSystemUi();
   await installTrustedCertificates();
   registerThirdPartyLicenses();
+  await installSeedFiles();
   final services = await LandmarkServices.bootstrap();
   runApp(
     ProviderScope(
