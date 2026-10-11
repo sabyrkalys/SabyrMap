@@ -135,6 +135,20 @@ void main() {
     expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapLongClick, isNull);
   });
 
+  testWidgets('the orthophoto button sits above the zoom buttons and opens the list', (tester) async {
+    await pumpMap(tester);
+    final button = find.byKey(const Key('orthophoto_button'));
+    expect(button, findsOneWidget);
+    expect(tester.getCenter(button).dy, lessThan(tester.getCenter(find.byKey(const Key('zoom_in_button'))).dy));
+    expect(tester.getCenter(button).dx, tester.getCenter(find.byKey(const Key('zoom_in_button'))).dx);
+
+    await tester.tap(button);
+    // The catalog may still be loading (a spinner): no pumpAndSettle.
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('orthophoto_sheet')), findsOneWidget);
+    expect(find.text('Ортофотопланы'), findsOneWidget);
+  });
+
   testWidgets('tapping the crosshair opens the card above it; tapping again closes it', (tester) async {
     await pumpMap(tester);
 

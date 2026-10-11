@@ -27,6 +27,7 @@ class AppIcons {
   static const String compassOff = '$_base/compass-off.svg'; // explore_off
   static const String dotsVertical = '$_base/dots-vertical.svg'; // more_vert
   static const String download = '$_base/download.svg'; // download
+  static const String drone = '$_base/drone.svg'; // quadcopter with a camera: aerial imagery
   static const String edit = '$_base/edit.svg'; // edit
   static const String export = '$_base/export.svg'; // output
   static const String eye = '$_base/eye.svg'; // visibility

@@ -20,21 +20,32 @@ class MapZoomButtons extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _RoundButton(key: const Key('zoom_in_button'), icon: Icons.add, onTap: onZoomIn),
+        MapRoundButton(
+          key: const Key('zoom_in_button'),
+          onTap: onZoomIn,
+          child: const Icon(Icons.add, color: MapRoundButton.iconColor),
+        ),
         const SizedBox(height: 12),
-        _RoundButton(key: const Key('zoom_out_button'), icon: Icons.remove, onTap: onZoomOut),
+        MapRoundButton(
+          key: const Key('zoom_out_button'),
+          onTap: onZoomOut,
+          child: const Icon(Icons.remove, color: MapRoundButton.iconColor),
+        ),
       ],
     );
   }
 }
 
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({super.key, required this.icon, required this.onTap});
+/// Round white button over the map (zoom, orthophotos): 48 dp, shadow.
+class MapRoundButton extends StatelessWidget {
+  const MapRoundButton({super.key, required this.child, required this.onTap, this.tooltip});
 
   static const double _size = 48;
+  static const Color iconColor = Color(0xFF16181A);
 
-  final IconData icon;
+  final Widget child;
   final VoidCallback onTap;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -46,10 +57,10 @@ class _RoundButton extends StatelessWidget {
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onTap,
-        child: SizedBox(
-          width: _size,
-          height: _size,
-          child: Icon(icon, color: const Color(0xFF16181A)),
+        child: Tooltip(
+          message: tooltip ?? '',
+          triggerMode: tooltip == null ? TooltipTriggerMode.manual : TooltipTriggerMode.longPress,
+          child: SizedBox(width: _size, height: _size, child: Center(child: child)),
         ),
       ),
     );

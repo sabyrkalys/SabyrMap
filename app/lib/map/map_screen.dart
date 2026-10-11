@@ -20,7 +20,10 @@ import 'map_crosshair.dart';
 import 'map_overlays.dart';
 import 'map_scale.dart';
 import '../icons/icon_renderer.dart';
+import '../app_icons.dart';
+import '../widgets/app_icon.dart';
 import 'map_focus.dart';
+import 'orthophoto/orthophoto_sheet.dart';
 import 'map_target.dart';
 import 'point_info_sheet.dart';
 import 'prefetch/neighbor_prefetcher.dart';
@@ -963,9 +966,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             child: SafeArea(
               top: false,
               left: false,
-              child: MapZoomButtons(
-                onZoomIn: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
-                onZoomOut: () => _controller?.animateCamera(CameraUpdate.zoomOut()),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Ортофотопланы: список своих карт аэросъёмки, «Показать»
+                  // или «Добавить как слой».
+                  MapRoundButton(
+                    key: const Key('orthophoto_button'),
+                    tooltip: 'Ортофотопланы',
+                    onTap: () => showOrthophotoSheet(context),
+                    child: const AppIcon(AppIcons.drone, size: 26, color: MapRoundButton.iconColor),
+                  ),
+                  const SizedBox(height: 12),
+                  MapZoomButtons(
+                    onZoomIn: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
+                    onZoomOut: () => _controller?.animateCamera(CameraUpdate.zoomOut()),
+                  ),
+                ],
               ),
             ),
           ),
