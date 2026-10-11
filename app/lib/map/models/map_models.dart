@@ -277,30 +277,37 @@ class MapState {
     required this.overlays,
     required this.favoriteIds,
     required this.presets,
+    this.orthophotosOn = false,
   });
 
   const MapState.initial()
       : baseSourceId = null,
         overlays = const [],
         favoriteIds = const [],
-        presets = const [];
+        presets = const [],
+        orthophotosOn = false;
 
   final String? baseSourceId;
   final List<ActiveLayer> overlays;
   final List<String> favoriteIds;
   final List<MapPreset> presets;
 
+  /// All orthophotos (mediafile/orthophoto) are shown over the map.
+  final bool orthophotosOn;
+
   MapState copyWith({
     String? baseSourceId,
     List<ActiveLayer>? overlays,
     List<String>? favoriteIds,
     List<MapPreset>? presets,
+    bool? orthophotosOn,
   }) =>
       MapState(
         baseSourceId: baseSourceId ?? this.baseSourceId,
         overlays: overlays ?? this.overlays,
         favoriteIds: favoriteIds ?? this.favoriteIds,
         presets: presets ?? this.presets,
+        orthophotosOn: orthophotosOn ?? this.orthophotosOn,
       );
 
   factory MapState.fromJson(Map<String, dynamic> json) => MapState(
@@ -312,6 +319,7 @@ class MapState {
         presets: [
           for (final p in (json['presets'] as List<dynamic>? ?? const [])) MapPreset.fromJson(p as Map<String, dynamic>),
         ],
+        orthophotosOn: json['orthophotosOn'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -319,6 +327,7 @@ class MapState {
         'overlays': [for (final o in overlays) o.toJson()],
         'favoriteIds': favoriteIds,
         'presets': [for (final p in presets) p.toJson()],
+        if (orthophotosOn) 'orthophotosOn': true,
       };
 
   @override
@@ -327,9 +336,16 @@ class MapState {
       other.baseSourceId == baseSourceId &&
       _listEquality.equals(other.overlays, overlays) &&
       _listEquality.equals(other.favoriteIds, favoriteIds) &&
-      _listEquality.equals(other.presets, presets);
+      _listEquality.equals(other.presets, presets) &&
+      other.orthophotosOn == orthophotosOn;
 
   @override
   int get hashCode =>
-      Object.hash(baseSourceId, Object.hashAll(overlays), Object.hashAll(favoriteIds), Object.hashAll(presets));
+      Object.hash(
+        baseSourceId,
+        Object.hashAll(overlays),
+        Object.hashAll(favoriteIds),
+        Object.hashAll(presets),
+        orthophotosOn,
+      );
 }

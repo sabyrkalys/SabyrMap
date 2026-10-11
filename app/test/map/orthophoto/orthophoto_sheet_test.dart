@@ -22,11 +22,19 @@ const base = MapSource(
   tileUrlTemplate: 'https://t/{z}/{x}/{y}.png',
 );
 const ortho = MapSource(
-  id: 'local-Ортофотоплан Доброполье.mbtiles',
-  name: 'Ортофотоплан Доброполье',
+  id: 'ortho-Доброполье.mbtiles',
+  name: 'Доброполье',
   format: TileFormat.raster,
   storageMode: StorageMode.offlineRegion,
-  tileUrlTemplate: 'mbtiles:///maps/Ортофотоплан Доброполье.mbtiles',
+  tileUrlTemplate: 'mbtiles:///orthophoto/Доброполье.mbtiles',
+  canBeOverlay: true,
+);
+const ortho2 = MapSource(
+  id: 'ortho-Авдеевка 2026.mbtiles',
+  name: 'Авдеевка 2026',
+  format: TileFormat.raster,
+  storageMode: StorageMode.offlineRegion,
+  tileUrlTemplate: 'mbtiles:///orthophoto/Авдеевка 2026.mbtiles',
   canBeOverlay: true,
 );
 const otherLocal = MapSource(
@@ -38,9 +46,11 @@ const otherLocal = MapSource(
   canBeOverlay: true,
 );
 
-List<MapProvider> catalogWith(List<MapSource> local) => [
+List<MapProvider> catalogWith(List<MapSource> orthophotos) => [
   const MapProvider(id: 'osm', name: 'OSM', sources: [base]),
-  MapProvider(id: CatalogRepository.localProviderId, name: 'Установленные карты', sources: local),
+  const MapProvider(id: CatalogRepository.localProviderId, name: 'Установленные карты', sources: [otherLocal]),
+  if (orthophotos.isNotEmpty)
+    MapProvider(id: CatalogRepository.orthophotoProviderId, name: 'Ортофотопланы', sources: orthophotos),
 ];
 
 class _FixedCatalog extends CatalogNotifier {
@@ -54,41 +64,33 @@ class _FixedCatalog extends CatalogNotifier {
 
 void main() {
   group('isOrthophoto', () {
-    test('only local raster maps with «ортофото» in the name', () {
+    test('any file of the orthophoto folder, whatever its name', () {
       expect(isOrthophoto(ortho), isTrue);
+      expect(isOrthophoto(ortho2), isTrue);
       expect(isOrthophoto(otherLocal), isFalse);
       expect(isOrthophoto(base), isFalse);
-      const online = MapSource(
-        id: 'server-orthophoto',
-        name: 'Ортофото сервера',
-        format: TileFormat.raster,
-        storageMode: StorageMode.onlineCache,
-      );
-      expect(isOrthophoto(online), isFalse);
-    });
-
-    test('orthophotosOf lists them by name', () {
-      const second = MapSource(
-        id: 'local-ортофото Авдеевка.mbtiles',
-        name: 'ортофото Авдеевка',
+      const namedLikeOne = MapSource(
+        id: 'local-ортофотоплан.mbtiles',
+        name: 'ортофотоплан',
         format: TileFormat.raster,
         storageMode: StorageMode.offlineRegion,
       );
-      expect(orthophotosOf(catalogWith([ortho, otherLocal, second])).map((s) => s.name), [
-        'ортофото Авдеевка',
-        'Ортофотоплан Доброполье',
-      ]);
+      expect(isOrthophoto(namedLikeOne), isFalse);
+    });
+
+    test('orthophotosOf lists them by name', () {
+      expect(orthophotosOf(catalogWith([ortho, ortho2])).map((s) => s.name), ['Авдеевка 2026', 'Доброполье']);
     });
   });
 
   group('OrthophotoSheet', () {
     late ProviderContainer container;
 
-    Future<void> pump(WidgetTester tester, List<MapSource> local) async {
+    Future<void> pump(WidgetTester tester, List<MapSource> orthophotos) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      final providers = catalogWith(local);
+      final providers = catalogWith(orthophotos);
       container = ProviderContainer(
         overrides: [
           catalogProvider.overrideWith(() => _FixedCatalog(providers)),
@@ -133,9 +135,10 @@ void main() {
     }
 
     testWidgets('lists only orthophotos, with their size', (tester) async {
-      await pump(tester, [ortho, otherLocal]);
+      await pump(tester, [ortho, ortho2]);
       expect(find.text('Ортофотопланы'), findsOneWidget);
-      expect(find.text('Ортофотоплан Доброполье'), findsOneWidget);
+      expect(find.text('Доброполье'), findsOneWidget);
+      expect(find.text('Авдеевка 2026'), findsOneWidget);
       expect(find.text('Карпаты'), findsNothing);
       expect(find.text('283.9 МБ'), findsOneWidget);
     });
@@ -147,7 +150,7 @@ void main() {
       expect(state.overlays.map((l) => l.sourceId), [ortho.id]);
       expect(state.baseSourceId, base.id);
       expect(find.byKey(const Key('orthophoto_sheet')), findsNothing);
-      expect(find.text('«Ортофотоплан Доброполье» добавлен как слой'), findsOneWidget);
+      expect(find.text('«Доброполье» добавлен как слой'), findsOneWidget);
     });
 
     testWidgets('«Показать» makes it the base map', (tester) async {
@@ -167,9 +170,26 @@ void main() {
       expect(container.read(mapLayersProvider).overlays, isEmpty);
     });
 
-    testWidgets('no orthophotos: an explanation', (tester) async {
-      await pump(tester, [otherLocal]);
+    testWidgets('no orthophotos: an explanation, the switch is off', (tester) async {
+      await pump(tester, const []);
       expect(find.byKey(const Key('orthophoto_empty')), findsOneWidget);
+      expect(tester.widget<SwitchListTile>(find.byKey(const Key('orthophoto_all'))).onChanged, isNull);
+    });
+
+    testWidgets('«Показывать все» shows every territory at once and is remembered', (tester) async {
+      await pump(tester, [ortho, ortho2]);
+      expect(find.text('Территорий: 2 — каждая там, где есть снимок'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('orthophoto_all')));
+      await tester.pumpAndSettle();
+      final state = container.read(mapLayersProvider);
+      expect(state.orthophotosOn, isTrue);
+      expect(state.overlays, isEmpty);
+      expect(state.baseSourceId, base.id);
+      expect(find.text('283.9 МБ · показан'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('orthophoto_all')));
+      await tester.pumpAndSettle();
+      expect(container.read(mapLayersProvider).orthophotosOn, isFalse);
     });
   });
 }

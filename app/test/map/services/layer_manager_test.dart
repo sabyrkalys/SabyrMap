@@ -412,4 +412,78 @@ void main() {
     await overlay;
     expect(host.layers, ['osm-standard-layer']);
   });
+
+  group('orthophotos', () {
+    MapSource ortho(String name) => MapSource(
+          id: 'ortho-$name.mbtiles',
+          name: name,
+          format: TileFormat.raster,
+          storageMode: StorageMode.offlineRegion,
+          tileUrlTemplate: 'mbtiles:///o/$name.mbtiles',
+          canBeOverlay: true,
+        );
+    final dobro = ortho('Доброполье');
+    final avd = ortho('Авдеевка');
+    final kram = ortho('Краматорск');
+    final konst = ortho('Константиновка');
+
+    test('any number of territories, not counted against the overlay limit', () async {
+      final m = manager(maxRasterOverlays: 1);
+      await m.setBaseSource(liberty);
+      await m.addOverlay(osm);
+      final result = await m.setOrthophotos([dobro, avd, kram, konst]);
+      expect(result.ok, isTrue);
+      expect(m.getOrthophotos(), hasLength(4));
+      expect(host.sources['ortho-Доброполье.mbtiles'], 'mbtiles:///o/Доброполье.mbtiles');
+      // Above the overlay.
+      expect(host.layers.first, 'osm-standard-layer');
+      expect(host.layers.skip(1), hasLength(4));
+    });
+
+    test('an empty list takes them off', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      await m.setOrthophotos([dobro, avd]);
+      await m.setOrthophotos(const []);
+      expect(m.getOrthophotos(), isEmpty);
+      expect(host.layers, isEmpty);
+      expect(host.sources, isEmpty);
+    });
+
+    test('a new overlay goes under the orthophotos', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      await m.setOrthophotos([dobro]);
+      await m.addOverlay(osm);
+      expect(host.layers, ['osm-standard-layer', 'ortho-Доброполье.mbtiles-layer']);
+    });
+
+    test('they survive a base change and stay above the overlays', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      await m.addOverlay(osm);
+      await m.setOrthophotos([dobro, avd]);
+      final result = await m.setBaseSource(ySat);
+      expect(result.ok, isTrue);
+      expect(m.getOrthophotos().map((s) => s.id), [dobro.id, avd.id]);
+      expect(host.layers.first, 'osm-standard-layer');
+      expect(host.layers.skip(1).toSet(), {'ortho-Доброполье.mbtiles-layer', 'ortho-Авдеевка.mbtiles-layer'});
+    });
+
+    test('one shown as the base or as an overlay is not added twice', () async {
+      final m = manager();
+      await m.setBaseSource(dobro);
+      await m.setOrthophotos([dobro, avd]);
+      expect(m.getOrthophotos().map((s) => s.id), [avd.id]);
+      await expectLater(m.addOverlay(avd), throwsA(isA<LayerException>()));
+    });
+
+    test('over an isolated base they are not shown', () async {
+      final m = manager();
+      await m.setBaseSource(googleSat);
+      final result = await m.setOrthophotos([dobro]);
+      expect(result.ok, isFalse);
+      expect(m.getOrthophotos(), isEmpty);
+    });
+  });
 }

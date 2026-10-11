@@ -74,6 +74,7 @@ class SecureUserSourcesStore implements UserSourcesStore {
 class CatalogRepository {
   CatalogRepository({
     MediaFileFolderService? mapsFolder,
+    MediaFileFolderService? orthophotoFolder,
     http.Client? httpClient,
     AssetBundle? bundle,
     UserSourcesStore? userSources,
@@ -82,6 +83,7 @@ class CatalogRepository {
     this.catalogUrl,
     this.hiddenProviderIds = AppConfig.hiddenMapProviders,
   })  : _mapsFolder = mapsFolder ?? MediaFileFolderService(subfolder: kMapsSubfolder),
+        _orthophotoFolder = orthophotoFolder ?? MediaFileFolderService(subfolder: kOrthophotoSubfolder),
         _http = httpClient ?? http.Client(),
         _bundle = bundle ?? rootBundle,
         _userSources = userSources ?? SecureUserSourcesStore(),
@@ -90,6 +92,12 @@ class CatalogRepository {
 
   static const String builtinAsset = 'assets/maps/builtin_catalog.json';
   static const String localProviderId = 'local';
+
+  /// Orthophotos from mediafile/orthophoto, «Ортофотопланы».
+  static const String orthophotoProviderId = 'orthophoto';
+
+  /// Id prefix of an orthophoto [MapSource].
+  static const String orthophotoPrefix = 'ortho-';
   static const String serverProviderId = 'server';
   static const String serverHybridSourceId = 'server-hybrid-day';
   static const String serverSatelliteSourceId = 'server-satellite';
@@ -99,6 +107,7 @@ class CatalogRepository {
   static const String defaultBaseSourceId = serverHybridSourceId;
 
   final MediaFileFolderService _mapsFolder;
+  final MediaFileFolderService _orthophotoFolder;
   final http.Client _http;
   final AssetBundle _bundle;
   final UserSourcesStore _userSources;
@@ -190,9 +199,11 @@ class CatalogRepository {
         if (!hiddenProviderIds.contains(p.id)) p,
     ];
     final local = [...await _localSources(), ...await _userSources.load()];
+    final orthophotos = await _orthophotoSources();
     return [
       ...providers,
       if (local.isNotEmpty) MapProvider(id: localProviderId, name: 'Установленные карты', sources: local),
+      if (orthophotos.isNotEmpty) MapProvider(id: orthophotoProviderId, name: 'Ортофотопланы', sources: orthophotos),
     ];
   }
 
@@ -328,7 +339,35 @@ class CatalogRepository {
     for (final entry in await _mapsFolder.list()) {
       info['local-${entry.fileName}'] = LocalMapInfo(sizeBytes: entry.sizeBytes);
     }
+    try {
+      for (final entry in await _orthophotoFolder.list()) {
+        info['$orthophotoPrefix${entry.fileName}'] = LocalMapInfo(sizeBytes: entry.sizeBytes);
+      }
+    } catch (_) {}
     return info;
+  }
+
+  /// Every .mbtiles in mediafile/orthophoto, whatever its name: one
+  /// territory each. No folder (tests, no storage) — none.
+  Future<List<MapSource>> _orthophotoSources() async {
+    final List<MediaFileEntry> entries;
+    try {
+      entries = await _orthophotoFolder.list();
+    } catch (_) {
+      return const [];
+    }
+    return [
+      for (final entry in entries)
+        if (entry.fileName.toLowerCase().endsWith('.mbtiles'))
+          MapSource(
+            id: '$orthophotoPrefix${entry.fileName}',
+            name: entry.fileName.substring(0, entry.fileName.length - '.mbtiles'.length),
+            tileUrlTemplate: 'mbtiles://${entry.path}',
+            format: TileFormat.raster,
+            storageMode: StorageMode.offlineRegion,
+            canBeOverlay: true,
+          ),
+    ];
   }
 
   Future<List<MapSource>> _localSources() async {

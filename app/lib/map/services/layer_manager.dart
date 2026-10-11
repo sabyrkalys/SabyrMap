@@ -117,12 +117,73 @@ class LayerManager {
 
   MapSource? _base;
   final List<ActiveLayer> _overlays = [];
+
+  /// Orthophotos shown over the map: each file is one territory, so they
+  /// don't cover each other and aren't counted against [maxRasterOverlays].
+  /// They sit above the overlays, right under the app's annotations.
+  final List<MapSource> _orthophotos = [];
   Future<void> _tail = Future.value();
 
   MapSource? get base => _base;
 
   /// Current overlays, bottom → top.
   List<ActiveLayer> getActiveLayers() => List.unmodifiable(_overlays);
+
+  /// Orthophotos on the map now.
+  List<MapSource> getOrthophotos() => List.unmodifiable(_orthophotos);
+
+  /// Where overlays go: under the lowest orthophoto, or under the
+  /// annotations when there are none.
+  String? get _overlayCeiling =>
+      _orthophotos.isEmpty ? _host.annotationsBottomLayerId : layerIdOf(_orthophotos.first.id);
+
+  /// Shows exactly [sources] as orthophotos (an empty list removes them).
+  /// A source already on the map as the base or an overlay is skipped; one
+  /// that fails is reported and left out.
+  Future<LayerChangeResult> setOrthophotos(List<MapSource> sources) => _serial(() async {
+        for (final source in _orthophotos) {
+          try {
+            await _host.removeLayer(layerIdOf(source.id));
+            await _host.removeSource(source.id);
+          } catch (_) {}
+        }
+        _orthophotos.clear();
+        return _addOrthophotos(sources);
+      });
+
+  Future<LayerChangeResult> _addOrthophotos(List<MapSource> sources) async {
+    final base = _base;
+    if (sources.isEmpty) return const LayerChangeResult();
+    if (base != null && _catalog.isIsolated(base.id)) {
+      return const LayerChangeResult(['$isolatedMessage — ортофотопланы не показаны']);
+    }
+    final problems = <String>[];
+    for (final source in sources) {
+      if (source.id == base?.id || _overlays.any((l) => l.sourceId == source.id)) continue;
+      try {
+        await _host.addRasterSource(
+          source.id,
+          tileUrl: await _styles.tileUrl(source),
+          tileSize: tileSize,
+          attribution: source.attribution,
+          minZoom: source.minZoom,
+          maxZoom: source.maxZoom,
+        );
+        // Each one right under the annotations: above the overlays and the
+        // orthophotos added before it.
+        await _host.addRasterLayer(
+          source.id,
+          layerIdOf(source.id),
+          opacity: 1,
+          belowLayerId: _host.annotationsBottomLayerId,
+        );
+        _orthophotos.add(source);
+      } on Exception catch (e) {
+        problems.add('${source.name}: $e');
+      }
+    }
+    return LayerChangeResult(problems);
+  }
 
   static String layerIdOf(String sourceId) => '$sourceId-layer';
 
@@ -137,14 +198,22 @@ class LayerManager {
   Future<LayerChangeResult> setBaseSource(MapSource source) => _serial(() async {
         final style = await _styles.styleOf(source);
         final snapshot = List.of(_overlays);
+        final orthophotos = List.of(_orthophotos);
         await _host.setStyleAndWait(style);
         _base = source;
         await _tweakRoads(style);
         _overlays.clear();
+        _orthophotos.clear();
         if (_catalog.isIsolated(source.id)) {
-          return LayerChangeResult(snapshot.isEmpty ? const [] : ['$isolatedMessage — наложенные слои убраны']);
+          return LayerChangeResult(
+            snapshot.isEmpty && orthophotos.isEmpty ? const [] : ['$isolatedMessage — наложенные слои убраны'],
+          );
         }
-        return _restore(snapshot);
+        // The new style has none of them: orthophotos first, so the
+        // overlays are put back under them.
+        final shown = await _addOrthophotos(orthophotos);
+        final restored = await _restore(snapshot);
+        return LayerChangeResult([...shown.problems, ...restored.problems]);
       });
 
   /// Our look of the hybrid styles' roads ([hybridRoadPaint]). Cosmetic:
@@ -206,7 +275,7 @@ class LayerManager {
             layer.sourceId,
             layerIdOf(layer.sourceId),
             opacity: layer.visible ? layer.opacity : 0.0,
-            belowLayerId: _host.annotationsBottomLayerId,
+            belowLayerId: _overlayCeiling,
           );
           _overlays.add(layer);
         }
@@ -243,6 +312,9 @@ class LayerManager {
       throw LayerException('«${source.name}» нельзя добавить как слой');
     }
     if (_overlays.any((l) => l.sourceId == source.id)) throw LayerException('Слой «${source.name}» уже добавлен');
+    if (_orthophotos.any((s) => s.id == source.id)) {
+      throw LayerException('«${source.name}» уже показан среди ортофотопланов');
+    }
     if (_overlays.length >= maxRasterOverlays) {
       throw LayerException('Можно наложить не больше $maxRasterOverlays слоёв');
     }
@@ -250,7 +322,7 @@ class LayerManager {
     final url = await _styles.tileUrl(source);
     final z = zIndex ?? (_overlays.isEmpty ? zStep : _overlays.last.zIndex + zStep);
     final above = _overlays.where((l) => l.zIndex > z).toList();
-    final below = above.isEmpty ? _host.annotationsBottomLayerId : layerIdOf(above.first.sourceId);
+    final below = above.isEmpty ? _overlayCeiling : layerIdOf(above.first.sourceId);
     final clamped = opacity.clamp(0.0, 1.0);
 
     await _host.addRasterSource(

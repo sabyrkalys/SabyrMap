@@ -112,7 +112,34 @@ class MapStateNotifier extends Notifier<MapState> {
     }
     final result = await manager.restoreOverlays(saved.overlays);
     _syncOverlays();
+    if (!saved.orthophotosOn) return result;
+    final shown = await manager.setOrthophotos(await _orthophotoSources());
+    return LayerChangeResult([...result.problems, ...shown.problems]);
+  }
+
+  /// Orthophotos of the catalog (mediafile/orthophoto).
+  Future<List<MapSource>> _orthophotoSources() async {
+    final providers = await ref.read(catalogProvider.future);
+    return [
+      for (final provider in providers)
+        if (provider.id == CatalogRepository.orthophotoProviderId) ...provider.sources,
+    ];
+  }
+
+  /// Shows all orthophotos over the map, or takes them off; remembered.
+  Future<LayerChangeResult> setOrthophotosOn(bool on) async {
+    final result = await _requireManager().setOrthophotos(on ? await _orthophotoSources() : const []);
+    _publish(state.copyWith(orthophotosOn: on));
     return result;
+  }
+
+  /// Re-reads the orthophoto folder (new territories dropped in) and, when
+  /// orthophotos are on, shows the current set.
+  Future<LayerChangeResult> refreshOrthophotos() async {
+    await ref.read(catalogProvider.notifier).reload();
+    final manager = _manager;
+    if (!state.orthophotosOn || manager == null) return const LayerChangeResult();
+    return manager.setOrthophotos(await _orthophotoSources());
   }
 
   Future<LayerChangeResult> setBase(MapSource source) async {

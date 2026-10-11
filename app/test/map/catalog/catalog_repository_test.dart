@@ -353,5 +353,36 @@ void main() {
     final providers = await repo(hidden: const {'google', 'yandex'}).load();
     expect(providers.map((p) => p.id), ['server', 'osm']);
   });
-}
 
+  test('every .mbtiles of the orthophoto folder is a territory under «Ортофотопланы»', () async {
+    final fs = MemoryFileSystem();
+    fs.file('/storage/orthophoto/Доброполье.mbtiles')
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(List.filled(10, 1));
+    fs.file('/storage/orthophoto/Авдеевка 2026.mbtiles').createSync();
+    fs.file('/storage/orthophoto/readme.txt').createSync();
+    final repository = CatalogRepository(
+      mapsFolder: MediaFileFolderService(subfolder: 'maps', fileSystem: fs, baseDirectoryPath: mapsDir),
+      orthophotoFolder: MediaFileFolderService(subfolder: 'orthophoto', fileSystem: fs, baseDirectoryPath: '/storage/orthophoto'),
+      httpClient: MockClient((_) async => http.Response('', 404)),
+      userSources: userStore,
+      fileSystem: fs,
+    );
+
+    final providers = await repository.load();
+    final ortho = providers.singleWhere((p) => p.id == CatalogRepository.orthophotoProviderId);
+    expect(ortho.name, 'Ортофотопланы');
+    expect(ortho.sources.map((s) => s.name), ['Авдеевка 2026', 'Доброполье']);
+    final dobro = ortho.sources.last;
+    expect(dobro.id, 'ortho-Доброполье.mbtiles');
+    expect(dobro.tileUrlTemplate, 'mbtiles:///storage/orthophoto/Доброполье.mbtiles');
+    expect(dobro.format, TileFormat.raster);
+    expect(dobro.canBeOverlay, isTrue);
+    expect((await repository.localMapInfo())['ortho-Доброполье.mbtiles']!.sizeBytes, 10);
+  });
+
+  test('no orthophoto files, no «Ортофотопланы»', () async {
+    final providers = await repo().load();
+    expect(providers.where((p) => p.id == CatalogRepository.orthophotoProviderId), isEmpty);
+  });
+}

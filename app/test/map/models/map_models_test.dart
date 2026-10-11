@@ -73,4 +73,12 @@ void main() {
     expect(const MapState.initial().baseSourceId, isNull);
     expect(const MapState.initial().overlays, isEmpty);
   });
+
+  test('MapState keeps «показывать ортофотопланы» through json; old json reads as off', () {
+    const on = MapState(baseSourceId: 'osm', overlays: [], favoriteIds: [], presets: [], orthophotosOn: true);
+    expect(MapState.fromJson(on.toJson()), on);
+    expect(MapState.fromJson(const {'baseSourceId': 'osm'}).orthophotosOn, isFalse);
+    expect(on.copyWith(orthophotosOn: false).orthophotosOn, isFalse);
+    expect(on == on.copyWith(orthophotosOn: false), isFalse);
+  });
 }

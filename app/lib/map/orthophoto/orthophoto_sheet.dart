@@ -11,15 +11,9 @@ import '../services/layer_manager.dart';
 import '../services/offline_service.dart';
 import '../state/map_layers_controller.dart';
 
-/// Ортофотоплан — своя карта из папки карт телефона (`.mbtiles`), в имени
-/// которой есть «ортофото».
-///
-/// Decision: по имени, а не по содержимому файла: метаданные MBTiles
-/// (зумы, границы) лежат в SQLite, а читать SQLite приложению нечем.
-bool isOrthophoto(MapSource source) =>
-    source.id.startsWith('local-') &&
-    source.format == TileFormat.raster &&
-    source.name.toLowerCase().contains('ортофото');
+/// Ортофотоплан — любой `.mbtiles` из папки ортофотопланов телефона
+/// (`mediafile/orthophoto`), как бы он ни назывался: одна территория на файл.
+bool isOrthophoto(MapSource source) => source.id.startsWith(CatalogRepository.orthophotoPrefix);
 
 /// Ортофотопланы каталога, по имени.
 List<MapSource> orthophotosOf(List<MapProvider> providers) => [
@@ -28,9 +22,10 @@ List<MapSource> orthophotosOf(List<MapProvider> providers) => [
       if (isOrthophoto(source)) source,
 ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
-/// Шторка «Ортофотопланы» с главного экрана: список ортофотопланов; нажатие
-/// открывает то же меню, что в «Доступных картах» («Показать», «Добавить как
-/// слой», «Убрать»).
+/// Шторка «Ортофотопланы» с главного экрана: «Показывать все» — все
+/// территории разом поверх карты; ниже список, нажатие открывает то же меню,
+/// что в «Доступных картах» («Показать», «Добавить как слой», «Убрать»).
+/// При открытии папка перечитывается: новые файлы появляются сами.
 Future<void> showOrthophotoSheet(BuildContext context) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
@@ -39,7 +34,7 @@ Future<void> showOrthophotoSheet(BuildContext context) => showModalBottomSheet<v
   builder: (_) => const OrthophotoSheet(),
 );
 
-class OrthophotoSheet extends ConsumerWidget {
+class OrthophotoSheet extends ConsumerStatefulWidget {
   const OrthophotoSheet({super.key});
 
   static const Color _text = Color(0xFF212121);
@@ -47,7 +42,38 @@ class OrthophotoSheet extends ConsumerWidget {
   static const Color _accent = Color(0xFF00897B);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrthophotoSheet> createState() => _OrthophotoSheetState();
+}
+
+class _OrthophotoSheetState extends ConsumerState<OrthophotoSheet> {
+  bool _switching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Новые территории, положенные в папку, появляются без перезапуска.
+    Future.microtask(() async {
+      try {
+        await ref.read(mapLayersProvider.notifier).refreshOrthophotos();
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _setAll(bool on) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _switching = true);
+    try {
+      final result = await ref.read(mapLayersProvider.notifier).setOrthophotosOn(on);
+      if (!result.ok) messenger.showSnackBar(SnackBar(content: Text(result.problems.join('\n'))));
+    } on LayerException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _switching = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final catalog = ref.watch(catalogProvider);
     final layers = ref.watch(mapLayersProvider);
     final sizes = ref.watch(localMapInfoProvider).value ?? const <String, LocalMapInfo>{};
@@ -56,6 +82,7 @@ class OrthophotoSheet extends ConsumerWidget {
     String stateOf(MapSource source) {
       if (layers.baseSourceId == source.id) return 'на экране';
       if (layers.overlays.any((l) => l.sourceId == source.id)) return 'слой';
+      if (layers.orthophotosOn) return 'показан';
       return '';
     }
 
@@ -75,9 +102,22 @@ class OrthophotoSheet extends ConsumerWidget {
                 padding: EdgeInsets.only(bottom: 12),
                 child: Text(
                   'Ортофотопланы',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500, color: _text),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500, color: OrthophotoSheet._text),
                 ),
               ),
+              SwitchListTile(
+                key: const Key('orthophoto_all'),
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Показывать все', style: TextStyle(fontSize: 16, color: OrthophotoSheet._text)),
+                subtitle: Text(
+                  maps.isEmpty ? 'Нет файлов' : 'Территорий: ${maps.length} — каждая там, где есть снимок',
+                  style: const TextStyle(fontSize: 13, color: OrthophotoSheet._secondary),
+                ),
+                activeThumbColor: OrthophotoSheet._accent,
+                value: layers.orthophotosOn,
+                onChanged: _switching || (maps.isEmpty && !layers.orthophotosOn) ? null : _setAll,
+              ),
+              const Divider(height: 1),
               if (catalog.isLoading && maps.isEmpty)
                 const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator()))
               else if (maps.isEmpty)
@@ -85,9 +125,9 @@ class OrthophotoSheet extends ConsumerWidget {
                   key: Key('orthophoto_empty'),
                   padding: EdgeInsets.symmetric(vertical: 16),
                   child: Text(
-                    'Ортофотопланов нет. Положите файл .mbtiles со словом «ортофото» в названии '
-                    'в папку карт телефона (mediafile/maps).',
-                    style: TextStyle(fontSize: 14, color: _secondary),
+                    'Ортофотопланов нет. Положите файлы .mbtiles в папку телефона '
+                    'Android/data/…/files/mediafile/orthophoto — каждый файл станет территорией.',
+                    style: TextStyle(fontSize: 14, color: OrthophotoSheet._secondary),
                   ),
                 )
               else
@@ -109,16 +149,16 @@ class OrthophotoSheet extends ConsumerWidget {
                             alignment: Alignment.center,
                             child: const AppIcon(AppIcons.drone, size: 24, color: Color(0xFF333333)),
                           ),
-                          title: Text(source.name, style: const TextStyle(fontSize: 16, color: _text)),
+                          title: Text(source.name, style: const TextStyle(fontSize: 16, color: OrthophotoSheet._text)),
                           subtitle: Text(
                             [
                               if (sizes[source.id] case final info?) formatBytes(info.sizeBytes),
                               if (stateOf(source) case final state when state.isNotEmpty) state,
                             ].join(' · '),
-                            style: const TextStyle(fontSize: 13, color: _secondary),
+                            style: const TextStyle(fontSize: 13, color: OrthophotoSheet._secondary),
                           ),
                           trailing: const Icon(Icons.more_vert),
-                          onTap: () => _openMenu(context, ref, source),
+                          onTap: () => _openMenu(context, source),
                         ),
                     ],
                   ),
@@ -127,7 +167,7 @@ class OrthophotoSheet extends ConsumerWidget {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   key: const Key('orthophoto_close'),
-                  style: TextButton.styleFrom(foregroundColor: _accent),
+                  style: TextButton.styleFrom(foregroundColor: OrthophotoSheet._accent),
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Закрыть'),
                 ),
@@ -139,7 +179,7 @@ class OrthophotoSheet extends ConsumerWidget {
     );
   }
 
-  Future<void> _openMenu(BuildContext context, WidgetRef ref, MapSource source) async {
+  Future<void> _openMenu(BuildContext context, MapSource source) async {
     final layers = ref.read(mapLayersProvider);
     final active = layers.baseSourceId == source.id || layers.overlays.any((l) => l.sourceId == source.id);
     final action = await showMapCardMenu(

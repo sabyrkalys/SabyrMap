@@ -6,3 +6,7 @@ const String kCustomTypesSubfolder = 'custom-types';
 
 /// Local map files (.mbtiles) shown in the map catalog.
 const String kMapsSubfolder = 'maps';
+
+/// Orthophotos (.mbtiles of aerial imagery): every file here is one
+/// territory; the map shows them all at once over the base map.
+const String kOrthophotoSubfolder = 'orthophoto';
