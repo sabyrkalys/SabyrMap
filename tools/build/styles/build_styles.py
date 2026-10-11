@@ -10,6 +10,7 @@
 Источники и адреса совпадают с infra/martin/martin.yaml:
   overview   — обзор мира Natural Earth, растр WebP 256px, z0–5 (overview.sh)
   satellite  — растр WebP 256px, z0–17
+  satellite-hi — растр JPG 256px, берётся на z18–19 поверх satellite
   osm        — вектор OpenMapTiles (Planetiler), z0–14, дальше overzoom
   font/...   — Noto Sans (кириллица + латиница), глифы PBF генерирует Martin
   sprite/sabyr — иконки из tools/build/sprites/sabyr/*.svg
@@ -291,6 +292,17 @@ def style(name, theme, hybrid, tiles_base, buildings=True):
                        "source": "satellite", "minzoom": 5.5,
                        "paint": {"raster-opacity": zoom(5.5, 0, 6.5, 1),
                                  "raster-fade-duration": 250, **dim}})
+        # Детальнее z17 снимок есть не везде: недостающий тайл z18–19 пуст,
+        # и сквозь него виден растянутый z17 слоем ниже.
+        sources["satellite-hi"] = {
+            "type": "raster",
+            "tiles": [f"{tiles_base}/satellite-hi/{{z}}/{{x}}/{{y}}"],
+            "tileSize": 256, "minzoom": 18, "maxzoom": 19,
+            "attribution": "Esri, Maxar, Earthstar Geographics, and the GIS Community",
+        }
+        layers.append({"id": "satellite-hi", "type": "raster",
+                       "source": "satellite-hi", "minzoom": 18,
+                       "paint": {"raster-fade-duration": 250, **dim}})
         if buildings:
             layers.append(fill("building", "building", None, "rgba(255,255,255,0.12)",
                                minzoom=14, outline="rgba(255,255,255,0.45)"))

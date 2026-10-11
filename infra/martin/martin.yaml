@@ -6,6 +6,8 @@ listen_addresses: "0.0.0.0:3000"
 pmtiles:
   sources:
     satellite: /srv/tiles/v1/satellite.pmtiles
+    # Esri z0–19 JPG, используется только на z18–19 поверх satellite (там есть дыры).
+    satellite-hi: /srv/tiles/v1/satellite-z19.pmtiles
     osm: /srv/tiles/v1/osm.pmtiles
     overview: /srv/tiles/v1/overview.pmtiles
 
