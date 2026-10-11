@@ -72,6 +72,25 @@ class MainActivity : FlutterActivity() {
                 }
             }
         }
+        // Tile range and zooms of a local .mbtiles (orthophotos in Dart:
+        // only the files around the screen are put on the map).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "sabyrmap/mbtiles").setMethodCallHandler { call, result ->
+            val path = call.argument<String>("path")
+            if (call.method != "info" || path == null) {
+                if (call.method == "info") result.error("bad_args", "path is required", null) else result.notImplemented()
+                return@setMethodCallHandler
+            }
+            tileCacheThread.execute {
+                val outcome = try {
+                    Result.success(MbtilesInfo.read(path))
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
+                runOnUiThread {
+                    outcome.fold({ result.success(it) }, { result.error("mbtiles_failed", it.message, null) })
+                }
+            }
+        }
         // A map's style drawn off screen into a JPEG (map previews in
         // «Доступные карты», MapPreviews in Dart). Tiles come through
         // MapLibre's own cache, so a cached area renders offline too.

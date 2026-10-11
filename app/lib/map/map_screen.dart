@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' show Point;
 
 import 'package:flutter/gestures.dart' show kTouchSlop;
@@ -23,7 +24,7 @@ import '../icons/icon_renderer.dart';
 import '../app_icons.dart';
 import '../widgets/app_icon.dart';
 import 'map_focus.dart';
-import 'orthophoto/orthophoto_sheet.dart';
+import 'orthophoto/orthophoto_extent.dart';
 import 'map_target.dart';
 import 'point_info_sheet.dart';
 import 'prefetch/neighbor_prefetcher.dart';
@@ -321,6 +322,49 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (!result.ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.problems.join('\n'))));
     }
+    await _updateOrthophotos();
+  }
+
+  /// Кнопка ортофотопланов: включить или выключить.
+  Future<void> _toggleOrthophotos() async {
+    final notifier = ref.read(mapLayersProvider.notifier);
+    final on = !ref.read(mapLayersProvider).orthophotosOn;
+    final files = await notifier.setOrthophotosOn(on);
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    if (on && files == 0) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Ортофотопланов нет: положите файлы .mbtiles в папку mediafile/orthophoto')),
+      );
+      return;
+    }
+    if (on) await _updateOrthophotos();
+  }
+
+  /// Ортофотопланы вокруг экрана (видимая область и соседние участки) — на
+  /// карту, остальные — с карты. Вызывается после каждой остановки камеры.
+  Future<void> _updateOrthophotos() async {
+    final controller = _controller;
+    final zoom = controller?.cameraPosition?.zoom;
+    if (controller == null || zoom == null || !ref.read(mapLayersProvider).orthophotosOn) return;
+    try {
+      final visible = await controller.getVisibleRegion();
+      final result = await ref.read(mapLayersProvider.notifier).updateOrthophotos(
+        GeoBox(
+          west: visible.southwest.longitude,
+          south: visible.southwest.latitude,
+          east: visible.northeast.longitude,
+          north: visible.northeast.latitude,
+        ),
+        zoom,
+      );
+      if (!result.ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.problems.join('\n'))));
+      }
+    } catch (_) {
+      // Карта ещё не готова или уже закрыта: следующая остановка повторит.
+    }
   }
 
   // Driven by MapLibreMap.onCameraMove, not a controller listener: the
@@ -447,6 +491,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _cameraZoom = position.zoom;
     });
     ref.read(mapCrosshairProvider.notifier).set(position.target);
+    unawaited(_updateOrthophotos());
     if (_savedCameraLoaded && shouldPersistCamera(position, cameraRestored: _hasCenteredCamera)) {
       ref.read(mapCameraStoreProvider).save(position).catchError((_) {});
     }
@@ -828,6 +873,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final orthophotosOn = ref.watch(mapLayersProvider.select((state) => state.orthophotosOn));
     ref.listen<List<Waypoint>>(waypointsControllerProvider, (previous, next) {
       _requestSync();
     });
@@ -969,13 +1015,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Ортофотопланы: список своих карт аэросъёмки, «Показать»
-                  // или «Добавить как слой».
+                  // Ортофотопланы: одно нажатие включает или выключает; во
+                  // включённом виде кнопка залита цветом.
                   MapRoundButton(
                     key: const Key('orthophoto_button'),
-                    tooltip: 'Ортофотопланы',
-                    onTap: () => showOrthophotoSheet(context),
-                    child: const AppIcon(AppIcons.drone, size: 26, color: MapRoundButton.iconColor),
+                    active: orthophotosOn,
+                    tooltip: orthophotosOn ? 'Ортофотопланы включены' : 'Ортофотопланы выключены',
+                    onTap: _toggleOrthophotos,
+                    child: Semantics(
+                      toggled: orthophotosOn,
+                      label: 'Ортофотопланы',
+                      child: AppIcon(AppIcons.drone, size: 26, color: MapRoundButton.iconColorFor(orthophotosOn)),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   MapZoomButtons(

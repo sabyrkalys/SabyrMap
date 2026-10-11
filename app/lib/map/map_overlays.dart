@@ -36,21 +36,27 @@ class MapZoomButtons extends StatelessWidget {
   }
 }
 
-/// Round white button over the map (zoom, orthophotos): 48 dp, shadow.
+/// Round button over the map (zoom, orthophotos): 48 dp, shadow. White;
+/// with [active] (a switch that is on) — filled teal, for a white icon.
 class MapRoundButton extends StatelessWidget {
-  const MapRoundButton({super.key, required this.child, required this.onTap, this.tooltip});
+  const MapRoundButton({super.key, required this.child, required this.onTap, this.tooltip, this.active = false});
 
   static const double _size = 48;
   static const Color iconColor = Color(0xFF16181A);
+  static const Color activeColor = Color(0xFF00897B);
+
+  /// Icon colour for [active].
+  static Color iconColorFor(bool active) => active ? Colors.white : iconColor;
 
   final Widget child;
   final VoidCallback onTap;
   final String? tooltip;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: active ? activeColor : Colors.white,
       shape: const CircleBorder(),
       elevation: 4,
       shadowColor: Colors.black54,

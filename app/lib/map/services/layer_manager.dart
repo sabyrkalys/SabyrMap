@@ -138,17 +138,25 @@ class LayerManager {
       _orthophotos.isEmpty ? _host.annotationsBottomLayerId : layerIdOf(_orthophotos.first.id);
 
   /// Shows exactly [sources] as orthophotos (an empty list removes them).
-  /// A source already on the map as the base or an overlay is skipped; one
-  /// that fails is reported and left out.
+  /// Only the difference is applied: ones already shown stay as they are
+  /// (no flicker while the map moves), ones no longer wanted are removed,
+  /// new ones added. A source already on the map as the base or an overlay
+  /// is skipped; one that fails is reported and left out.
   Future<LayerChangeResult> setOrthophotos(List<MapSource> sources) => _serial(() async {
-        for (final source in _orthophotos) {
+        final wanted = {for (final s in sources) s.id};
+        for (final source in List.of(_orthophotos)) {
+          if (wanted.contains(source.id)) continue;
           try {
             await _host.removeLayer(layerIdOf(source.id));
             await _host.removeSource(source.id);
           } catch (_) {}
+          _orthophotos.remove(source);
         }
-        _orthophotos.clear();
-        return _addOrthophotos(sources);
+        final shown = {for (final s in _orthophotos) s.id};
+        return _addOrthophotos([
+          for (final s in sources)
+            if (!shown.contains(s.id)) s,
+        ]);
       });
 
   Future<LayerChangeResult> _addOrthophotos(List<MapSource> sources) async {

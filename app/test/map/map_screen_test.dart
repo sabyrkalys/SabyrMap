@@ -14,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app/map/map_overlays.dart';
+import 'package:app/map/state/map_layers_controller.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../icons/fakes.dart';
@@ -135,18 +137,29 @@ void main() {
     expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapLongClick, isNull);
   });
 
-  testWidgets('the orthophoto button sits above the zoom buttons and opens the list', (tester) async {
+  testWidgets('the orthophoto button sits above the zoom buttons and switches orthophotos on and off', (tester) async {
     await pumpMap(tester);
     final button = find.byKey(const Key('orthophoto_button'));
     expect(button, findsOneWidget);
     expect(tester.getCenter(button).dy, lessThan(tester.getCenter(find.byKey(const Key('zoom_in_button'))).dy));
     expect(tester.getCenter(button).dx, tester.getCenter(find.byKey(const Key('zoom_in_button'))).dx);
 
+    Color fill() => tester.widget<Material>(find.descendant(of: button, matching: find.byType(Material)).first).color!;
+    final container = ProviderScope.containerOf(tester.element(button));
+    expect(container.read(mapLayersProvider).orthophotosOn, isFalse);
+    expect(fill(), Colors.white);
+
     await tester.tap(button);
-    // The catalog may still be loading (a spinner): no pumpAndSettle.
-    await tester.pump(const Duration(milliseconds: 500));
-    expect(find.byKey(const Key('orthophoto_sheet')), findsOneWidget);
-    expect(find.text('Ортофотопланы'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(container.read(mapLayersProvider).orthophotosOn, isTrue);
+    expect(fill(), MapRoundButton.activeColor);
+    // Никакой шторки: одно нажатие — сразу включение.
+    expect(find.byType(BottomSheet), findsNothing);
+
+    await tester.tap(button);
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(container.read(mapLayersProvider).orthophotosOn, isFalse);
+    expect(fill(), Colors.white);
   });
 
   testWidgets('tapping the crosshair opens the card above it; tapping again closes it', (tester) async {

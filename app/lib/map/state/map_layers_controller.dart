@@ -6,6 +6,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
+import '../orthophoto/orthophoto_extent.dart';
 import '../services/layer_manager.dart';
 
 abstract class MapStateStore {
@@ -112,9 +113,9 @@ class MapStateNotifier extends Notifier<MapState> {
     }
     final result = await manager.restoreOverlays(saved.overlays);
     _syncOverlays();
-    if (!saved.orthophotosOn) return result;
-    final shown = await manager.setOrthophotos(await _orthophotoSources());
-    return LayerChangeResult([...result.problems, ...shown.problems]);
+    // Orthophotos (when on) come with the first [updateOrthophotos]: only the
+    // ones around the screen are put on the map.
+    return result;
   }
 
   /// Orthophotos of the catalog (mediafile/orthophoto).
@@ -126,20 +127,34 @@ class MapStateNotifier extends Notifier<MapState> {
     ];
   }
 
-  /// Shows all orthophotos over the map, or takes them off; remembered.
-  Future<LayerChangeResult> setOrthophotosOn(bool on) async {
-    final result = await _requireManager().setOrthophotos(on ? await _orthophotoSources() : const []);
+  /// Turns orthophotos on or off; remembered. Turning on re-reads the
+  /// folder (new territories dropped in) and returns how many files there
+  /// are; the map then calls [updateOrthophotos] for the screen.
+  Future<int> setOrthophotosOn(bool on) async {
     _publish(state.copyWith(orthophotosOn: on));
-    return result;
+    if (!on) {
+      await _manager?.setOrthophotos(const []);
+      return 0;
+    }
+    await ref.read(catalogProvider.notifier).reload();
+    return (await _orthophotoSources()).length;
   }
 
-  /// Re-reads the orthophoto folder (new territories dropped in) and, when
-  /// orthophotos are on, shows the current set.
-  Future<LayerChangeResult> refreshOrthophotos() async {
-    await ref.read(catalogProvider.notifier).reload();
+  /// Puts on the map the orthophotos around [viewport] (the screen and its
+  /// neighbours) and takes off the rest; nothing when orthophotos are off.
+  Future<LayerChangeResult> updateOrthophotos(GeoBox viewport, double zoom) async {
     final manager = _manager;
     if (!state.orthophotosOn || manager == null) return const LayerChangeResult();
-    return manager.setOrthophotos(await _orthophotoSources());
+    final sources = await _orthophotoSources();
+    final reader = ref.read(mbtilesExtentReaderProvider);
+    final extents = <String, MbtilesExtent?>{
+      for (final source in sources)
+        source.id: switch (orthophotoPath(source)) {
+          final path? => await reader.read(path),
+          null => null,
+        },
+    };
+    return manager.setOrthophotos(orthophotosFor(sources, extents, viewport: viewport, zoom: zoom));
   }
 
   Future<LayerChangeResult> setBase(MapSource source) async {
