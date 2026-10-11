@@ -91,6 +91,9 @@ class MapLibreLayerHost implements MapLayerHost {
         ),
       );
 
+  @override
+  Future<List<String>> layerIds() async => [for (final id in await _controller.getLayerIds()) '$id'];
+
   /// Track lines are the lowest annotation layer (MapLibreMap's default
   /// annotation order is line, symbol, circle, fill).
   @override

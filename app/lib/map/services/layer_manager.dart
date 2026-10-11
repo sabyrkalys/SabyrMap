@@ -33,6 +33,9 @@ abstract class MapLayerHost {
   /// Changes the paint of a line layer that came with the style.
   Future<void> setLinePaint(String layerId, LinePaint paint);
 
+  /// Ids of all the map's layers now, bottom → top.
+  Future<List<String>> layerIds();
+
   /// Lowest layer of the app's own annotations (tracks, waypoints, target):
   /// overlays go below it so the app's data stays on top. Null before the
   /// annotation managers exist.
@@ -120,7 +123,7 @@ class LayerManager {
 
   /// Orthophotos shown over the map: each file is one territory, so they
   /// don't cover each other and aren't counted against [maxRasterOverlays].
-  /// They sit above the overlays, right under the app's annotations.
+  /// They sit above the overlays, under the base style's roads.
   final List<MapSource> _orthophotos = [];
   Future<void> _tail = Future.value();
 
@@ -166,6 +169,7 @@ class LayerManager {
       return const LayerChangeResult(['$isolatedMessage — ортофотопланы не показаны']);
     }
     final problems = <String>[];
+    final ceiling = await _orthophotoCeiling();
     for (final source in sources) {
       if (source.id == base?.id || _overlays.any((l) => l.sourceId == source.id)) continue;
       try {
@@ -177,20 +181,28 @@ class LayerManager {
           minZoom: source.minZoom,
           maxZoom: source.maxZoom,
         );
-        // Each one right under the annotations: above the overlays and the
+        // Each one right under the roads: above the overlays and the
         // orthophotos added before it.
-        await _host.addRasterLayer(
-          source.id,
-          layerIdOf(source.id),
-          opacity: 1,
-          belowLayerId: _host.annotationsBottomLayerId,
-        );
+        await _host.addRasterLayer(source.id, layerIdOf(source.id), opacity: 1, belowLayerId: ceiling);
         _orthophotos.add(source);
       } on Exception catch (e) {
         problems.add('${source.name}: $e');
       }
     }
     return LayerChangeResult(problems);
+  }
+
+  /// Where orthophotos go: under the lowest road layer of our styles
+  /// (road_layers in tools/build/styles/build_styles.py), so roads, borders
+  /// and labels stay on top of the photo; under the annotations for a base
+  /// without such roads.
+  Future<String?> _orthophotoCeiling() async {
+    try {
+      for (final id in await _host.layerIds()) {
+        if (id.startsWith('road-')) return id;
+      }
+    } catch (_) {}
+    return _host.annotationsBottomLayerId;
   }
 
   static String layerIdOf(String sourceId) => '$sourceId-layer';

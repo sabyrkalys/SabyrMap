@@ -76,6 +76,12 @@ class FakeHost implements MapLayerHost {
     calls.add('linePaint $layerId');
     linePaints[layerId] = paint;
   }
+
+  /// The style's own layers, all below [layers].
+  List<String> styleLayers = [];
+
+  @override
+  Future<List<String>> layerIds() async => [...styleLayers, ...layers];
 }
 
 void main() {
@@ -448,6 +454,23 @@ void main() {
       expect(m.getOrthophotos(), isEmpty);
       expect(host.layers, isEmpty);
       expect(host.sources, isEmpty);
+    });
+
+    test('they go under the base style roads, so the roads stay visible', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      host.styleLayers = ['background', 'satellite', 'road-middle-casing', 'road-major', 'boundary-country'];
+      await m.setOrthophotos([dobro, avd]);
+      expect(host.calls, contains('addLayer ortho-Доброполье.mbtiles-layer below road-middle-casing'));
+      expect(host.calls, contains('addLayer ortho-Авдеевка.mbtiles-layer below road-middle-casing'));
+    });
+
+    test('a base without roads: under the annotations', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      host.styleLayers = ['background', 'satellite'];
+      await m.setOrthophotos([dobro]);
+      expect(host.calls, contains('addLayer ortho-Доброполье.mbtiles-layer below lines_0'));
     });
 
     test('a new overlay goes under the orthophotos', () async {
