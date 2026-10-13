@@ -1,8 +1,8 @@
+import 'package:app/map/screens/layer_details/layer_details_screen.dart';
 import 'package:app/map/screens/on_screen/layer_blending_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_color_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_context_menu.dart';
 import 'package:app/map/screens/on_screen/layer_erase_color_sheet.dart';
-import 'package:app/map/screens/on_screen/layer_details_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_opacity_sheet.dart';
 import 'package:app/map/services/layer_manager.dart';
 import 'package:app/map/state/map_layers_controller.dart';
@@ -108,14 +108,14 @@ void main() {
     expect(find.byType(LayerOpacitySheet), findsOneWidget);
   });
 
-  testWidgets('«Детали» shows the source', (tester) async {
+  testWidgets('«Детали» opens the layer details screen', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'yandex-hybrid');
     await tester.tap(find.byKey(const Key('layer_menu_details')));
     await tester.pumpAndSettle();
-    expect(find.byType(LayerDetailsSheet), findsOneWidget);
-    expect(find.text('Яндекс'), findsOneWidget);
-    expect(find.text('Растровая'), findsOneWidget);
+    expect(find.byType(LayerDetailsScreen), findsOneWidget);
+    expect(find.text('Яндекс'), findsOneWidget); // группа в шапке
+    expect(find.text('Гибрид · Растр · Онлайн'), findsOneWidget);
   });
 
   testWidgets('«Инверсия цветов» toggles and inverts the layer on the map', (tester) async {

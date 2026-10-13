@@ -16,9 +16,23 @@ import '../models/map_models.dart';
 /// Disk size of an installed map and, for a region downloaded from our
 /// server, the catalog map it was cut from (manifest.json `map_id`).
 class LocalMapInfo {
-  const LocalMapInfo({required this.sizeBytes, this.originSourceId, this.createdAt, this.bbox, this.maxZoom});
+  const LocalMapInfo({
+    required this.sizeBytes,
+    this.originSourceId,
+    this.createdAt,
+    this.bbox,
+    this.maxZoom,
+    this.path,
+    this.files = const [],
+  });
 
   final int sizeBytes;
+
+  /// The map's file, or its region folder.
+  final String? path;
+
+  /// Names of its files: the file itself, or the folder's top-level files.
+  final List<String> files;
   final String? originSourceId;
 
   /// From the region's manifest.json; null for plain files.
@@ -334,14 +348,18 @@ class CatalogRepository {
         createdAt: DateTime.tryParse('${manifest['created_at']}'),
         bbox: bbox is List && bbox.length == 4 ? [for (final v in bbox) (v as num).toDouble()] : null,
         maxZoom: (manifest['max_zoom'] as num?)?.toInt(),
+        path: dir.path,
+        files: [for (final f in dir.listSync().whereType<File>()) f.basename]..sort(),
       );
     }
     for (final entry in await _mapsFolder.list()) {
-      info['local-${entry.fileName}'] = LocalMapInfo(sizeBytes: entry.sizeBytes);
+      info['local-${entry.fileName}'] =
+          LocalMapInfo(sizeBytes: entry.sizeBytes, path: entry.path, files: [entry.fileName]);
     }
     try {
       for (final entry in await _orthophotoFolder.list()) {
-        info['$orthophotoPrefix${entry.fileName}'] = LocalMapInfo(sizeBytes: entry.sizeBytes);
+        info['$orthophotoPrefix${entry.fileName}'] =
+            LocalMapInfo(sizeBytes: entry.sizeBytes, path: entry.path, files: [entry.fileName]);
       }
     } catch (_) {}
     return info;

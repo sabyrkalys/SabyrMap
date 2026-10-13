@@ -253,8 +253,12 @@ void main() {
       expect(hoverla.bbox, [24.4, 48.1, 24.6, 48.2]);
       expect(hoverla.maxZoom, 15);
       expect(hoverla.sizeBytes, 1200 + fs.file('$mapsDir/Говерла/manifest.json').lengthSync());
+      expect(hoverla.path, '$mapsDir/Говерла');
+      expect(hoverla.files, ['manifest.json', 'osm.mbtiles'], reason: 'top-level files only');
       expect(info['local-Карпаты.mbtiles']!.sizeBytes, 300);
       expect(info['local-Карпаты.mbtiles']!.originSourceId, isNull);
+      expect(info['local-Карпаты.mbtiles']!.path, '$mapsDir/Карпаты.mbtiles');
+      expect(info['local-Карпаты.mbtiles']!.files, ['Карпаты.mbtiles']);
     });
 
     test('a folder with style.json is one vector map, one with only MBTiles a raster map', () async {

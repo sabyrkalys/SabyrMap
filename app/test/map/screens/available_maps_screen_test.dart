@@ -8,6 +8,7 @@ import 'package:file/memory.dart';
 import 'package:app/map/screens/available_maps/map_card.dart';
 import 'package:app/map/screens/available_maps/maps_app_bar.dart';
 import 'package:app/map/screens/available_maps_screen.dart';
+import 'package:app/map/screens/layer_details/layer_details_screen.dart';
 import 'package:app/map/services/google_tiles_service.dart';
 import 'package:app/map/services/layer_manager.dart';
 import 'package:app/map/services/map_previews.dart';
@@ -354,7 +355,7 @@ void main() {
     expect(find.text('Кэш очищен'), findsOneWidget);
   });
 
-  testWidgets('«Детали» shows source, size, date, coverage and tile format', (tester) async {
+  testWidgets('«Детали» opens the details screen: group, size, date, coverage and type', (tester) async {
     await pump(
       tester,
       localInfo: {
@@ -372,13 +373,21 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('map_card_menu_details')));
     await tester.pumpAndSettle();
+    expect(find.byType(LayerDetailsScreen), findsOneWidget);
+    String? value(String label) => tester
+        .widget<SelectableText>(find.descendant(
+          of: find.ancestor(of: find.text(label), matching: find.byType(Row)).first,
+          matching: find.byType(SelectableText),
+        ))
+        .data;
     expect(find.text('OPENSTREETMAP'), findsWidgets);
-    expect(find.text('5.0 МБ'), findsWidgets);
-    expect(find.text('07.10.2026'), findsOneWidget);
-    expect(find.text('47.900…48.100 с. ш., 37.700…37.900 в. д., масштаб 0–12'), findsOneWidget);
-    expect(find.text('Растровые · 📦 Офлайн'), findsOneWidget);
+    expect(value('Размер'), '5.0 МБ');
+    expect(value('Версия'), '07.10.2026');
+    expect(value('Покрытие'), '47.900…48.100 с. ш., 37.700…37.900 в. д.');
+    expect(value('Масштабы'), '0–12');
+    expect(value('Тип'), 'Схема · Растр · Файл');
     expect(find.textContaining('mbtiles://'), findsNothing);
-    expect(find.text('URL'), findsNothing);
+    expect(find.text('Источник'), findsNothing);
   });
 
   testWidgets('installed maps show their disk size; unknown origin goes to «Свои карты»', (tester) async {

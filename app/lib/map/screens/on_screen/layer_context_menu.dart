@@ -6,11 +6,11 @@ import '../../../explorer/sheet_menu.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../models/layer_look.dart';
 import '../../state/map_layers_controller.dart';
+import '../layer_details/layer_details_screen.dart';
 import '../layers_panel.dart';
 import 'force_refresh_dialog.dart';
 import 'layer_blending_sheet.dart';
 import 'layer_color_sheet.dart';
-import 'layer_details_sheet.dart';
 import 'layer_erase_color_sheet.dart';
 import 'layer_opacity_sheet.dart';
 
@@ -87,7 +87,7 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.info_outline,
           color: SheetMenuColors.accent,
           label: 'Детали',
-          onTap: () => openSheet((c) => LayerDetailsSheet.show(c, realId)),
+          onTap: () => openSheet((c) => LayerDetailsScreen.show(c, realId, layerMenuId: sourceId)),
         ),
         SheetMenuItem(
           key: const Key('layer_menu_compare'),

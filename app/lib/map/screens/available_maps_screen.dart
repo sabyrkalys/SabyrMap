@@ -14,6 +14,7 @@ import '../regions/server_region_dialog.dart';
 import '../regions/server_region_service.dart';
 import '../services/layer_manager.dart';
 import '../services/map_previews.dart';
+import 'layer_details/layer_details_screen.dart';
 import '../services/offline_service.dart';
 import '../services/tile_cache_stats.dart';
 import '../state/map_layers_controller.dart';
@@ -313,9 +314,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     required bool canOverlay,
     required bool canClearCache,
     required int sizeBytes,
-    required int cachedBytes,
     required String sourceName,
-    LocalMapInfo? local,
   }) async {
     final action = await showMapCardMenu(
       context,
@@ -337,16 +336,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         await ref.read(mapLayersProvider.notifier).toggleFavorite(source.id);
         _message(favorite ? '«${source.name}» убрана из избранных' : '«${source.name}» сохранена в избранные');
       case MapCardAction.details:
-        await showDialog<void>(
-          context: context,
-          builder: (_) => _DetailsDialog(
-            source: source,
-            sourceName: sourceName,
-            sizeBytes: sizeBytes,
-            cachedBytes: cachedBytes,
-            local: local,
-          ),
-        );
+        await LayerDetailsScreen.show(context, source.id, groupTitle: sourceName);
       case MapCardAction.clearCache:
         await _confirmClearCache(source, sizeBytes);
     }
@@ -458,9 +448,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
           canClearCache: source.id.startsWith(CatalogRepository.localRegionPrefix) ||
               (!source.id.startsWith('local-') && cacheOf(source) > 0),
           sizeBytes: sizeBytes ?? cacheOf(source),
-          cachedBytes: cached,
           sourceName: titles[groupFor((origin ?? source).id)]!,
-          local: localInfo[source.id],
         ),
       );
     }
@@ -719,80 +707,6 @@ class _RegionDownloadTile extends StatelessWidget {
 
 /// «Детали»: source, size, date, coverage and tile format of a map. Server
 /// addresses are deliberately left out.
-class _DetailsDialog extends StatelessWidget {
-  const _DetailsDialog({
-    required this.source,
-    required this.sourceName,
-    required this.sizeBytes,
-    required this.cachedBytes,
-    this.local,
-  });
-
-  final MapSource source;
-
-  /// Group title and attribution of the map (or of the map it came from).
-  final String sourceName;
-  /// Disk size of an installed map, or the saved areas of an online one.
-  final int sizeBytes;
-
-  /// MapLibre's tile cache for the map's tile sets (shared ones included).
-  final int cachedBytes;
-  final LocalMapInfo? local;
-
-  @override
-  Widget build(BuildContext context) {
-    final local = this.local;
-    final created = local?.createdAt?.toLocal();
-    final bbox = local?.bbox;
-    String two(int v) => v.toString().padLeft(2, '0');
-    String coord(double v) => v.toStringAsFixed(3);
-    final rows = <(String, String)>[
-      ('Источник', [sourceName, if (source.attribution case final a?) a].join(' · ')),
-      if (source.storageMode == StorageMode.offlineRegion)
-        ('Размер', sizeBytes > 0 ? formatBytes(sizeBytes) : '—')
-      else ...[
-        (
-          'В кэше',
-          cachedBytes > 0 ? '≈ ${formatBytes(cachedBytes)} (тайлы, общие с другими картами, входят и в их кэш)' : 'Нет',
-        ),
-        if (sizeBytes > 0) ('Сохранённые участки', formatBytes(sizeBytes)),
-      ],
-      (
-        'Обновлено',
-        created != null
-            ? '${two(created.day)}.${two(created.month)}.${created.year}'
-            : (source.version != null ? 'версия ${source.version}' : '—'),
-      ),
-      (
-        'Покрытие',
-        [
-          if (bbox != null) '${coord(bbox[1])}…${coord(bbox[3])} с. ш., ${coord(bbox[0])}…${coord(bbox[2])} в. д.',
-          'масштаб ${source.minZoom}–${local?.maxZoom ?? source.maxZoom}',
-        ].join(', '),
-      ),
-      ('Формат тайлов', '${source.format == TileFormat.vector ? 'Векторные' : 'Растровые'} · ${storageModeLabel(source.storageMode)}'),
-    ];
-    final theme = Theme.of(context);
-    return AlertDialog(
-      title: Text(source.name),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final (label, value) in rows) ...[
-              Text(label, style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              Text(value),
-              const SizedBox(height: 8),
-            ],
-          ],
-        ),
-      ),
-      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Закрыть'))],
-    );
-  }
-}
-
 class _SaveRegionRequest {
   const _SaveRegionRequest(this.name, this.minZoom, this.maxZoom);
 
