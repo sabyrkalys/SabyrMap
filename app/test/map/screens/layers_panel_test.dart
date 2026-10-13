@@ -1,194 +1,135 @@
-import 'package:app/map/catalog/catalog_repository.dart';
-import 'package:app/map/models/map_models.dart';
 import 'package:app/map/screens/available_maps_screen.dart';
 import 'package:app/map/screens/layers_panel.dart';
-import 'package:app/map/services/google_tiles_service.dart';
+import 'package:app/map/screens/on_screen/favorite_set_save_dialog.dart';
+import 'package:app/map/screens/on_screen/layer_context_menu.dart';
+import 'package:app/map/screens/on_screen/layer_opacity_sheet.dart';
 import 'package:app/map/services/layer_manager.dart';
-import 'package:app/map/services/offline_service.dart';
-import 'package:app/map/services/yandex_tiles_service.dart';
-import 'package:app/map/state/map_layers_controller.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 
-import '../services/layer_manager_test.dart' show FakeHost;
-import '../services/offline_service_test.dart' show FakeOfflineBackend;
-import '../state/map_layers_controller_test.dart' show MemoryMapStateStore;
-
-const liberty = MapSource(
-  id: 'ofm-liberty',
-  name: 'OpenFreeMap Liberty',
-  format: TileFormat.vector,
-  storageMode: StorageMode.onlineCache,
-  styleUrl: 'https://tiles.openfreemap.org/styles/liberty',
-);
-const osm = MapSource(
-  id: 'osm-standard',
-  name: 'OSM Standard Raster',
-  format: TileFormat.raster,
-  storageMode: StorageMode.onlineCache,
-  tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  canBeOverlay: true,
-  defaultOpacity: 0.7,
-);
-const googleSat = MapSource(
-  id: 'google-satellite',
-  name: 'Google Satellite',
-  format: TileFormat.raster,
-  storageMode: StorageMode.onlineOnly,
-  extraParams: {'mapType': 'satellite'},
-);
-const yHybrid = MapSource(
-  id: 'yandex-hybrid',
-  name: 'Яндекс Гибрид',
-  format: TileFormat.raster,
-  storageMode: StorageMode.onlineOnly,
-  tileUrlTemplate: 'https://y/?x={x}&y={y}&z={z}&l=skl',
-  canBeOverlay: true,
-  defaultOpacity: 0.75,
-);
-const ySat = MapSource(
-  id: 'yandex-sat',
-  name: 'Яндекс Спутник',
-  format: TileFormat.raster,
-  storageMode: StorageMode.onlineOnly,
-  tileUrlTemplate: 'https://y/?x={x}&y={y}&z={z}&l=sat',
-  canBeOverlay: true,
-  defaultOpacity: 0.75,
-);
-
-final providers = [
-  const MapProvider(id: 'osm', name: 'OpenStreetMap Maps', sources: [liberty, osm]),
-  const MapProvider(id: 'google', name: 'Google Maps', isolated: true, sources: [googleSat]),
-  const MapProvider(id: 'yandex', name: 'Яндекс', sources: [yHybrid, ySat]),
-];
-
-class _FixedCatalog extends CatalogNotifier {
-  @override
-  Future<List<MapProvider>> build() async => providers;
-}
+import 'on_screen/harness.dart';
 
 void main() {
-  late FakeHost host;
-  late ProviderContainer container;
-  late MemoryMapStateStore store;
+  final h = LayersHarness();
 
-  Future<void> pump(WidgetTester tester, {MapState? saved}) async {
-    tester.view.physicalSize = const Size(1080, 3000);
-    tester.view.devicePixelRatio = 2.625;
-    addTearDown(tester.view.reset);
-    host = FakeHost();
-    store = MemoryMapStateStore(saved);
-    container = ProviderContainer(
-      overrides: [
-        catalogProvider.overrideWith(_FixedCatalog.new),
-        mapStateStoreProvider.overrideWithValue(store),
-        offlineServiceProvider.overrideWithValue(OfflineService(backend: FakeOfflineBackend())),
-      ],
-    );
-    addTearDown(container.dispose);
-    await container.read(mapLayersProvider.notifier).attach(
-          LayerManager(
-            host: host,
-            catalog: LayerCatalog(providers),
-            google: GoogleTilesService(
-              apiKey: 'G',
-              httpClient: MockClient((r) async => r.url.path.endsWith('createSession')
-                  ? http.Response('{"session":"S","expiry":"9999999999"}', 200)
-                  : http.Response.bytes(const [1], 200)),
-            ),
-            yandex: YandexTilesService(apiKey: 'Y', httpClient: MockClient((_) async => http.Response.bytes(const [1], 200))),
-          ),
-        );
-    await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const MaterialApp(home: LayersPanel())));
-    await tester.pumpAndSettle();
-  }
+  List<String> rowTitles(WidgetTester tester) => [
+        for (final finder in [find.text('OSM Standard Raster'), find.text('Яндекс Гибрид'), find.text('Базовая карта')])
+          if (finder.evaluate().isNotEmpty) '${tester.getTopLeft(finder.first).dy}',
+      ];
 
-  MapState stateWith(List<ActiveLayer> overlays) =>
-      MapState(baseSourceId: 'ofm-liberty', overlays: overlays, favoriteIds: const [], presets: const []);
-  const hybridLayer = ActiveLayer(sourceId: 'yandex-hybrid', type: MapLayerType.overlay, opacity: 0.75, visible: true, zIndex: 10);
-  const osmLayer = ActiveLayer(sourceId: 'osm-standard', type: MapLayerType.overlay, opacity: 0.7, visible: true, zIndex: 20);
-
-  testWidgets('sections: base, overlays with a load indicator, presets', (tester) async {
-    await pump(tester, saved: stateWith(const [hybridLayer]));
-    expect(find.text('Базовая подложка'), findsOneWidget);
-    expect(find.text('Наложенные слои (1/3)'), findsOneWidget);
-    expect(find.text('Пресеты'), findsOneWidget);
-    expect(find.text('+ Добавить слой'), findsOneWidget);
-    expect(tester.widget<RadioGroup<String>>(find.byType(RadioGroup<String>)).groupValue, 'ofm-liberty');
+  testWidgets('layers top → bottom, the base map last without eye and opacity buttons', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    expect(find.byType(LayersPanel), findsOneWidget);
+    expect(find.text('Карты на экране'), findsOneWidget);
+    final osmY = tester.getTopLeft(find.text('OSM Standard Raster')).dy;
+    final hybridY = tester.getTopLeft(find.text('Яндекс Гибрид')).dy;
+    final baseY = tester.getTopLeft(find.text('Базовая карта')).dy;
+    expect(osmY < hybridY && hybridY < baseY, isTrue, reason: rowTitles(tester).join(' '));
+    expect(find.text('OpenFreeMap Liberty'), findsOneWidget);
+    final baseRow = find.byKey(const Key('layer_base_row'));
+    expect(find.descendant(of: baseRow, matching: find.byIcon(Icons.visibility)), findsNothing);
+    expect(find.descendant(of: baseRow, matching: find.byIcon(Icons.layers_outlined)), findsNothing);
+    expect(find.descendant(of: baseRow, matching: find.byIcon(Icons.more_vert)), findsOneWidget);
   });
 
-  testWidgets('picking a base radio switches the map', (tester) async {
-    await pump(tester);
-    await tester.tap(find.byKey(const Key('base_yandex-sat')));
+  testWidgets('row: «N % непрозрачн.», the eye hides the layer and changes its icon', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    expect(find.text('75 % непрозрачн.'), findsOneWidget);
+    final eye = find.byKey(const Key('layer_visible_yandex-hybrid'));
+    expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility)), findsOneWidget);
+    await tester.tap(eye);
     await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).baseSourceId, 'yandex-sat');
-    expect(host.style, contains('yandex-sat'));
+    expect(h.state.overlays.single.visible, isFalse);
+    expect(h.host.opacities[LayerManager.layerIdOf('yandex-hybrid')], 0);
+    expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility_off)), findsOneWidget);
   });
 
-  testWidgets('overlay row: visibility, opacity slider in %, delete', (tester) async {
-    await pump(tester, saved: stateWith(const [hybridLayer]));
-    expect(find.text('Яндекс Гибрид'), findsWidgets);
-    expect(find.text('75%'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('overlay_visible_yandex-hybrid')));
+  testWidgets('the layers icon and a tap on the row open the opacity sheet', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await tester.tap(find.byKey(const Key('layer_opacity_yandex-hybrid')));
     await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).overlays.single.visible, isFalse);
-
-    tester.widget<Slider>(find.byKey(const Key('overlay_opacity_yandex-hybrid'))).onChangeEnd!(0.3);
+    expect(find.byType(LayerOpacitySheet), findsOneWidget);
+    await tester.tap(find.byKey(const Key('opacity_done')));
     await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).overlays.single.opacity, 0.3);
-    expect(find.text('30%'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('overlay_delete_yandex-hybrid')));
+    await tester.tap(find.text('Яндекс Гибрид'));
     await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).overlays, isEmpty);
+    expect(find.byType(LayerOpacitySheet), findsOneWidget);
+  });
+
+  testWidgets('three dots open the layer menu, also for the base map', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await tester.tap(find.byKey(const Key('layer_menu_yandex-hybrid')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayerContextMenu), findsOneWidget);
+    await tester.tap(find.byKey(const Key('layer_menu_cancel')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('layer_menu_base')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayerContextMenu), findsOneWidget);
+    expect(find.text('OpenFreeMap Liberty'), findsNWidgets(2)); // строка и заголовок меню
+  });
+
+  testWidgets('header: the cross closes the panel', (tester) async {
+    await h.pump(tester);
+    await tester.tap(find.byKey(const Key('layers_header_close')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayersPanel), findsNothing);
+  });
+
+  testWidgets('header: the map icon closes the panel and opens the available maps', (tester) async {
+    await h.pump(tester);
+    await tester.tap(find.byKey(const Key('layers_header_maps')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayersPanel), findsNothing);
+    expect(find.byType(AvailableMapsScreen), findsOneWidget);
+  });
+
+  testWidgets('header: the bookmark saves the screen as a favourite set', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await tester.tap(find.byKey(const Key('layers_header_save')));
+    await tester.pumpAndSettle();
+    expect(find.byType(FavoriteSetNameDialog), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('favorite_set_name')), ' Гибрид ');
+    await tester.tap(find.byKey(const Key('favorite_set_ok')));
+    await tester.pumpAndSettle();
+    final preset = h.state.presets.single;
+    expect(preset.name, 'Гибрид');
+    expect(preset.baseSourceId, 'ofm-liberty');
+    expect(preset.overlays.single.sourceId, 'yandex-hybrid');
+    expect(find.text('Набор сохранён'), findsOneWidget);
   });
 
   testWidgets('reordering the list reorders the layers (top of the list = top of the map)', (tester) async {
-    await pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
     final list = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
-    // Shown top → bottom: OSM (z20) first, Hybrid (z10) second. Move Hybrid to the top.
+    // Сверху вниз: OSM (z20), затем Гибрид (z10). Гибрид — наверх.
     list.onReorderItem!(1, 0);
     await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
+    expect(h.state.overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
   });
 
-  testWidgets('moving a layer down the list puts it right below its new neighbour', (tester) async {
-    await pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
-    final list = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
-    // OSM is shown first; move it to the bottom.
-    list.onReorderItem!(0, 1);
-    await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
-  });
-
-  testWidgets('«+ Добавить слой» opens the catalog in overlay-picking mode', (tester) async {
-    await pump(tester);
-    await tester.tap(find.text('+ Добавить слой'));
+  testWidgets('«Добавить слой» opens the catalog in overlay-picking mode', (tester) async {
+    await h.pump(tester);
+    expect(find.text('Добавить слой (0/3)'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('layers_add')));
     await tester.pumpAndSettle();
     expect(find.byType(AvailableMapsScreen), findsOneWidget);
     expect(find.text('Добавить слой'), findsOneWidget);
   });
 
   testWidgets('over a Google base, adding is refused with the reason', (tester) async {
-    await pump(tester);
-    await tester.tap(find.byKey(const Key('base_google-satellite')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('+ Добавить слой'));
+    await h.pump(tester, saved: stateWith(const [], base: 'google-satellite'));
+    await tester.tap(find.byKey(const Key('layers_add')));
     await tester.pumpAndSettle();
     expect(find.byType(AvailableMapsScreen), findsNothing);
     expect(find.text(LayerManager.isolatedMessage), findsOneWidget);
   });
 
-  testWidgets('a preset is applied with one tap', (tester) async {
-    const preset = MapPreset(id: 'p', name: 'Спутник + гибрид', baseSourceId: 'yandex-sat', overlays: [hybridLayer]);
-    await pump(tester, saved: const MapState(baseSourceId: null, overlays: [], favoriteIds: [], presets: [preset]));
-    await tester.tap(find.text('Спутник + гибрид'));
+  testWidgets('a tap on the base row opens the available maps to change it', (tester) async {
+    await h.pump(tester);
+    await tester.tap(find.text('Базовая карта'));
     await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).baseSourceId, 'yandex-sat');
-    expect(container.read(mapLayersProvider).overlays.single.sourceId, 'yandex-hybrid');
+    expect(find.byType(AvailableMapsScreen), findsOneWidget);
   });
+
 }

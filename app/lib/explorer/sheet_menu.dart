@@ -8,9 +8,12 @@ abstract final class SheetMenuColors {
   static const Color clipboard = Color(0xFF9C27B0);
   static const Color edit = Color(0xFFD32F2F);
   static const Color divider = Color(0xFFBDBDBD);
+  static const Color disabled = Color(0xFFBDBDBD);
+  static const Color info = Color(0xFF1976D2);
 }
 
 /// Пункт шторки-меню: иконка 24 в поле 32, отступ 16, подпись 16.
+/// Без [onTap] пункт недоступен и показан бледным.
 class SheetMenuItem extends StatelessWidget {
   const SheetMenuItem({
     super.key,
@@ -18,33 +21,43 @@ class SheetMenuItem extends StatelessWidget {
     required this.color,
     required this.label,
     required this.onTap,
+    this.trailing,
   });
 
   final IconData icon;
   final Color color;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(8),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          SizedBox(width: 32, child: Icon(icon, size: 24, color: color)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(fontSize: 16, color: SheetMenuColors.text),
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    final trailing = this.trailing;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 32,
+              child: Icon(icon, size: 24, color: enabled ? color : SheetMenuColors.disabled),
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(fontSize: 16, color: enabled ? SheetMenuColors.text : SheetMenuColors.disabled),
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 8), trailing],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 /// Линия с подписью раздела: «— БУФЕР ОБМЕНА ——».

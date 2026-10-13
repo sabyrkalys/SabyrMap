@@ -58,13 +58,14 @@ class MapLibreLayerHost implements MapLayerHost {
   }
 
   @override
-  Future<void> addRasterLayer(String sourceId, String layerId, {required double opacity, String? belowLayerId}) {
-    return _controller.addRasterLayer(
-      sourceId,
-      layerId,
-      RasterLayerProperties(rasterOpacity: opacity),
-      belowLayerId: belowLayerId,
-    );
+  Future<void> addRasterLayer(
+    String sourceId,
+    String layerId, {
+    required double opacity,
+    RasterColor color = RasterColor.none,
+    String? belowLayerId,
+  }) {
+    return _controller.addRasterLayer(sourceId, layerId, _paint(opacity, color), belowLayerId: belowLayerId);
   }
 
   @override
@@ -74,8 +75,16 @@ class MapLibreLayerHost implements MapLayerHost {
   Future<void> removeSource(String sourceId) => _controller.removeSource(sourceId);
 
   @override
-  Future<void> setRasterOpacity(String layerId, double opacity) =>
-      _controller.setLayerProperties(layerId, RasterLayerProperties(rasterOpacity: opacity));
+  Future<void> setRasterOpacity(String layerId, double opacity, {RasterColor color = RasterColor.none}) =>
+      _controller.setLayerProperties(layerId, _paint(opacity, color));
+
+  static RasterLayerProperties _paint(double opacity, RasterColor color) => RasterLayerProperties(
+        rasterOpacity: opacity,
+        rasterBrightnessMin: color.brightnessMin,
+        rasterBrightnessMax: color.brightnessMax,
+        rasterContrast: color.contrast,
+        rasterSaturation: color.saturation,
+      );
 
   /// Every property not given here is reset to MapLibre's default, so the
   /// layout of our styles' lines (round cap and join) is repeated.

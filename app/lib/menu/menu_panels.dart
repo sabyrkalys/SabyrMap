@@ -5,6 +5,7 @@ import '../app_icons.dart';
 import '../compass/compass_screen.dart';
 import '../map/screens/available_maps_screen.dart';
 import '../map/screens/layers_panel.dart';
+import '../map/screens/on_screen/favorite_sets_section.dart';
 import '../tracks/track_recording_actions.dart';
 import '../tracks/track_recording_controller.dart';
 import '../app/landmark_services_provider.dart';
@@ -15,10 +16,11 @@ import 'menu_widgets.dart';
 /// Bottom-nav destinations, in nav order; each opens its own panel.
 enum MenuTab { settings, maps, waypoints, positioning, orientation }
 
-Widget menuPanelFor(MenuTab tab, {required double arrowCenterX}) {
+/// [onClose] closes the open panel (e.g. after a favourite set is applied).
+Widget menuPanelFor(MenuTab tab, {required double arrowCenterX, VoidCallback? onClose}) {
   return switch (tab) {
     MenuTab.settings => _SettingsPanel(arrowCenterX: arrowCenterX),
-    MenuTab.maps => _MapsPanel(arrowCenterX: arrowCenterX),
+    MenuTab.maps => _MapsPanel(arrowCenterX: arrowCenterX, onClose: onClose),
     MenuTab.waypoints => _WaypointsPanel(arrowCenterX: arrowCenterX),
     MenuTab.positioning => _PositioningPanel(arrowCenterX: arrowCenterX),
     MenuTab.orientation => _OrientationPanel(arrowCenterX: arrowCenterX),
@@ -71,9 +73,10 @@ class _SettingsPanel extends StatelessWidget {
 }
 
 class _MapsPanel extends StatelessWidget {
-  const _MapsPanel({required this.arrowCenterX});
+  const _MapsPanel({required this.arrowCenterX, this.onClose});
 
   final double arrowCenterX;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +93,12 @@ class _MapsPanel extends StatelessWidget {
         MenuListItem(
           icon: AppIcons.layers,
           label: 'Карты на экране',
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LayersPanel())),
+          // The panel is a sheet over the map: the menu closes so changes
+          // to the layers are seen at once.
+          onTap: () {
+            onClose?.call();
+            LayersPanel.show(context);
+          },
         ),
         MenuListItem(
           icon: AppIcons.download,
@@ -98,7 +106,7 @@ class _MapsPanel extends StatelessWidget {
           onTap: () => Navigator.of(context)
               .push(MaterialPageRoute(builder: (_) => const AvailableMapsScreen(saveBaseRegion: true))),
         ),
-        const MenuListItem(icon: AppIcons.star, label: 'Избранные карты'),
+        FavoriteSetsSection(onApplied: onClose),
       ],
       sections: const [
         MenuSection(title: 'ОПЦИИ', children: [

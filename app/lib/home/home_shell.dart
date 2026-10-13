@@ -84,6 +84,7 @@ class _HomeShellState extends State<HomeShell> {
                         child: menuPanelFor(
                           openTab,
                           arrowCenterX: _BottomNav.iconCenterX(openTab.index) - _panelMargin,
+                          onClose: () => setState(() => _openTab = null),
                         ),
                       ),
                     ),

@@ -4,6 +4,7 @@ import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_screen.dart';
 import 'package:app/map/screens/available_maps_screen.dart';
 import 'package:app/map/screens/layers_panel.dart';
+import 'package:app/map/state/map_layers_controller.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/menu/menu_panels.dart';
 import 'package:app/menu/menu_toggles.dart';
@@ -16,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../compass/fakes.dart';
+import '../map/state/map_layers_controller_test.dart' show MemoryMapStateStore;
 import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
 import '../waypoints/fakes.dart';
@@ -60,6 +62,7 @@ void main() {
         waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
         tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
         compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
+        mapStateStoreProvider.overrideWithValue(MemoryMapStateStore()),
         if (locationSource != null) locationSourceProvider.overrideWithValue(locationSource),
       ],
     );
@@ -96,7 +99,15 @@ void main() {
 
   testWidgets('КАРТЫ content', (tester) async {
     await pumpPanel(tester, MenuTab.maps);
-    expectTexts(['КАРТЫ', 'Доступные карты', 'Карты на экране', 'Сохранить участок карты', 'Избранные карты', 'ОПЦИИ']);
+    expectTexts([
+      'КАРТЫ',
+      'Доступные карты',
+      'Карты на экране',
+      'Сохранить участок карты',
+      'ИЗБРАННЫЕ КАРТЫ И НАБОРЫ КАРТ',
+      'Избранные карты и наборы карт не созданы',
+      'ОПЦИИ',
+    ]);
     await expand(tester, 'ОПЦИИ');
     expectTexts([
       'Использовать только сохранённый кэш карты',

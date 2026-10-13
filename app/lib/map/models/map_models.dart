@@ -1,5 +1,7 @@
 import 'package:collection/collection.dart';
 
+import 'layer_look.dart';
+
 /// How a source's tiles may be kept on the device.
 enum StorageMode {
   /// Online only, never downloaded for offline use (Google, Яндекс).
@@ -235,12 +237,24 @@ class ActiveLayer {
 
 /// A named base + overlays combination, switched with one tap.
 class MapPreset {
-  const MapPreset({required this.id, required this.name, required this.baseSourceId, required this.overlays});
+  const MapPreset({
+    required this.id,
+    required this.name,
+    required this.baseSourceId,
+    required this.overlays,
+    this.looks = const {},
+  });
 
   final String id;
   final String name;
   final String baseSourceId;
   final List<ActiveLayer> overlays;
+
+  /// Overlays' colour, erasing and blending, by source id; only changed ones.
+  final Map<String, LayerLook> looks;
+
+  MapPreset copyWith({String? name}) =>
+      MapPreset(id: id, name: name ?? this.name, baseSourceId: baseSourceId, overlays: overlays, looks: looks);
 
   factory MapPreset.fromJson(Map<String, dynamic> json) => MapPreset(
         id: json['id'] as String,
@@ -249,6 +263,10 @@ class MapPreset {
         overlays: [
           for (final o in (json['overlays'] as List<dynamic>? ?? const [])) ActiveLayer.fromJson(o as Map<String, dynamic>),
         ],
+        looks: {
+          for (final e in (json['looks'] as Map<String, dynamic>? ?? const {}).entries)
+            e.key: LayerLook.fromJson(e.value as Map<String, dynamic>),
+        },
       );
 
   Map<String, dynamic> toJson() => {
@@ -256,6 +274,7 @@ class MapPreset {
         'name': name,
         'baseSourceId': baseSourceId,
         'overlays': [for (final o in overlays) o.toJson()],
+        if (looks.isNotEmpty) 'looks': {for (final e in looks.entries) e.key: e.value.toJson()},
       };
 
   @override
@@ -264,7 +283,8 @@ class MapPreset {
       other.id == id &&
       other.name == name &&
       other.baseSourceId == baseSourceId &&
-      _listEquality.equals(other.overlays, overlays);
+      _listEquality.equals(other.overlays, overlays) &&
+      const MapEquality<String, LayerLook>().equals(other.looks, looks);
 
   @override
   int get hashCode => Object.hash(id, name, baseSourceId, Object.hashAll(overlays));

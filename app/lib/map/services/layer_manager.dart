@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import '../../maps/color/layer_color_settings.dart';
 import '../models/map_models.dart';
 import 'google_tiles_service.dart';
 import 'hybrid_road_style.dart';
@@ -22,13 +23,21 @@ abstract class MapLayerHost {
     required int maxZoom,
   });
 
-  Future<void> addRasterLayer(String sourceId, String layerId, {required double opacity, String? belowLayerId});
+  Future<void> addRasterLayer(
+    String sourceId,
+    String layerId, {
+    required double opacity,
+    RasterColor color = RasterColor.none,
+    String? belowLayerId,
+  });
 
   Future<void> removeLayer(String layerId);
 
   Future<void> removeSource(String sourceId);
 
-  Future<void> setRasterOpacity(String layerId, double opacity);
+  /// Sets a raster layer's opacity together with its [color]: MapLibre
+  /// resets every paint property not given, so both always go together.
+  Future<void> setRasterOpacity(String layerId, double opacity, {RasterColor color = RasterColor.none});
 
   /// Changes the paint of a line layer that came with the style.
   Future<void> setLinePaint(String layerId, LinePaint paint);
@@ -40,6 +49,48 @@ abstract class MapLayerHost {
   /// overlays go below it so the app's data stays on top. Null before the
   /// annotation managers exist.
   String? get annotationsBottomLayerId;
+}
+
+/// A raster layer's colour correction in MapLibre's terms.
+class RasterColor {
+  const RasterColor({this.brightnessMin = 0, this.brightnessMax = 1, this.contrast = 0, this.saturation = 0});
+
+  static const RasterColor none = RasterColor();
+
+  /// [LayerColorSettings] as MapLibre paint: brightness narrows the
+  /// brightness range, inversion swaps its ends. The tint has no MapLibre
+  /// equivalent and is not shown.
+  factory RasterColor.of(LayerColorSettings s) {
+    final b = s.brightness.clamp(-1.0, 1.0);
+    final low = b > 0 ? b : 0.0;
+    final high = b < 0 ? 1 + b : 1.0;
+    return RasterColor(
+      brightnessMin: s.inverted ? high : low,
+      brightnessMax: s.inverted ? low : high,
+      contrast: (s.contrast - 1).clamp(-1.0, 1.0),
+      saturation: (s.saturation - 1).clamp(-1.0, 1.0),
+    );
+  }
+
+  final double brightnessMin;
+  final double brightnessMax;
+
+  /// −1..1, 0 — unchanged.
+  final double contrast;
+
+  /// −1..1, 0 — unchanged.
+  final double saturation;
+
+  @override
+  bool operator ==(Object other) =>
+      other is RasterColor &&
+      other.brightnessMin == brightnessMin &&
+      other.brightnessMax == brightnessMax &&
+      other.contrast == contrast &&
+      other.saturation == saturation;
+
+  @override
+  int get hashCode => Object.hash(brightnessMin, brightnessMax, contrast, saturation);
 }
 
 /// Whether [url] points at a whole tileset (TileJSON-like, e.g. a local
@@ -127,7 +178,26 @@ class LayerManager {
   final List<MapSource> _orthophotos = [];
   Future<void> _tail = Future.value();
 
+  /// Colour correction of overlays, by source id; kept while the overlay is
+  /// on the map (also across base changes), dropped when it is removed.
+  final Map<String, LayerColorSettings> _colors = {};
+
   MapSource? get base => _base;
+
+  RasterColor _colorOf(String sourceId) {
+    final settings = _colors[sourceId];
+    return settings == null ? RasterColor.none : RasterColor.of(settings);
+  }
+
+  /// Colour correction of [sourceId]; for an overlay not on the map yet it
+  /// applies once it is added.
+  Future<void> setColor(String sourceId, LayerColorSettings settings) => _serial(() async {
+        settings.isIdentity ? _colors.remove(sourceId) : _colors[sourceId] = settings;
+        final index = _overlays.indexWhere((l) => l.sourceId == sourceId);
+        if (index == -1) return;
+        final layer = _overlays[index];
+        await _host.setRasterOpacity(layerIdOf(sourceId), layer.visible ? layer.opacity : 0.0, color: _colorOf(sourceId));
+      });
 
   /// Current overlays, bottom → top.
   List<ActiveLayer> getActiveLayers() => List.unmodifiable(_overlays);
@@ -225,6 +295,7 @@ class LayerManager {
         _overlays.clear();
         _orthophotos.clear();
         if (_catalog.isIsolated(source.id)) {
+          _colors.clear();
           return LayerChangeResult(
             snapshot.isEmpty && orthophotos.isEmpty ? const [] : ['$isolatedMessage — наложенные слои убраны'],
           );
@@ -259,6 +330,7 @@ class LayerManager {
         await _host.removeLayer(layerIdOf(sourceId));
         await _host.removeSource(sourceId);
         _overlays.removeAt(index);
+        _colors.remove(sourceId);
       });
 
   Future<void> setOpacity(String sourceId, double opacity) => _serial(() async {
@@ -266,7 +338,7 @@ class LayerManager {
         final layer = _overlays[index];
         final clamped = opacity.clamp(0.0, 1.0);
         _overlays[index] = layer.copyWith(opacity: clamped);
-        if (layer.visible) await _host.setRasterOpacity(layerIdOf(sourceId), clamped);
+        if (layer.visible) await _host.setRasterOpacity(layerIdOf(sourceId), clamped, color: _colorOf(sourceId));
       });
 
   /// Hiding sets the map opacity to 0 but keeps the chosen opacity.
@@ -274,7 +346,7 @@ class LayerManager {
         final index = _indexOf(sourceId);
         final layer = _overlays[index];
         _overlays[index] = layer.copyWith(visible: visible);
-        await _host.setRasterOpacity(layerIdOf(sourceId), visible ? layer.opacity : 0.0);
+        await _host.setRasterOpacity(layerIdOf(sourceId), visible ? layer.opacity : 0.0, color: _colorOf(sourceId));
       });
 
   /// [orderedIds] bottom → top; must name exactly the current overlays.
@@ -295,6 +367,7 @@ class LayerManager {
             layer.sourceId,
             layerIdOf(layer.sourceId),
             opacity: layer.visible ? layer.opacity : 0.0,
+            color: _colorOf(layer.sourceId),
             belowLayerId: _overlayCeiling,
           );
           _overlays.add(layer);
@@ -353,7 +426,13 @@ class LayerManager {
       minZoom: source.minZoom,
       maxZoom: source.maxZoom,
     );
-    await _host.addRasterLayer(source.id, layerIdOf(source.id), opacity: visible ? clamped : 0.0, belowLayerId: below);
+    await _host.addRasterLayer(
+      source.id,
+      layerIdOf(source.id),
+      opacity: visible ? clamped : 0.0,
+      color: _colorOf(source.id),
+      belowLayerId: below,
+    );
     final layer = ActiveLayer(sourceId: source.id, type: MapLayerType.overlay, opacity: clamped, visible: visible, zIndex: z);
     _overlays
       ..add(layer)

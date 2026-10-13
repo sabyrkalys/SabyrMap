@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../catalog/catalog_repository.dart';
+import '../models/layer_look.dart';
 import '../models/map_models.dart';
 import '../orthophoto/orthophoto_extent.dart';
 import '../services/layer_manager.dart';
@@ -84,6 +85,7 @@ class MapStateNotifier extends Notifier<MapState> {
 
   void _publish(MapState next) {
     state = next;
+    ref.read(layerLooksProvider.notifier).retain({for (final l in next.overlays) l.sourceId});
     unawaited(ref.read(mapStateStoreProvider).save(next).catchError((_) {}));
   }
 
@@ -178,6 +180,18 @@ class MapStateNotifier extends Notifier<MapState> {
     _syncOverlays();
   }
 
+  /// Changes the map's opacity while a slider is dragged; [setOpacity]
+  /// stores the final value.
+  Future<void> previewOpacity(String sourceId, double opacity) => _requireManager().setOpacity(sourceId, opacity);
+
+  /// Session look of [sourceId] ([LayerLook]); the colour goes to the map.
+  Future<void> setLook(String sourceId, LayerLook look) async {
+    final looks = ref.read(layerLooksProvider.notifier);
+    final before = looks.of(sourceId);
+    looks.put(sourceId, look);
+    if (before.color != look.color) await _requireManager().setColor(sourceId, look.color);
+  }
+
   Future<void> setVisibility(String sourceId, bool visible) async {
     await _requireManager().setVisibility(sourceId, visible);
     _syncOverlays();
@@ -204,12 +218,17 @@ class MapStateNotifier extends Notifier<MapState> {
     for (final layer in manager.getActiveLayers()) {
       await manager.removeOverlay(layer.sourceId);
     }
+    for (final entry in preset.looks.entries) {
+      await manager.setColor(entry.key, entry.value.color);
+    }
     final result = await manager.restoreOverlays(preset.overlays);
+    ref.read(layerLooksProvider.notifier).replaceAll(preset.looks);
     _publish(state.copyWith(baseSourceId: base.id, overlays: manager.getActiveLayers()));
     return result;
   }
 
-  /// Stores the current base + overlays as a preset named [name].
+  /// Stores the current base + overlays (with their looks) as a preset
+  /// named [name].
   Future<void> savePreset(String name) async {
     final base = state.baseSourceId;
     if (base == null) throw const LayerException('Сначала выберите карту');
@@ -218,12 +237,45 @@ class MapStateNotifier extends Notifier<MapState> {
       name: name,
       baseSourceId: base,
       overlays: state.overlays,
+      looks: {
+        for (final e in ref.read(layerLooksProvider).entries)
+          if (!e.value.copyWith(forceRefresh: false).isDefault) e.key: e.value.copyWith(forceRefresh: false),
+      },
     );
     _publish(state.copyWith(presets: [...state.presets, preset]));
   }
+
+  Future<void> renamePreset(String id, String name) async => _publish(state.copyWith(presets: [
+        for (final p in state.presets) p.id == id ? p.copyWith(name: name) : p,
+      ]));
 
   Future<void> deletePreset(String id) async =>
       _publish(state.copyWith(presets: [for (final p in state.presets) if (p.id != id) p]));
 }
 
 final mapLayersProvider = NotifierProvider<MapStateNotifier, MapState>(MapStateNotifier.new);
+
+/// Session looks of the overlays on the map, by source id. Not saved:
+/// a look leaves with its overlay and comes back only with a favourite set.
+class LayerLooksNotifier extends Notifier<Map<String, LayerLook>> {
+  @override
+  Map<String, LayerLook> build() => const {};
+
+  LayerLook of(String sourceId) => state[sourceId] ?? const LayerLook();
+
+  void put(String sourceId, LayerLook look) {
+    final next = Map.of(state);
+    look.isDefault ? next.remove(sourceId) : next[sourceId] = look;
+    state = next;
+  }
+
+  void replaceAll(Map<String, LayerLook> looks) => state = Map.unmodifiable(looks);
+
+  /// Drops the looks of overlays no longer on the map.
+  void retain(Set<String> sourceIds) {
+    if (state.keys.every(sourceIds.contains)) return;
+    state = {for (final e in state.entries) if (sourceIds.contains(e.key)) e.key: e.value};
+  }
+}
+
+final layerLooksProvider = NotifierProvider<LayerLooksNotifier, Map<String, LayerLook>>(LayerLooksNotifier.new);

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:app/map/models/map_models.dart';
+import 'package:app/maps/color/layer_color_settings.dart';
 import 'package:app/map/services/google_tiles_service.dart';
 import 'package:app/map/services/hybrid_road_style.dart';
 import 'package:app/map/services/layer_manager.dart';
@@ -16,6 +17,7 @@ class FakeHost implements MapLayerHost {
   final sources = <String, String>{}; // id → tile URL
   final layers = <String>[]; // bottom → top, overlay layers only
   final opacities = <String, double>{};
+  final colors = <String, RasterColor>{};
   String? style;
   Completer<void>? styleGate;
 
@@ -40,7 +42,14 @@ class FakeHost implements MapLayerHost {
   }
 
   @override
-  Future<void> addRasterLayer(String sourceId, String layerId, {required double opacity, String? belowLayerId}) async {
+  Future<void> addRasterLayer(
+    String sourceId,
+    String layerId, {
+    required double opacity,
+    RasterColor color = RasterColor.none,
+    String? belowLayerId,
+  }) async {
+    colors[layerId] = color;
     calls.add('addLayer $layerId below ${belowLayerId ?? 'top'}');
     final index = belowLayerId == null ? -1 : layers.indexOf(belowLayerId);
     if (index == -1) {
@@ -64,8 +73,9 @@ class FakeHost implements MapLayerHost {
   }
 
   @override
-  Future<void> setRasterOpacity(String layerId, double opacity) async {
+  Future<void> setRasterOpacity(String layerId, double opacity, {RasterColor color = RasterColor.none}) async {
     calls.add('opacity $layerId $opacity');
+    colors[layerId] = color;
     opacities[layerId] = opacity;
   }
 
@@ -507,6 +517,49 @@ void main() {
       final result = await m.setOrthophotos([dobro]);
       expect(result.ok, isFalse);
       expect(m.getOrthophotos(), isEmpty);
+    });
+  });
+
+  group('colour', () {
+    test('settings map to MapLibre raster paint; inversion swaps the brightness range', () {
+      expect(RasterColor.of(const LayerColorSettings()), RasterColor.none);
+      expect(
+        RasterColor.of(const LayerColorSettings(brightness: 0.25, contrast: 1.5, saturation: 0)),
+        const RasterColor(brightnessMin: 0.25, brightnessMax: 1, contrast: 0.5, saturation: -1),
+      );
+      expect(
+        RasterColor.of(const LayerColorSettings(brightness: -0.25, inverted: true)),
+        const RasterColor(brightnessMin: 0.75, brightnessMax: 0),
+      );
+    });
+
+    test('goes with every opacity change, survives reordering and is dropped on removal', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      await m.addOverlay(osm);
+      await m.addOverlay(yHybrid);
+      const inverted = LayerColorSettings(inverted: true);
+      final invertedPaint = RasterColor.of(inverted);
+      await m.setColor(osm.id, inverted);
+      expect(host.colors['osm-standard-layer'], invertedPaint);
+
+      await m.setOpacity(osm.id, 0.4);
+      expect(host.colors['osm-standard-layer'], invertedPaint);
+      await m.reorderOverlays([yHybrid.id, osm.id]);
+      expect(host.colors['osm-standard-layer'], invertedPaint);
+      expect(host.colors[LayerManager.layerIdOf(yHybrid.id)], RasterColor.none);
+
+      await m.removeOverlay(osm.id);
+      await m.addOverlay(osm);
+      expect(host.colors['osm-standard-layer'], RasterColor.none);
+    });
+
+    test('set before the overlay is added, it applies when it is added', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      await m.setColor(osm.id, const LayerColorSettings(saturation: 0));
+      await m.addOverlay(osm);
+      expect(host.colors['osm-standard-layer']!.saturation, -1);
     });
   });
 }
