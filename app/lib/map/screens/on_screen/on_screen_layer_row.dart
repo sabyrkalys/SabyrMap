@@ -5,6 +5,7 @@ import '../../models/map_models.dart';
 import '../../services/map_previews.dart';
 
 const Color _ink = Color(0xFF333333);
+const double _handleWidth = 36;
 const Color _accent = Color(0xFF00A38E);
 const TextStyle _titleStyle = TextStyle(fontSize: 16, color: Color(0xFF212121));
 const TextStyle _subtitleStyle = TextStyle(fontSize: 12, color: Color(0xFF757575));
@@ -57,11 +58,13 @@ class LayerRowBackground extends ConsumerWidget {
 /// «N % непрозрачн.»
 String opacityLabel(double opacity) => '${(opacity * 100).round()} % непрозрачн.';
 
-/// Строка наложенного слоя: глазик, имя и непрозрачность, кнопки
-/// непрозрачности и меню. Тап по строке — непрозрачность, долгий тап — меню.
+/// Строка наложенного слоя: ручка перетаскивания, глазик, имя и
+/// непрозрачность, кнопки непрозрачности и меню. Тап по строке —
+/// непрозрачность, долгий тап — меню.
 class OnScreenLayerRow extends StatelessWidget {
   const OnScreenLayerRow({
     super.key,
+    required this.index,
     required this.layer,
     required this.name,
     this.source,
@@ -70,6 +73,8 @@ class OnScreenLayerRow extends StatelessWidget {
     required this.onMenu,
   });
 
+  /// Место в [ReorderableListView] — для ручки перетаскивания.
+  final int index;
   final ActiveLayer layer;
   final String name;
   final MapSource? source;
@@ -87,6 +92,15 @@ class OnScreenLayerRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
+            ReorderableDragStartListener(
+              key: Key('layer_drag_${layer.sourceId}'),
+              index: index,
+              child: const SizedBox(
+                width: _handleWidth,
+                height: 48,
+                child: Icon(Icons.drag_handle, size: 22, color: _ink),
+              ),
+            ),
             IconButton(
               key: Key('layer_visible_${layer.sourceId}'),
               icon: Icon(layer.visible ? Icons.visibility : Icons.visibility_off, size: 22, color: _accent),
@@ -141,8 +155,7 @@ class OnScreenLayerBaseRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
-            const SizedBox(width: 48),
-            const SizedBox(width: 8),
+            const SizedBox(width: _handleWidth + 48 + 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -123,6 +123,28 @@ void main() {
     expect(find.byType(AvailableMapsScreen), findsNothing);
   });
 
+  testWidgets('dragging a layer by its ≡ handle reorders the map (top of the list = top of the map)', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    expect(find.byIcon(Icons.drag_handle), findsNWidgets(2));
+    // Сверху вниз: OSM, затем Гибрид. Тянем Гибрид за ручку наверх.
+    final handle = find.byKey(const Key('layer_drag_yandex-hybrid'));
+    final gesture = await tester.startGesture(tester.getCenter(handle));
+    await gesture.moveBy(const Offset(0, -200), timeStamp: const Duration(milliseconds: 100));
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -50));
+    await tester.pump();
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(h.state.overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
+  });
+
+  testWidgets('moving a layer down the list puts it right below its new neighbour', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    tester.widget<ReorderableListView>(find.byType(ReorderableListView)).onReorderItem!(0, 1);
+    await tester.pumpAndSettle();
+    expect(h.state.overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
+  });
+
   testWidgets('«Добавить слой» opens the catalog in overlay-picking mode', (tester) async {
     await h.pump(tester);
     expect(find.text('Добавить слой (0/3)'), findsOneWidget);

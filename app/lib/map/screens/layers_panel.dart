@@ -100,17 +100,31 @@ class LayersPanel extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Долгий тап — меню слоя; порядок — «Переместить вверх» в меню.
-                        for (final layer in shown)
-                          OnScreenLayerRow(
-                            key: ValueKey(layer.sourceId),
-                            layer: layer,
-                            name: index[layer.sourceId]?.source.name ?? layer.sourceId,
-                            source: index[layer.sourceId]?.source,
-                            onVisible: (v) => runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
-                            onOpacity: () => _openOpacity(context, layer.sourceId),
-                            onMenu: () => LayerContextMenu.show(context, layer.sourceId),
-                          ),
+                        // Порядок — ручкой ≡ (долгий тап по строке открывает меню).
+                        ReorderableListView(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          buildDefaultDragHandles: false,
+                          onReorderItem: (oldIndex, newIndex) {
+                            final order = shown.map((l) => l.sourceId).toList();
+                            order.insert(newIndex, order.removeAt(oldIndex));
+                            runLayerChange(context, () => notifier.reorderOverlays(order.reversed.toList()));
+                          },
+                          children: [
+                            for (final (i, layer) in shown.indexed)
+                              OnScreenLayerRow(
+                                key: ValueKey(layer.sourceId),
+                                index: i,
+                                layer: layer,
+                                name: index[layer.sourceId]?.source.name ?? layer.sourceId,
+                                source: index[layer.sourceId]?.source,
+                                onVisible: (v) =>
+                                    runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
+                                onOpacity: () => _openOpacity(context, layer.sourceId),
+                                onMenu: () => LayerContextMenu.show(context, layer.sourceId),
+                              ),
+                          ],
+                        ),
                         OnScreenLayerBaseRow(
                           name: index[baseId]?.source.name ?? baseId,
                           source: index[baseId]?.source,
