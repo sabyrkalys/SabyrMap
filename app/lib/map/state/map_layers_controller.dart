@@ -132,14 +132,25 @@ class MapStateNotifier extends Notifier<MapState> {
   /// Turns orthophotos on or off; remembered. Turning on re-reads the
   /// folder (new territories dropped in) and returns how many files there
   /// are; the map then calls [updateOrthophotos] for the screen.
+  /// Orthophotos added as overlays («Карты на экране») follow the switch
+  /// too: they are shown or hidden, not removed.
   Future<int> setOrthophotosOn(bool on) async {
     _publish(state.copyWith(orthophotosOn: on));
-    if (!on) {
-      await _manager?.setOrthophotos(const []);
-      return 0;
+    if (on) await ref.read(catalogProvider.notifier).reload();
+    final sources = await _orthophotoSources();
+    final manager = _manager;
+    if (manager != null) {
+      final ids = {for (final s in sources) s.id};
+      var changed = false;
+      for (final layer in manager.getActiveLayers()) {
+        if (!ids.contains(layer.sourceId) || layer.visible == on) continue;
+        await manager.setVisibility(layer.sourceId, on);
+        changed = true;
+      }
+      if (changed) _syncOverlays();
+      if (!on) await manager.setOrthophotos(const []);
     }
-    await ref.read(catalogProvider.notifier).reload();
-    return (await _orthophotoSources()).length;
+    return on ? sources.length : 0;
   }
 
   /// Puts on the map the orthophotos around [viewport] (the screen and its
@@ -165,9 +176,15 @@ class MapStateNotifier extends Notifier<MapState> {
     return result;
   }
 
+  /// An orthophoto added as an overlay turns the orthophoto switch on, so
+  /// the switch can hide it again.
   Future<void> addOverlay(MapSource source, {double? opacity}) async {
     await _requireManager().addOverlay(source, opacity: opacity);
-    _syncOverlays();
+    final isOrthophoto = (await _orthophotoSources()).any((s) => s.id == source.id);
+    _publish(state.copyWith(
+      overlays: _requireManager().getActiveLayers(),
+      orthophotosOn: state.orthophotosOn || isOrthophoto,
+    ));
   }
 
   Future<void> removeOverlay(String sourceId) async {

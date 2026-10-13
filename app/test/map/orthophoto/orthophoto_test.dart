@@ -213,5 +213,33 @@ void main() {
       await c.read(mapLayersProvider.notifier).updateOrthophotos(overDobro, 15);
       expect(host.sources.keys, contains(dobro.id));
     });
+
+    test('one added as an overlay turns the switch on; the switch hides and shows it, keeping the layer', () async {
+      final c = await attached();
+      final notifier = c.read(mapLayersProvider.notifier);
+      await notifier.addOverlay(dobro);
+      expect(c.read(mapLayersProvider).orthophotosOn, isTrue);
+      final layerId = LayerManager.layerIdOf(dobro.id);
+      expect(host.opacities[layerId], 1);
+
+      await notifier.setOrthophotosOn(false);
+      expect(c.read(mapLayersProvider).overlays.single.visible, isFalse);
+      expect(host.opacities[layerId], 0);
+      expect(host.sources.keys, contains(dobro.id), reason: 'the overlay stays, only hidden');
+
+      await notifier.setOrthophotosOn(true);
+      expect(c.read(mapLayersProvider).overlays.single.visible, isTrue);
+      expect(host.opacities[layerId], 1);
+    });
+
+    test('turning on also shows an orthophoto overlay hidden with its eye', () async {
+      final c = await attached();
+      final notifier = c.read(mapLayersProvider.notifier);
+      await notifier.setOrthophotosOn(false);
+      await notifier.addOverlay(avd);
+      await notifier.setVisibility(avd.id, false);
+      await notifier.setOrthophotosOn(true);
+      expect(c.read(mapLayersProvider).overlays.single.visible, isTrue);
+    });
   });
 }
