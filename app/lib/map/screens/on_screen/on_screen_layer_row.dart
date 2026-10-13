@@ -9,13 +9,17 @@ const Color _accent = Color(0xFF00A38E);
 const TextStyle _titleStyle = TextStyle(fontSize: 16, color: Color(0xFF212121));
 const TextStyle _subtitleStyle = TextStyle(fontSize: 12, color: Color(0xFF757575));
 
-/// Картинка карты [source] (та же, что в «Доступных картах») бледной
-/// подложкой строки; без картинки — белый фон.
+/// Карточка строки слоя с промежутком снизу: картинка карты [source]
+/// (та же, что в «Доступных картах») бледной подложкой; без картинки —
+/// белый фон.
 class LayerRowBackground extends ConsumerWidget {
   const LayerRowBackground({super.key, required this.source, required this.child});
 
   /// Сила картинки: видна карта, но текст читается.
   static const double previewOpacity = 0.35;
+
+  /// Промежуток между строками.
+  static const double gap = 8;
 
   final MapSource? source;
   final Widget child;
@@ -26,20 +30,25 @@ class LayerRowBackground extends ConsumerWidget {
     final preview = source == null ? null : ref.watch(mapPreviewProvider(source)).value;
     final asset = source?.thumbnailAsset;
     final image = preview != null ? FileImage(preview) : (asset != null ? AssetImage(asset) : null);
-    return Material(
-      color: Colors.white,
-      child: Ink(
-        decoration: image == null
-            ? null
-            : BoxDecoration(
-                image: DecorationImage(
-                  image: image as ImageProvider,
-                  fit: BoxFit.cover,
-                  opacity: previewOpacity,
-                  onError: (_, _) {},
+    return Padding(
+      padding: const EdgeInsets.only(bottom: gap),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        clipBehavior: Clip.antiAlias,
+        child: Ink(
+          decoration: image == null
+              ? null
+              : BoxDecoration(
+                  image: DecorationImage(
+                    image: image as ImageProvider,
+                    fit: BoxFit.cover,
+                    opacity: previewOpacity,
+                    onError: (_, _) {},
+                  ),
                 ),
-              ),
-        child: child,
+          child: child,
+        ),
       ),
     );
   }
@@ -70,44 +79,44 @@ class OnScreenLayerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayerRowBackground(
-        source: source,
-        child: InkWell(
-          onTap: onOpacity,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              children: [
-                IconButton(
-                  key: Key('layer_visible_${layer.sourceId}'),
-                  icon: Icon(layer.visible ? Icons.visibility : Icons.visibility_off, size: 22, color: _accent),
-                  onPressed: () => onVisible(!layer.visible),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(name, style: _titleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(opacityLabel(layer.opacity), style: _subtitleStyle),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  key: Key('layer_opacity_${layer.sourceId}'),
-                  tooltip: 'Непрозрачность',
-                  icon: const Icon(Icons.layers_outlined, size: 22, color: _ink),
-                  onPressed: onOpacity,
-                ),
-                IconButton(
-                  key: Key('layer_menu_${layer.sourceId}'),
-                  icon: const Icon(Icons.more_vert, size: 22, color: _ink),
-                  onPressed: onMenu,
-                ),
-              ],
+    source: source,
+    child: InkWell(
+      onTap: onOpacity,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            IconButton(
+              key: Key('layer_visible_${layer.sourceId}'),
+              icon: Icon(layer.visible ? Icons.visibility : Icons.visibility_off, size: 22, color: _accent),
+              onPressed: () => onVisible(!layer.visible),
             ),
-          ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, style: _titleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(opacityLabel(layer.opacity), style: _subtitleStyle),
+                ],
+              ),
+            ),
+            IconButton(
+              key: Key('layer_opacity_${layer.sourceId}'),
+              tooltip: 'Непрозрачность',
+              icon: const Icon(Icons.layers_outlined, size: 22, color: _ink),
+              onPressed: onOpacity,
+            ),
+            IconButton(
+              key: Key('layer_menu_${layer.sourceId}'),
+              icon: const Icon(Icons.more_vert, size: 22, color: _ink),
+              onPressed: onMenu,
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
 
 /// Строка базовой карты — всегда последняя; без глазика и непрозрачности:
@@ -122,33 +131,33 @@ class OnScreenLayerBaseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => LayerRowBackground(
-        key: const Key('layer_base_row'),
-        source: source,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Row(
-              children: [
-                const SizedBox(width: 48),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Базовая карта', style: _titleStyle),
-                      Text(name, style: _subtitleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  key: const Key('layer_menu_base'),
-                  icon: const Icon(Icons.more_vert, size: 22, color: _ink),
-                  onPressed: onMenu,
-                ),
-              ],
+    key: const Key('layer_base_row'),
+    source: source,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            const SizedBox(width: 48),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Базовая карта', style: _titleStyle),
+                  Text(name, style: _subtitleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
             ),
-          ),
+            IconButton(
+              key: const Key('layer_menu_base'),
+              icon: const Icon(Icons.more_vert, size: 22, color: _ink),
+              onPressed: onMenu,
+            ),
+          ],
         ),
-      );
+      ),
+    ),
+  );
 }
