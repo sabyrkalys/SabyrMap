@@ -4,6 +4,10 @@ import 'package:app/map/screens/on_screen/favorite_set_save_dialog.dart';
 import 'package:app/map/screens/on_screen/layer_context_menu.dart';
 import 'package:app/map/screens/on_screen/layer_opacity_sheet.dart';
 import 'package:app/map/services/layer_manager.dart';
+import 'dart:io';
+
+import 'package:app/map/screens/on_screen/on_screen_layer_row.dart';
+import 'package:app/map/services/map_previews.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -44,16 +48,22 @@ void main() {
     expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility_off)), findsOneWidget);
   });
 
-  testWidgets('the layers icon and a tap on the row open the opacity sheet', (tester) async {
+  testWidgets('the layers icon and a tap on the row hide the panel behind the opacity sheet; ✓ brings it back',
+      (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await tester.tap(find.byKey(const Key('layer_opacity_yandex-hybrid')));
     await tester.pumpAndSettle();
     expect(find.byType(LayerOpacitySheet), findsOneWidget);
+    expect(find.byType(LayersPanel), findsNothing);
     await tester.tap(find.byKey(const Key('opacity_done')));
     await tester.pumpAndSettle();
+    expect(find.byType(LayerOpacitySheet), findsNothing);
+    expect(find.byType(LayersPanel), findsOneWidget);
+
     await tester.tap(find.text('Яндекс Гибрид'));
     await tester.pumpAndSettle();
     expect(find.byType(LayerOpacitySheet), findsOneWidget);
+    expect(find.byType(LayersPanel), findsNothing);
   });
 
   testWidgets('three dots open the layer menu, also for the base map', (tester) async {
@@ -132,4 +142,27 @@ void main() {
     expect(find.byType(AvailableMapsScreen), findsOneWidget);
   });
 
+
+  testWidgets('rows have the map picture as a pale background; without one they stay white', (tester) async {
+    await h.pump(
+      tester,
+      saved: stateWith(const [hybridLayer, osmLayer]),
+      overrides: [
+        mapPreviewProvider.overrideWith((ref, source) async => source.id == 'osm-standard' ? null : File('/no/${source.id}.jpg')),
+      ],
+    );
+    DecorationImage? backgroundOf(Finder row) {
+      final ink = tester.widget<Ink>(find.descendant(of: row, matching: find.byType(Ink)).first);
+      return (ink.decoration as BoxDecoration?)?.image;
+    }
+
+    final rows = find.byType(LayerRowBackground);
+    final hybrid = find.ancestor(of: find.text('Яндекс Гибрид'), matching: rows);
+    final osmRow = find.ancestor(of: find.text('OSM Standard Raster'), matching: rows);
+    final base = find.byKey(const Key('layer_base_row'));
+    expect((backgroundOf(hybrid)!.image as FileImage).file.path, '/no/yandex-hybrid.jpg');
+    expect(backgroundOf(hybrid)!.opacity, LayerRowBackground.previewOpacity);
+    expect((backgroundOf(base)!.image as FileImage).file.path, '/no/ofm-liberty.jpg');
+    expect(backgroundOf(osmRow), isNull);
+  });
 }

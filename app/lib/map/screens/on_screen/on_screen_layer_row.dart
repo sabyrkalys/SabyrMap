@@ -1,11 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/map_models.dart';
+import '../../services/map_previews.dart';
 
 const Color _ink = Color(0xFF333333);
 const Color _accent = Color(0xFF00A38E);
 const TextStyle _titleStyle = TextStyle(fontSize: 16, color: Color(0xFF212121));
 const TextStyle _subtitleStyle = TextStyle(fontSize: 12, color: Color(0xFF757575));
+
+/// Картинка карты [source] (та же, что в «Доступных картах») бледной
+/// подложкой строки; без картинки — белый фон.
+class LayerRowBackground extends ConsumerWidget {
+  const LayerRowBackground({super.key, required this.source, required this.child});
+
+  /// Сила картинки: видна карта, но текст читается.
+  static const double previewOpacity = 0.35;
+
+  final MapSource? source;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final source = this.source;
+    final preview = source == null ? null : ref.watch(mapPreviewProvider(source)).value;
+    final asset = source?.thumbnailAsset;
+    final image = preview != null ? FileImage(preview) : (asset != null ? AssetImage(asset) : null);
+    return Material(
+      color: Colors.white,
+      child: Ink(
+        decoration: image == null
+            ? null
+            : BoxDecoration(
+                image: DecorationImage(
+                  image: image as ImageProvider,
+                  fit: BoxFit.cover,
+                  opacity: previewOpacity,
+                  onError: (_, _) {},
+                ),
+              ),
+        child: child,
+      ),
+    );
+  }
+}
 
 /// «N % непрозрачн.»
 String opacityLabel(double opacity) => '${(opacity * 100).round()} % непрозрачн.';
@@ -17,6 +55,7 @@ class OnScreenLayerRow extends StatelessWidget {
     super.key,
     required this.layer,
     required this.name,
+    this.source,
     required this.onVisible,
     required this.onOpacity,
     required this.onMenu,
@@ -24,13 +63,14 @@ class OnScreenLayerRow extends StatelessWidget {
 
   final ActiveLayer layer;
   final String name;
+  final MapSource? source;
   final ValueChanged<bool> onVisible;
   final VoidCallback onOpacity;
   final VoidCallback onMenu;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.white,
+  Widget build(BuildContext context) => LayerRowBackground(
+        source: source,
         child: InkWell(
           onTap: onOpacity,
           child: Padding(
@@ -73,16 +113,17 @@ class OnScreenLayerRow extends StatelessWidget {
 /// Строка базовой карты — всегда последняя; без глазика и непрозрачности:
 /// базовую карту не убрать, только сменить (тап по строке).
 class OnScreenLayerBaseRow extends StatelessWidget {
-  const OnScreenLayerBaseRow({super.key, required this.name, required this.onTap, required this.onMenu});
+  const OnScreenLayerBaseRow({super.key, required this.name, this.source, required this.onTap, required this.onMenu});
 
   final String name;
+  final MapSource? source;
   final VoidCallback onTap;
   final VoidCallback onMenu;
 
   @override
-  Widget build(BuildContext context) => Material(
+  Widget build(BuildContext context) => LayerRowBackground(
         key: const Key('layer_base_row'),
-        color: Colors.white,
+        source: source,
         child: InkWell(
           onTap: onTap,
           child: Padding(

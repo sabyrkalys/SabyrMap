@@ -10,6 +10,7 @@ import 'package:app/map/services/yandex_tiles_service.dart';
 import 'package:app/map/state/map_layers_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/map/screens/layers_panel.dart';
 import 'package:http/http.dart' as http;
@@ -87,7 +88,13 @@ class LayersHarness {
 
   MapState get state => container.read(mapLayersProvider);
 
-  Future<void> pump(WidgetTester tester, {MapState? saved, Widget? child, bool open = true}) async {
+  Future<void> pump(
+    WidgetTester tester, {
+    MapState? saved,
+    Widget? child,
+    bool open = true,
+    List<Override> overrides = const [],
+  }) async {
     tester.view.physicalSize = const Size(1080, 3000);
     tester.view.devicePixelRatio = 2.625;
     addTearDown(tester.view.reset);
@@ -98,6 +105,7 @@ class LayersHarness {
         catalogProvider.overrideWith(FixedCatalog.new),
         mapStateStoreProvider.overrideWithValue(store),
         offlineServiceProvider.overrideWithValue(OfflineService(backend: FakeOfflineBackend())),
+        ...overrides,
       ],
     );
     addTearDown(container.dispose);

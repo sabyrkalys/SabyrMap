@@ -47,6 +47,16 @@ class LayersPanel extends ConsumerWidget {
         builder: (_) => const LayersPanel(),
       );
 
+  /// Панель прячется, пока открыта шторка непрозрачности (карта видна
+  /// целиком), и возвращается, когда шторку закрыли.
+  static Future<void> _openOpacity(BuildContext context, String sourceId) async {
+    final navigator = Navigator.of(context);
+    final under = navigator.context;
+    navigator.pop();
+    await LayerOpacitySheet.show(under, sourceId);
+    if (under.mounted) await show(under);
+  }
+
   Future<void> _addLayer(BuildContext context, bool baseIsolated) async {
     if (baseIsolated) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(LayerManager.isolatedMessage)));
@@ -103,14 +113,16 @@ class LayersPanel extends ConsumerWidget {
                                 key: ValueKey(layer.sourceId),
                                 layer: layer,
                                 name: index[layer.sourceId]?.source.name ?? layer.sourceId,
+                                source: index[layer.sourceId]?.source,
                                 onVisible: (v) => runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
-                                onOpacity: () => LayerOpacitySheet.show(context, layer.sourceId),
+                                onOpacity: () => _openOpacity(context, layer.sourceId),
                                 onMenu: () => LayerContextMenu.show(context, layer.sourceId),
                               ),
                           ],
                         ),
                         OnScreenLayerBaseRow(
                           name: index[baseId]?.source.name ?? baseId,
+                          source: index[baseId]?.source,
                           onTap: () => Navigator.of(context)
                               .push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
                           onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId),

@@ -34,6 +34,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.state.overlays.single.opacity, 0.4);
     expect(h.store.saved!.overlays.single.opacity, 0.4);
+    await tester.tap(find.byKey(const Key('opacity_done')));
+    await tester.pumpAndSettle();
     expect(find.text('40 % непрозрачн.'), findsOneWidget);
   });
 
