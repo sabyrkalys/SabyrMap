@@ -109,6 +109,7 @@ class MapStateNotifier extends Notifier<MapState> {
     // Встроенная карта мира ложится под каждую карту при смене стиля; её
     // копирование из APK не задерживает показ карты.
     unawaited(_attachWorld(manager));
+    await manager.setMapVisible(state.mapVisible);
     try {
       MapSource base;
       try {
@@ -169,6 +170,12 @@ class MapStateNotifier extends Notifier<MapState> {
   /// [setOrthophotoOpacity] stores the final value.
   Future<void> previewOrthophotoOpacity(double opacity) async =>
       _manager?.setOrthophotoPaint(opacity: opacity);
+
+  /// Shows or hides the chosen map; remembered.
+  Future<void> setMapVisible(bool visible) async {
+    await _manager?.setMapVisible(visible);
+    _publish(state.copyWith(mapVisible: visible));
+  }
 
   /// Opacity of the world map while a slider is dragged; [setWorldOpacity]
   /// stores the final value.

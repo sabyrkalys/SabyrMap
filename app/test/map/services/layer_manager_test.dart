@@ -81,6 +81,15 @@ class FakeHost implements MapLayerHost {
 
   final linePaints = <String, LinePaint>{};
 
+  /// Hidden layers (any, also the style's own).
+  final hidden = <String>{};
+
+  @override
+  Future<void> setLayerVisibility(String layerId, bool visible) async {
+    calls.add('visibility $layerId $visible');
+    visible ? hidden.remove(layerId) : hidden.add(layerId);
+  }
+
   @override
   Future<void> setLinePaint(String layerId, LinePaint paint) async {
     calls.add('linePaint $layerId');
@@ -590,6 +599,26 @@ void main() {
       expect(host.opacities[layer], 0.4);
       await m.setWorldOpacity(0.8);
       expect(host.opacities[layer], 0.8);
+    });
+
+    test('hiding the map hides its style layers but the background; it stays hidden on a base change', () async {
+      final m = manager();
+      host.styleLayers = ['background', 'water', 'road-main'];
+      await m.setWorld('/w.mbtiles');
+      await m.setBaseSource(liberty);
+      await m.addOverlay(osm);
+      await m.setMapVisible(false);
+      expect(host.hidden, {'water', 'road-main'});
+      expect(m.mapVisible, isFalse);
+
+      host.hidden.clear();
+      await m.setBaseSource(ySat);
+      expect(host.hidden, {'water', 'road-main'}, reason: 'the new style is hidden too');
+      expect(host.hidden, isNot(contains(LayerManager.layerIdOf(osm.id))));
+      expect(host.hidden, isNot(contains(LayerManager.layerIdOf(LayerManager.worldSourceId))));
+
+      await m.setMapVisible(true);
+      expect(host.hidden, isEmpty);
     });
 
     test('without a file nothing is added', () async {

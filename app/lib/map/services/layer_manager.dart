@@ -40,6 +40,9 @@ abstract class MapLayerHost {
   /// resets every paint property not given, so both always go together.
   Future<void> setRasterOpacity(String layerId, double opacity, {RasterColor color = RasterColor.none});
 
+  /// Shows or hides any layer (also one that came with the style).
+  Future<void> setLayerVisibility(String layerId, bool visible);
+
   /// Changes the paint of a line layer that came with the style.
   Future<void> setLinePaint(String layerId, LinePaint paint);
 
@@ -184,6 +187,29 @@ class LayerManager {
   static const String worldSourceId = 'sabyr-world';
   String? _worldPath;
   double _worldOpacity = 1;
+
+  /// The chosen map's own layers (its style), to hide the map with
+  /// [setMapVisible]; the style background stays under the world map.
+  List<String> _styleLayerIds = const [];
+  bool _mapVisible = true;
+
+  bool get mapVisible => _mapVisible;
+
+  /// Shows or hides the chosen map: its style layers, except the background.
+  /// Overlays, orthophotos and the world map stay. Kept across base changes.
+  Future<void> setMapVisible(bool visible) => _serial(() async {
+        _mapVisible = visible;
+        await _applyMapVisible();
+      });
+
+  Future<void> _applyMapVisible() async {
+    for (final id in _styleLayerIds) {
+      if (id.contains('background')) continue;
+      try {
+        await _host.setLayerVisibility(id, _mapVisible);
+      } catch (_) {}
+    }
+  }
 
   /// Opacity and colour shared by all orthophotos.
   double _orthophotoOpacity = 1;
@@ -359,8 +385,14 @@ class LayerManager {
         final orthophotos = List.of(_orthophotos);
         await _host.setStyleAndWait(style);
         _base = source;
+        try {
+          _styleLayerIds = await _host.layerIds();
+        } catch (_) {
+          _styleLayerIds = const [];
+        }
         await _tweakRoads(style);
         await _addWorld();
+        if (!_mapVisible) await _applyMapVisible();
         _overlays.clear();
         _orthophotos.clear();
         if (_catalog.isIsolated(source.id)) {

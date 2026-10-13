@@ -14,7 +14,10 @@ const TextStyle _subtitleStyle = TextStyle(fontSize: 12, color: Color(0xFF757575
 /// (та же, что в «Доступных картах») бледной подложкой; без картинки —
 /// белый фон.
 class LayerRowBackground extends ConsumerWidget {
-  const LayerRowBackground({super.key, required this.source, required this.child});
+  const LayerRowBackground({super.key, required this.source, this.image, required this.child});
+
+  /// Своя картинка вместо картинки карты [source].
+  final ImageProvider? image;
 
   /// Сила картинки: видна карта, но текст читается.
   static const double previewOpacity = 0.35;
@@ -30,7 +33,8 @@ class LayerRowBackground extends ConsumerWidget {
     final source = this.source;
     final preview = source == null ? null : ref.watch(mapPreviewProvider(source)).value;
     final asset = source?.thumbnailAsset;
-    final image = preview != null ? FileImage(preview) : (asset != null ? AssetImage(asset) : null);
+    final image =
+        this.image ?? (preview != null ? FileImage(preview) : (asset != null ? AssetImage(asset) : null));
     return Padding(
       padding: const EdgeInsets.only(bottom: gap),
       child: Material(
@@ -42,7 +46,7 @@ class LayerRowBackground extends ConsumerWidget {
               ? null
               : BoxDecoration(
                   image: DecorationImage(
-                    image: image as ImageProvider,
+                    image: image,
                     fit: BoxFit.cover,
                     opacity: previewOpacity,
                     onError: (_, _) {},
@@ -148,9 +152,21 @@ class OnScreenLayerBaseRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.source,
+    this.image,
+    this.visible,
+    this.visibleKey,
+    this.onVisible,
     required this.onTap,
     required this.onMenu,
   });
+
+  /// Картинка подложки вместо картинки карты [source].
+  final ImageProvider? image;
+
+  /// Глазик: null — без него.
+  final bool? visible;
+  final Key? visibleKey;
+  final ValueChanged<bool>? onVisible;
 
   final Key rowKey;
   final Key menuKey;
@@ -164,6 +180,7 @@ class OnScreenLayerBaseRow extends StatelessWidget {
   Widget build(BuildContext context) => LayerRowBackground(
     key: rowKey,
     source: source,
+    image: image,
     child: InkWell(
       onTap: onTap,
       onLongPress: onMenu,
@@ -171,7 +188,16 @@ class OnScreenLayerBaseRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
-            const SizedBox(width: _handleWidth + 48 + 8),
+            const SizedBox(width: _handleWidth),
+            if (visible case final visible?)
+              IconButton(
+                key: visibleKey,
+                icon: Icon(visible ? Icons.visibility : Icons.visibility_off, size: 22, color: _accent),
+                onPressed: () => onVisible?.call(!visible),
+              )
+            else
+              const SizedBox(width: 48),
+            const SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

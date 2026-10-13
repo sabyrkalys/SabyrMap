@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../base/world_base_map.dart';
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
 import '../services/layer_manager.dart';
@@ -161,6 +162,9 @@ class LayersPanel extends ConsumerWidget {
                           title: index[baseId]?.source.name ?? baseId,
                           subtitle: 'Карта',
                           source: index[baseId]?.source,
+                          visible: state.mapVisible,
+                          visibleKey: const Key('layer_base_visible'),
+                          onVisible: (v) => runLayerChange(context, () => notifier.setMapVisible(v)),
                           onTap: () => Navigator.of(
                             context,
                           ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
@@ -172,6 +176,7 @@ class LayersPanel extends ConsumerWidget {
                           menuKey: const Key('layer_menu_world'),
                           title: 'Базовая карта',
                           subtitle: opacityLabel(state.worldOpacity),
+                          image: const AssetImage(WorldBaseMap.preview),
                           onTap: () => _openOpacity(context, MapStateNotifier.worldKey),
                           onMenu: () => LayerContextMenu.show(context, MapStateNotifier.worldKey),
                         ),

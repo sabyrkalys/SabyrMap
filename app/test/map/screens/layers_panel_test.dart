@@ -22,7 +22,7 @@ void main() {
           if (finder.evaluate().isNotEmpty) '${tester.getTopLeft(finder.first).dy}',
       ];
 
-  testWidgets('layers top → bottom, the base map last without eye and opacity buttons', (tester) async {
+  testWidgets('layers top → bottom, then the map (eye, no opacity button), then the base map', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
     expect(find.byType(LayersPanel), findsOneWidget);
     expect(find.text('Карты на экране'), findsOneWidget);
@@ -32,7 +32,9 @@ void main() {
     expect(osmY < hybridY && hybridY < baseY, isTrue, reason: rowTitles(tester).join(' '));
     expect(find.text('OpenFreeMap Liberty'), findsOneWidget);
     final baseRow = find.byKey(const Key('layer_base_row'));
-    expect(find.descendant(of: baseRow, matching: find.byIcon(Icons.visibility)), findsNothing);
+    expect(find.descendant(of: baseRow, matching: find.byIcon(Icons.visibility)), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('layer_world_row')), matching: find.byIcon(Icons.visibility)),
+        findsNothing);
     expect(find.descendant(of: baseRow, matching: find.byIcon(Icons.layers_outlined)), findsNothing);
     expect(find.descendant(of: baseRow, matching: find.byIcon(Icons.more_vert)), findsOneWidget);
   });
@@ -207,6 +209,25 @@ void main() {
     await tester.pumpAndSettle();
     expect(h.state.worldOpacity, 0.3);
     expect(h.store.saved!.worldOpacity, 0.3);
+  });
+
+  testWidgets('the map row has an eye that hides the chosen map (remembered); the base map has a picture', (tester) async {
+    await h.pump(tester);
+    final eye = find.byKey(const Key('layer_base_visible'));
+    expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility)), findsOneWidget);
+    await tester.tap(eye);
+    await tester.pumpAndSettle();
+    expect(h.state.mapVisible, isFalse);
+    expect(h.store.saved!.mapVisible, isFalse);
+    expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility_off)), findsOneWidget);
+    await tester.tap(eye);
+    await tester.pumpAndSettle();
+    expect(h.state.mapVisible, isTrue);
+
+    final ink = tester.widget<Ink>(
+      find.descendant(of: find.byKey(const Key('layer_world_row')), matching: find.byType(Ink)).first,
+    );
+    expect(((ink.decoration! as BoxDecoration).image!.image as AssetImage).assetName, 'assets/base/world_preview.jpg');
   });
 
   testWidgets('the base map menu offers only details and opacity', (tester) async {

@@ -12,6 +12,9 @@ class WorldBaseMap {
   static const String asset = 'assets/base/world.mbtiles';
   static const String fileName = 'world.mbtiles';
 
+  /// Картинка для строки «Базовая карта» (Европа — Казахстан, z3).
+  static const String preview = 'assets/base/world_preview.jpg';
+
   /// Её свойства для «Деталей».
   static const String name = 'Natural Earth';
   static const int minZoom = 0;

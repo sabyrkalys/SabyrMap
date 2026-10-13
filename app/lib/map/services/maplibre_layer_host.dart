@@ -86,6 +86,9 @@ class MapLibreLayerHost implements MapLayerHost {
         rasterSaturation: color.saturation,
       );
 
+  @override
+  Future<void> setLayerVisibility(String layerId, bool visible) => _controller.setLayerVisibility(layerId, visible);
+
   /// Every property not given here is reset to MapLibre's default, so the
   /// layout of our styles' lines (round cap and join) is repeated.
   @override
