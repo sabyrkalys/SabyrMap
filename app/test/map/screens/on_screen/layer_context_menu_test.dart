@@ -1,4 +1,7 @@
+import 'package:app/map/screens/compare/compare_mode_screen.dart';
+import 'package:app/map/screens/compare/compare_select_dialog.dart';
 import 'package:app/map/screens/layer_details/layer_details_screen.dart';
+import 'package:app/map/screens/layers_panel.dart';
 import 'package:app/map/screens/on_screen/layer_blending_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_color_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_context_menu.dart';
@@ -37,7 +40,7 @@ void main() {
       'УПОРЯДОЧИТЬ',
       'Убрать',
       'Убрать остальные',
-      'Переместить вверх',
+      'Переместить вниз',
       'ИЗМЕНИТЬ',
       'Для сохранения изменений создайте/обновите избранную карту или набор карт.',
       'Непрозрачность',
@@ -84,19 +87,48 @@ void main() {
     expect(h.state.overlays, hasLength(1));
   });
 
-  testWidgets('«Переместить вверх» is disabled for the top layer and moves a lower one up', (tester) async {
+  testWidgets('the top layer can be moved down, the others up; a single layer cannot move', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
     await openMenu(tester, 'osm-standard');
-    expect(enabled(tester, 'layer_menu_move_up'), isFalse);
-    await tester.tap(find.byKey(const Key('layer_menu_cancel')));
-    await tester.pumpAndSettle();
-
-    await openMenu(tester, 'yandex-hybrid');
-    expect(enabled(tester, 'layer_menu_move_up'), isTrue);
+    expect(find.text('Переместить вниз'), findsOneWidget);
+    expect(find.text('Переместить вверх'), findsNothing);
     await tester.tap(find.byKey(const Key('layer_menu_move_up')));
     await tester.pumpAndSettle();
     expect(h.state.overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
+    expect(find.text('Переместить вверх'), findsOneWidget, reason: 'no longer on top');
+    await tester.tap(find.byKey(const Key('layer_menu_move_up')));
+    await tester.pumpAndSettle();
+    expect(h.state.overlays.map((l) => l.sourceId), ['yandex-hybrid', 'osm-standard']);
+  });
+
+  testWidgets('a single layer cannot move', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await openMenu(tester, 'yandex-hybrid');
     expect(enabled(tester, 'layer_menu_move_up'), isFalse);
+  });
+
+  testWidgets('«Сравнить...» picks layers, closes the panel and starts the compare mode', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    await openMenu(tester, 'yandex-hybrid');
+    await tester.tap(find.byKey(const Key('layer_menu_compare')));
+    await tester.pumpAndSettle();
+    expect(find.byType(CompareSelectDialog), findsOneWidget);
+    await tester.tap(find.byKey(const Key('compare_select_osm-standard')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('compare_select_ok')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayersPanel), findsNothing);
+    expect(h.container.read(compareRequestProvider), ['osm-standard', 'yandex-hybrid']);
+  });
+
+  testWidgets('nothing to compare without layers or for the orthophotos', (tester) async {
+    await h.pump(tester);
+    await openMenu(tester, 'base');
+    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+    await tester.tap(find.byKey(const Key('layer_menu_cancel')));
+    await tester.pumpAndSettle();
+    await openMenu(tester, MapStateNotifier.orthophotosKey);
+    expect(enabled(tester, 'layer_menu_compare'), isFalse);
   });
 
   testWidgets('«Непрозрачность» opens the slider sheet', (tester) async {

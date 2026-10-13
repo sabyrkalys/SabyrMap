@@ -6,6 +6,8 @@ import '../../../explorer/sheet_menu.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../models/layer_look.dart';
 import '../../state/map_layers_controller.dart';
+import '../compare/compare_mode_screen.dart';
+import '../compare/compare_select_dialog.dart';
 import '../layer_details/layer_details_screen.dart';
 import '../layers_panel.dart';
 import 'force_refresh_dialog.dart';
@@ -72,6 +74,18 @@ class LayerContextMenu extends ConsumerWidget {
       }
     }
 
+    /// Выбор слоёв, затем режим сравнения поверх главной карты: шторки
+    /// и экраны над ней закрываются.
+    Future<void> startCompare() async {
+      final container = ProviderScope.containerOf(context, listen: false);
+      final under = navigator.context;
+      navigator.pop();
+      final ids = await CompareSelectDialog.show(under, sourceId);
+      if (ids == null || !under.mounted) return;
+      Navigator.of(under).popUntil((route) => route.isFirst);
+      container.read(compareRequestProvider.notifier).start(ids);
+    }
+
     Future<void> toggleForceRefresh() async {
       final on = !look.forceRefresh;
       if (on && !await ForceRefreshDialog.show(context)) return;
@@ -94,10 +108,8 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.compare,
           color: SheetMenuColors.accent,
           label: 'Сравнить...',
-          onTap: () {
-            debugPrint('Compare requested: $realId');
-            navigator.pop();
-          },
+          // Сравнивать есть что, когда кроме базовой карты есть хотя бы один слой.
+          onTap: !isOrthophotos && ids.isNotEmpty ? startCompare : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_force_refresh'),
@@ -132,16 +144,17 @@ class LayerContextMenu extends ConsumerWidget {
         ),
         SheetMenuItem(
           key: const Key('layer_menu_move_up'),
-          icon: Icons.arrow_upward,
+          // Верхний слой — только вниз, остальные — вверх.
+          icon: isTop ? Icons.arrow_downward : Icons.arrow_upward,
           color: SheetMenuColors.accent,
-          label: 'Переместить вверх',
-          onTap: editable && !isTop
+          label: isTop ? 'Переместить вниз' : 'Переместить вверх',
+          onTap: editable && ids.length > 1
               ? () {
                   final order = List.of(ids);
                   final i = order.indexOf(sourceId);
                   order
                     ..removeAt(i)
-                    ..insert(i + 1, sourceId);
+                    ..insert(isTop ? i - 1 : i + 1, sourceId);
                   runLayerChange(context, () => notifier.reorderOverlays(order));
                 }
               : null,

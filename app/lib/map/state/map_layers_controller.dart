@@ -203,6 +203,10 @@ class MapStateNotifier extends Notifier<MapState> {
   /// stores the final value.
   Future<void> previewOpacity(String sourceId, double opacity) => _requireManager().setOpacity(sourceId, opacity);
 
+  /// Shows or hides an overlay on the map only, without storing it (the
+  /// compare mode puts the stored visibility back on exit).
+  Future<void> previewVisibility(String sourceId, bool visible) => _requireManager().setVisibility(sourceId, visible);
+
   /// Session look of [sourceId] ([LayerLook]); the colour goes to the map.
   Future<void> setLook(String sourceId, LayerLook look) async {
     final looks = ref.read(layerLooksProvider.notifier);

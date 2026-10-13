@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_icons.dart';
 import '../map/map_screen.dart';
 import '../map/map_target.dart';
+import '../map/screens/compare/compare_mode_screen.dart';
 import '../menu/menu_panels.dart';
 import '../system_ui.dart';
 import '../widgets/app_icon.dart';
@@ -60,6 +61,18 @@ class _HomeShellState extends State<HomeShell> {
               return Stack(
                 children: [
                   const MapScreen(),
+                  // Режим сравнения слоёв: панель над нижним меню.
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: padding.bottom,
+                    child: Consumer(
+                      builder: (context, ref, _) => switch (ref.watch(compareRequestProvider)) {
+                        final ids? => CompareModeScreen(key: ValueKey(ids), layerIds: ids),
+                        null => const SizedBox.shrink(),
+                      },
+                    ),
+                  ),
                   if (openTab != null) ...[
                     // Catches the tap that closes the panel so it never
                     // reaches the map underneath.
