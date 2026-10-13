@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../base/world_base_map.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../models/map_models.dart';
 import '../../services/tile_cache_stats.dart';
@@ -29,7 +32,19 @@ class LayerDetailsScreen extends ConsumerWidget {
         builder: (_) => LayerDetailsScreen(sourceId: sourceId, groupTitle: groupTitle, layerMenuId: layerMenuId),
       ));
 
-  LayerDetailsModel? _model(List<MapProvider> providers, Map<String, LocalMapInfo> local, TileCacheStats cache) {
+  LayerDetailsModel? _model(
+    List<MapProvider> providers,
+    Map<String, LocalMapInfo> local,
+    TileCacheStats cache,
+    String? worldPath,
+  ) {
+    if (sourceId == MapStateNotifier.worldKey) {
+      final file = worldPath == null ? null : File(worldPath);
+      return LayerDetailsModelBuilder.world(
+        path: worldPath,
+        sizeBytes: file != null && file.existsSync() ? file.lengthSync() : 0,
+      );
+    }
     if (sourceId == MapStateNotifier.orthophotosKey) {
       return LayerDetailsModelBuilder.orthophotos(
         sources: [
@@ -55,7 +70,7 @@ class LayerDetailsScreen extends ConsumerWidget {
     final providers = ref.watch(catalogProvider).value ?? const <MapProvider>[];
     final local = ref.watch(localMapInfoProvider).value ?? const <String, LocalMapInfo>{};
     final cache = ref.watch(tileCacheStatsProvider).value ?? TileCacheStats.empty;
-    final model = _model(providers, local, cache);
+    final model = _model(providers, local, cache, ref.watch(worldBaseMapPathProvider).value);
     final layerMenuId = this.layerMenuId;
 
     return Scaffold(

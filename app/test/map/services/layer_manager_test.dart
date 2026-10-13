@@ -562,4 +562,41 @@ void main() {
       expect(host.colors['osm-standard-layer']!.saturation, -1);
     });
   });
+
+  group('world base map', () {
+    test('goes right above the style background on every base change; not under an isolated base', () async {
+      final m = manager();
+      host.styleLayers = ['background', 'water', 'road-main'];
+      await m.setWorld('/data/base/world.mbtiles');
+      expect(host.sources, isEmpty, reason: 'no map yet');
+
+      await m.setBaseSource(liberty);
+      expect(host.sources[LayerManager.worldSourceId], 'mbtiles:///data/base/world.mbtiles');
+      expect(host.calls, contains('addLayer ${LayerManager.layerIdOf(LayerManager.worldSourceId)} below water'));
+
+      await m.setBaseSource(ySat);
+      expect(host.sources.keys, contains(LayerManager.worldSourceId), reason: 'put back on the new style');
+
+      await m.setBaseSource(googleSat);
+      expect(host.sources.keys, isNot(contains(LayerManager.worldSourceId)));
+    });
+
+    test('opacity is kept and applied', () async {
+      final m = manager();
+      host.styleLayers = ['background'];
+      await m.setWorld('/w.mbtiles', opacity: 0.4);
+      await m.setBaseSource(liberty);
+      final layer = LayerManager.layerIdOf(LayerManager.worldSourceId);
+      expect(host.opacities[layer], 0.4);
+      await m.setWorldOpacity(0.8);
+      expect(host.opacities[layer], 0.8);
+    });
+
+    test('without a file nothing is added', () async {
+      final m = manager();
+      await m.setWorld(null);
+      await m.setBaseSource(liberty);
+      expect(host.sources.keys, isNot(contains(LayerManager.worldSourceId)));
+    });
+  });
 }

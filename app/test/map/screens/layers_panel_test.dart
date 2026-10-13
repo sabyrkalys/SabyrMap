@@ -191,6 +191,44 @@ void main() {
     expect(h.container.read(layerLooksProvider)[MapStateNotifier.orthophotosKey]!.color.inverted, isTrue);
   });
 
+  testWidgets('the built-in base map is the last row; its opacity is set and kept', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    final mapY = tester.getTopLeft(find.byKey(const Key('layer_base_row'))).dy;
+    final worldY = tester.getTopLeft(find.byKey(const Key('layer_world_row'))).dy;
+    expect(mapY < worldY, isTrue);
+    expect(find.descendant(of: find.byKey(const Key('layer_base_row')), matching: find.text('Карта')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('layer_world_row')), matching: find.text('100 % непрозрачн.')),
+        findsOneWidget);
+
+    await tester.tap(find.text('Базовая карта'));
+    await tester.pumpAndSettle();
+    expect(find.text('Непрозрачность · Базовая карта'), findsOneWidget);
+    tester.widget<Slider>(find.byKey(const Key('opacity_slider'))).onChangeEnd!(30);
+    await tester.pumpAndSettle();
+    expect(h.state.worldOpacity, 0.3);
+    expect(h.store.saved!.worldOpacity, 0.3);
+  });
+
+  testWidgets('the base map menu offers only details and opacity', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await tester.tap(find.byKey(const Key('layer_menu_world')));
+    await tester.pumpAndSettle();
+    bool enabled(String key) =>
+        tester.widget<InkWell>(find.descendant(of: find.byKey(Key(key)), matching: find.byType(InkWell)).first).onTap != null;
+    expect(enabled('layer_menu_details'), isTrue);
+    expect(enabled('layer_menu_opacity'), isTrue);
+    for (final key in [
+      'layer_menu_compare',
+      'layer_menu_remove',
+      'layer_menu_remove_others',
+      'layer_menu_move_up',
+      'layer_menu_color',
+      'layer_menu_invert',
+    ]) {
+      expect(enabled(key), isFalse, reason: key);
+    }
+  });
+
   testWidgets('«Добавить слой» opens the catalog in overlay-picking mode', (tester) async {
     await h.pump(tester);
     expect(find.text('Добавить слой (0/3)'), findsOneWidget);
@@ -208,9 +246,9 @@ void main() {
     expect(find.text(LayerManager.isolatedMessage), findsOneWidget);
   });
 
-  testWidgets('a tap on the base row opens the available maps to change it', (tester) async {
+  testWidgets('a tap on the map row opens the available maps to change it', (tester) async {
     await h.pump(tester);
-    await tester.tap(find.text('Базовая карта'));
+    await tester.tap(find.byKey(const Key('layer_base_row')));
     await tester.pumpAndSettle();
     expect(find.byType(AvailableMapsScreen), findsOneWidget);
   });

@@ -83,7 +83,7 @@ void main() {
     expect(enabled(tester, 'layer_menu_color'), isFalse);
     await tester.tap(find.byKey(const Key('layer_menu_remove_others')));
     await tester.pumpAndSettle();
-    expect(find.text('Базовая карта остаётся всегда'), findsOneWidget);
+    expect(find.text('Карта остаётся всегда — её можно только сменить'), findsOneWidget);
     expect(h.state.overlays, hasLength(1));
   });
 

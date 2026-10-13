@@ -14,7 +14,7 @@ List<({String id, String name})> compareCandidates(MapState state, List<MapProvi
   final baseId = state.baseSourceId ?? LayersPanel.defaultBaseId;
   return [
     for (final layer in state.overlays.reversed) (id: layer.sourceId, name: layerName(providers, layer.sourceId)),
-    (id: LayerContextMenu.baseId, name: '${layerName(providers, baseId)} (базовая)'),
+    (id: LayerContextMenu.baseId, name: '${layerName(providers, baseId)} (карта)'),
   ];
 }
 

@@ -81,11 +81,11 @@ class LayerFilesSection {
 
 /// Тип карты по-русски.
 String mapKindLabel(MapKind kind) => switch (kind) {
-      MapKind.scheme => 'Схема',
-      MapKind.terrain => 'Рельеф',
-      MapKind.hybrid => 'Гибрид',
-      MapKind.satellite => 'Спутник',
-    };
+  MapKind.scheme => 'Схема',
+  MapKind.terrain => 'Рельеф',
+  MapKind.hybrid => 'Гибрид',
+  MapKind.satellite => 'Спутник',
+};
 
 /// Собирает [LayerDetailsModel] из каталога и того, что лежит на телефоне.
 abstract final class LayerDetailsModelBuilder {
@@ -130,9 +130,7 @@ abstract final class LayerDetailsModelBuilder {
   static LayerFilesSection? _files(MapSource source, LocalMapInfo? local, int cachedBytes) {
     final created = local?.createdAt?.toLocal();
     String two(int v) => v.toString().padLeft(2, '0');
-    final version = created != null
-        ? '${two(created.day)}.${two(created.month)}.${created.year}'
-        : source.version;
+    final version = created != null ? '${two(created.day)}.${two(created.month)}.${created.year}' : source.version;
     if (local != null) {
       final path = local.path;
       final isFolder = local.files.length != 1 || p.basename(path ?? '') != local.files.single;
@@ -147,6 +145,26 @@ abstract final class LayerDetailsModelBuilder {
     return null;
   }
 
+  /// Встроенная карта мира под всеми картами («Базовая карта»).
+  static LayerDetailsModel world({String? path, int sizeBytes = 0}) => LayerDetailsModel(
+    displayName: 'Базовая карта',
+    groupTitle: 'Встроена в приложение',
+    info: const LayerInfoSection(
+      name: 'Базовая карта (Natural Earth)',
+      type: 'Спутник · Растр · Файл',
+      canBeAddedAsLayer: false,
+    ),
+    projection: LayerProjectionSection(
+      name: LayerProjectionSection.webMercator.name,
+      id: LayerProjectionSection.webMercator.id,
+      geoid: LayerProjectionSection.webMercator.geoid,
+      zooms: '0–5',
+    ),
+    files: path == null
+        ? null
+        : LayerFilesSection(folder: p.dirname(path), files: [p.basename(path)], size: formatBytes(sizeBytes)),
+  );
+
   /// Все ортофотопланы вместе (строка «Ортофотопланы» в «Картах на экране»).
   static LayerDetailsModel orthophotos({required List<MapSource> sources, required Map<String, LocalMapInfo> local}) {
     final infos = [for (final s in sources) local[s.id]];
@@ -156,7 +174,11 @@ abstract final class LayerDetailsModelBuilder {
       displayName: 'Ортофотопланы',
       groupTitle: 'Ортофотопланы',
       previewSource: sources.firstOrNull,
-      info: const LayerInfoSection(name: 'Ортофотопланы', type: 'Ортофотоплан · Растр · Файл', canBeAddedAsLayer: false),
+      info: const LayerInfoSection(
+        name: 'Ортофотопланы',
+        type: 'Ортофотоплан · Растр · Файл',
+        canBeAddedAsLayer: false,
+      ),
       projection: LayerProjectionSection(
         name: LayerProjectionSection.webMercator.name,
         id: LayerProjectionSection.webMercator.id,
@@ -164,7 +186,7 @@ abstract final class LayerDetailsModelBuilder {
         zooms: sources.isEmpty
             ? '—'
             : '${sources.map((s) => s.minZoom).reduce((a, b) => a < b ? a : b)}–'
-                '${sources.map((s) => s.maxZoom).reduce((a, b) => a > b ? a : b)}',
+                  '${sources.map((s) => s.maxZoom).reduce((a, b) => a > b ? a : b)}',
       ),
       files: sources.isEmpty
           ? null

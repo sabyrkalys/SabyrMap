@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../base/world_base_map.dart';
 import '../catalog/catalog_repository.dart';
 import '../models/layer_look.dart';
 import '../models/map_models.dart';
@@ -50,6 +51,9 @@ final mapStateStoreProvider = Provider<MapStateStore>((ref) => SecureMapStateSto
 class MapStateNotifier extends Notifier<MapState> {
   /// Key of all orthophotos together in [layerLooksProvider] and preset looks.
   static const String orthophotosKey = '@orthophotos';
+
+  /// The built-in world map under every map («Базовая карта»).
+  static const String worldKey = '@world';
 
   LayerManager? _manager;
   late final Future<void> _loaded;
@@ -102,6 +106,9 @@ class MapStateNotifier extends Notifier<MapState> {
     // No base chosen yet, or the saved one left the catalog (renamed server
     // maps, a deleted local file) → start on the default (our map server).
     var baseId = saved.baseSourceId ?? CatalogRepository.defaultBaseSourceId;
+    // Встроенная карта мира ложится под каждую карту при смене стиля; её
+    // копирование из APK не задерживает показ карты.
+    unawaited(_attachWorld(manager));
     try {
       MapSource base;
       try {
@@ -127,6 +134,13 @@ class MapStateNotifier extends Notifier<MapState> {
     // Orthophotos (when on) come with the first [updateOrthophotos]: only the
     // ones around the screen are put on the map.
     return result;
+  }
+
+  Future<void> _attachWorld(LayerManager manager) async {
+    try {
+      final path = await ref.read(worldBaseMapPathProvider.future);
+      if (ref.mounted && identical(_manager, manager)) await manager.setWorld(path, opacity: state.worldOpacity);
+    } catch (_) {}
   }
 
   /// Orthophotos of the catalog (mediafile/orthophoto).
@@ -155,6 +169,15 @@ class MapStateNotifier extends Notifier<MapState> {
   /// [setOrthophotoOpacity] stores the final value.
   Future<void> previewOrthophotoOpacity(double opacity) async =>
       _manager?.setOrthophotoPaint(opacity: opacity);
+
+  /// Opacity of the world map while a slider is dragged; [setWorldOpacity]
+  /// stores the final value.
+  Future<void> previewWorldOpacity(double opacity) async => _manager?.setWorldOpacity(opacity);
+
+  Future<void> setWorldOpacity(double opacity) async {
+    await _manager?.setWorldOpacity(opacity);
+    _publish(state.copyWith(worldOpacity: opacity.clamp(0.0, 1.0)));
+  }
 
   Future<void> setOrthophotoOpacity(double opacity) async {
     await _manager?.setOrthophotoPaint(opacity: opacity);

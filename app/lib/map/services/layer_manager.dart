@@ -180,6 +180,11 @@ class LayerManager {
   final List<MapSource> _orthophotos = [];
   Future<void> _tail = Future.value();
 
+  /// The built-in world map under every map ([setWorld]).
+  static const String worldSourceId = 'sabyr-world';
+  String? _worldPath;
+  double _worldOpacity = 1;
+
   /// Opacity and colour shared by all orthophotos.
   double _orthophotoOpacity = 1;
   LayerColorSettings _orthophotoColor = const LayerColorSettings();
@@ -193,6 +198,47 @@ class LayerManager {
   RasterColor _colorOf(String sourceId) {
     final settings = _colors[sourceId];
     return settings == null ? RasterColor.none : RasterColor.of(settings);
+  }
+
+  /// The world map file (.mbtiles) to lay under every map, right above the
+  /// style's background: it shows wherever the map has no tiles. Null — none.
+  Future<void> setWorld(String? mbtilesPath, {double? opacity}) => _serial(() async {
+        if (opacity != null) _worldOpacity = opacity.clamp(0.0, 1.0);
+        if (_worldPath != null && _base != null) {
+          try {
+            await _host.removeLayer(layerIdOf(worldSourceId));
+            await _host.removeSource(worldSourceId);
+          } catch (_) {}
+        }
+        _worldPath = mbtilesPath;
+        if (_base != null) await _addWorld();
+      });
+
+  Future<void> setWorldOpacity(double opacity) => _serial(() async {
+        _worldOpacity = opacity.clamp(0.0, 1.0);
+        if (_worldPath != null && _base != null) {
+          await _host.setRasterOpacity(layerIdOf(worldSourceId), _worldOpacity);
+        }
+      });
+
+  /// Cosmetic like [_tweakRoads]: a map without the world under it still works.
+  Future<void> _addWorld() async {
+    final path = _worldPath;
+    final base = _base;
+    if (path == null || base == null || _catalog.isIsolated(base.id)) return;
+    try {
+      final ids = await _host.layerIds();
+      final background = ids.indexWhere((id) => id.contains('background'));
+      final ceiling = background + 1 < ids.length ? ids[background + 1] : null;
+      await _host.addRasterSource(
+        worldSourceId,
+        tileUrl: 'mbtiles://$path',
+        tileSize: tileSize,
+        minZoom: 0,
+        maxZoom: 5,
+      );
+      await _host.addRasterLayer(worldSourceId, layerIdOf(worldSourceId), opacity: _worldOpacity, belowLayerId: ceiling);
+    } catch (_) {}
   }
 
   /// Opacity and/or colour of all orthophotos, now and for those put on
@@ -314,6 +360,7 @@ class LayerManager {
         await _host.setStyleAndWait(style);
         _base = source;
         await _tweakRoads(style);
+        await _addWorld();
         _overlays.clear();
         _orthophotos.clear();
         if (_catalog.isIsolated(source.id)) {

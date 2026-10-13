@@ -49,6 +49,8 @@ class LayerContextMenu extends ConsumerWidget {
     final isTop = onMap && ids.last == sourceId;
     // Ортофотопланы: только вид (непрозрачность, цвет); убираются кнопкой.
     final isOrthophotos = sourceId == MapStateNotifier.orthophotosKey;
+    // Встроенная карта мира: только непрозрачность.
+    final isWorld = sourceId == MapStateNotifier.worldKey;
     final editable = !_isBase && onMap;
     final lookEditable = editable || isOrthophotos;
     final navigator = Navigator.of(context);
@@ -64,7 +66,7 @@ class LayerContextMenu extends ConsumerWidget {
     Future<void> removeOthers() async {
       if (_isBase) {
         navigator.pop();
-        messenger.showSnackBar(const SnackBar(content: Text('Базовая карта остаётся всегда')));
+        messenger.showSnackBar(const SnackBar(content: Text('Карта остаётся всегда — её можно только сменить')));
         return;
       }
       if (!await showConfirmDialog(context, title: 'Убрать остальные слои?')) return;
@@ -109,7 +111,7 @@ class LayerContextMenu extends ConsumerWidget {
           color: SheetMenuColors.accent,
           label: 'Сравнить...',
           // Сравнивать есть что, когда кроме базовой карты есть хотя бы один слой.
-          onTap: !isOrthophotos && ids.isNotEmpty ? startCompare : null,
+          onTap: !isOrthophotos && !isWorld && ids.isNotEmpty ? startCompare : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_force_refresh'),
@@ -181,7 +183,7 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.layers_outlined,
           color: SheetMenuColors.edit,
           label: 'Непрозрачность',
-          onTap: lookEditable ? () => openSheet((c) => LayerOpacitySheet.show(c, sourceId)) : null,
+          onTap: lookEditable || isWorld ? () => openSheet((c) => LayerOpacitySheet.show(c, sourceId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_color'),

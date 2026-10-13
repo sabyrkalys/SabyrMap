@@ -138,19 +138,31 @@ class OnScreenLayerRow extends StatelessWidget {
   );
 }
 
-/// Строка базовой карты — всегда последняя; без глазика и непрозрачности:
-/// базовую карту не убрать, только сменить (тап по строке).
+/// Нижние строки без глазика и ручки: выбранная карта (тап — сменить её)
+/// и встроенная «Базовая карта» под ней (тап — непрозрачность).
 class OnScreenLayerBaseRow extends StatelessWidget {
-  const OnScreenLayerBaseRow({super.key, required this.name, this.source, required this.onTap, required this.onMenu});
+  const OnScreenLayerBaseRow({
+    super.key,
+    required this.rowKey,
+    required this.menuKey,
+    required this.title,
+    required this.subtitle,
+    this.source,
+    required this.onTap,
+    required this.onMenu,
+  });
 
-  final String name;
+  final Key rowKey;
+  final Key menuKey;
+  final String title;
+  final String subtitle;
   final MapSource? source;
   final VoidCallback onTap;
   final VoidCallback onMenu;
 
   @override
   Widget build(BuildContext context) => LayerRowBackground(
-    key: const Key('layer_base_row'),
+    key: rowKey,
     source: source,
     child: InkWell(
       onTap: onTap,
@@ -164,13 +176,13 @@ class OnScreenLayerBaseRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Базовая карта', style: _titleStyle),
-                  Text(name, style: _subtitleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(title, style: _titleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(subtitle, style: _subtitleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
             IconButton(
-              key: const Key('layer_menu_base'),
+              key: menuKey,
               icon: const Icon(Icons.more_vert, size: 22, color: _ink),
               onPressed: onMenu,
             ),

@@ -127,4 +127,13 @@ void main() {
     await open(tester, 'osm-standard');
     expect(find.byKey(const Key('details_menu')), findsNothing);
   });
+
+  testWidgets('the built-in base map: Natural Earth, zooms 0–5, cannot be added as a layer', (tester) async {
+    await open(tester, MapStateNotifier.worldKey);
+    expect(tester.widget<Text>(find.byKey(const Key('details_subtitle'))).data, 'Базовая карта');
+    expect(find.text('Встроена в приложение'), findsOneWidget);
+    expect(valueOf(tester, 'Имя'), 'Базовая карта (Natural Earth)');
+    expect(valueOf(tester, 'Масштабы'), '0–5');
+    expect(valueOf(tester, 'Добавить как слой'), 'Нет');
+  });
 }

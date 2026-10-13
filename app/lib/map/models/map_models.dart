@@ -299,6 +299,7 @@ class MapState {
     required this.presets,
     this.orthophotosOn = false,
     this.orthophotoOpacity = 1.0,
+    this.worldOpacity = 1.0,
   });
 
   const MapState.initial()
@@ -307,7 +308,8 @@ class MapState {
         favoriteIds = const [],
         presets = const [],
         orthophotosOn = false,
-        orthophotoOpacity = 1.0;
+        orthophotoOpacity = 1.0,
+        worldOpacity = 1.0;
 
   final String? baseSourceId;
   final List<ActiveLayer> overlays;
@@ -320,6 +322,9 @@ class MapState {
   /// Opacity shared by all orthophotos.
   final double orthophotoOpacity;
 
+  /// Opacity of the built-in world map under every map.
+  final double worldOpacity;
+
   MapState copyWith({
     String? baseSourceId,
     List<ActiveLayer>? overlays,
@@ -327,6 +332,7 @@ class MapState {
     List<MapPreset>? presets,
     bool? orthophotosOn,
     double? orthophotoOpacity,
+    double? worldOpacity,
   }) =>
       MapState(
         baseSourceId: baseSourceId ?? this.baseSourceId,
@@ -335,6 +341,7 @@ class MapState {
         presets: presets ?? this.presets,
         orthophotosOn: orthophotosOn ?? this.orthophotosOn,
         orthophotoOpacity: orthophotoOpacity ?? this.orthophotoOpacity,
+        worldOpacity: worldOpacity ?? this.worldOpacity,
       );
 
   factory MapState.fromJson(Map<String, dynamic> json) => MapState(
@@ -348,6 +355,7 @@ class MapState {
         ],
         orthophotosOn: json['orthophotosOn'] as bool? ?? false,
         orthophotoOpacity: (json['orthophotoOpacity'] as num?)?.toDouble() ?? 1.0,
+        worldOpacity: (json['worldOpacity'] as num?)?.toDouble() ?? 1.0,
       );
 
   Map<String, dynamic> toJson() => {
@@ -357,6 +365,7 @@ class MapState {
         'presets': [for (final p in presets) p.toJson()],
         if (orthophotosOn) 'orthophotosOn': true,
         if (orthophotoOpacity != 1.0) 'orthophotoOpacity': orthophotoOpacity,
+        if (worldOpacity != 1.0) 'worldOpacity': worldOpacity,
       };
 
   @override
@@ -367,7 +376,8 @@ class MapState {
       _listEquality.equals(other.favoriteIds, favoriteIds) &&
       _listEquality.equals(other.presets, presets) &&
       other.orthophotosOn == orthophotosOn &&
-      other.orthophotoOpacity == orthophotoOpacity;
+      other.orthophotoOpacity == orthophotoOpacity &&
+      other.worldOpacity == worldOpacity;
 
   @override
   int get hashCode =>
@@ -378,5 +388,6 @@ class MapState {
         Object.hashAll(presets),
         orthophotosOn,
         orthophotoOpacity,
+        worldOpacity,
       );
 }

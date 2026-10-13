@@ -53,7 +53,7 @@ void main() {
     expect(opacity('osm-standard'), 0, reason: 'not compared, still hidden');
     tester.widget<Slider>(find.byKey(const Key('compare_slider'))).onChanged!(1);
     await tester.pumpAndSettle();
-    expect(tester.widget<Text>(find.byKey(const Key('compare_current'))).data, 'OpenFreeMap Liberty (базовая)');
+    expect(tester.widget<Text>(find.byKey(const Key('compare_current'))).data, 'OpenFreeMap Liberty (карта)');
     expect(opacity('yandex-hybrid'), 0);
     expect(h.state.overlays.map((l) => l.visible), [true, false], reason: 'stored visibility is not touched');
   });

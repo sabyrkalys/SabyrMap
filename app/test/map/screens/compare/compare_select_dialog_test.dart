@@ -40,7 +40,7 @@ void main() {
     expect(find.text('Сравнить...'), findsOneWidget);
     final osmY = tester.getTopLeft(find.text('OSM Standard Raster')).dy;
     final hybridY = tester.getTopLeft(find.text('Яндекс Гибрид')).dy;
-    final baseY = tester.getTopLeft(find.text('OpenFreeMap Liberty (базовая)')).dy;
+    final baseY = tester.getTopLeft(find.text('OpenFreeMap Liberty (карта)')).dy;
     expect(osmY < hybridY && hybridY < baseY, isTrue);
     expect(find.text('Ортофотопланы'), findsNothing);
     expect(checked(tester, 'yandex-hybrid'), isTrue);
@@ -59,7 +59,7 @@ void main() {
 
   testWidgets('ОК with two or more returns their ids top → bottom', (tester) async {
     await open(tester, 'yandex-hybrid');
-    await tester.tap(find.text('OpenFreeMap Liberty (базовая)'));
+    await tester.tap(find.text('OpenFreeMap Liberty (карта)'));
     await tester.tap(find.text('OSM Standard Raster'));
     await tester.pump();
     await tester.tap(find.byKey(const Key('compare_select_ok')));

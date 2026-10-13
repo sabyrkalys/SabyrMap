@@ -21,8 +21,11 @@ Map<String, ({MapProvider provider, MapSource source})> catalogIndex(List<MapPro
 };
 
 /// Имя слоя [id] для заголовков: карта каталога или «Ортофотопланы».
-String layerName(List<MapProvider> providers, String id) =>
-    id == MapStateNotifier.orthophotosKey ? 'Ортофотопланы' : catalogIndex(providers)[id]?.source.name ?? id;
+String layerName(List<MapProvider> providers, String id) => switch (id) {
+  MapStateNotifier.orthophotosKey => 'Ортофотопланы',
+  MapStateNotifier.worldKey => 'Базовая карта',
+  _ => catalogIndex(providers)[id]?.source.name ?? id,
+};
 
 /// Выполняет изменение слоёв; отказ карты ([LayerException]) — SnackBar.
 Future<void> runLayerChange(BuildContext context, Future<void> Function() action) async {
@@ -151,13 +154,26 @@ class LayersPanel extends ConsumerWidget {
                               ),
                           ],
                         ),
+                        // Выбранная карта: под слоями, тап — сменить.
                         OnScreenLayerBaseRow(
-                          name: index[baseId]?.source.name ?? baseId,
+                          rowKey: const Key('layer_base_row'),
+                          menuKey: const Key('layer_menu_base'),
+                          title: index[baseId]?.source.name ?? baseId,
+                          subtitle: 'Карта',
                           source: index[baseId]?.source,
                           onTap: () => Navigator.of(
                             context,
                           ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
                           onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId),
+                        ),
+                        // Встроенная карта мира под всеми: видна, где у карты нет тайлов.
+                        OnScreenLayerBaseRow(
+                          rowKey: const Key('layer_world_row'),
+                          menuKey: const Key('layer_menu_world'),
+                          title: 'Базовая карта',
+                          subtitle: opacityLabel(state.worldOpacity),
+                          onTap: () => _openOpacity(context, MapStateNotifier.worldKey),
+                          onMenu: () => LayerContextMenu.show(context, MapStateNotifier.worldKey),
                         ),
                         Align(
                           alignment: Alignment.centerLeft,

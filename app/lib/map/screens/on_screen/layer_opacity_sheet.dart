@@ -17,12 +17,12 @@ class LayerOpacitySheet extends ConsumerStatefulWidget {
   final String sourceId;
 
   static Future<void> show(BuildContext context, String sourceId) => showModalBottomSheet<void>(
-        context: context,
-        backgroundColor: onScreenPanelBackground,
-        barrierColor: Colors.transparent,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        builder: (_) => LayerOpacitySheet(sourceId: sourceId),
-      );
+    context: context,
+    backgroundColor: onScreenPanelBackground,
+    barrierColor: Colors.transparent,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    builder: (_) => LayerOpacitySheet(sourceId: sourceId),
+  );
 
   @override
   ConsumerState<LayerOpacitySheet> createState() => _LayerOpacitySheetState();
@@ -35,16 +35,24 @@ class _LayerOpacitySheetState extends ConsumerState<LayerOpacitySheet> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(mapLayersProvider);
-    final isOrthophotos = widget.sourceId == MapStateNotifier.orthophotosKey;
-    final opacity = isOrthophotos
-        ? state.orthophotoOpacity
-        : state.overlays.where((l) => l.sourceId == widget.sourceId).firstOrNull?.opacity;
+    final id = widget.sourceId;
+    final opacity = switch (id) {
+      MapStateNotifier.orthophotosKey => state.orthophotoOpacity,
+      MapStateNotifier.worldKey => state.worldOpacity,
+      _ => state.overlays.where((l) => l.sourceId == id).firstOrNull?.opacity,
+    };
     final name = layerName(ref.watch(catalogProvider).value ?? const [], widget.sourceId);
     final notifier = ref.read(mapLayersProvider.notifier);
-    Future<void> preview(double v) =>
-        isOrthophotos ? notifier.previewOrthophotoOpacity(v) : notifier.previewOpacity(widget.sourceId, v);
-    Future<void> store(double v) =>
-        isOrthophotos ? notifier.setOrthophotoOpacity(v) : notifier.setOpacity(widget.sourceId, v);
+    Future<void> preview(double v) => switch (id) {
+      MapStateNotifier.orthophotosKey => notifier.previewOrthophotoOpacity(v),
+      MapStateNotifier.worldKey => notifier.previewWorldOpacity(v),
+      _ => notifier.previewOpacity(id, v),
+    };
+    Future<void> store(double v) => switch (id) {
+      MapStateNotifier.orthophotosKey => notifier.setOrthophotoOpacity(v),
+      MapStateNotifier.worldKey => notifier.setWorldOpacity(v),
+      _ => notifier.setOpacity(id, v),
+    };
     final value = (_dragging ?? opacity ?? 1.0) * 100;
 
     return SafeArea(
@@ -109,9 +117,9 @@ class _LayerOpacitySheetState extends ConsumerState<LayerOpacitySheet> {
                 onChangeEnd: opacity == null
                     ? null
                     : (v) => runLayerChange(context, () async {
-                          await store(v / 100);
-                          if (mounted) setState(() => _dragging = null);
-                        }),
+                        await store(v / 100);
+                        if (mounted) setState(() => _dragging = null);
+                      }),
               ),
             ),
           ],
