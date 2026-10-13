@@ -109,13 +109,18 @@ void main() {
     expect(find.text('Набор сохранён'), findsOneWidget);
   });
 
-  testWidgets('reordering the list reorders the layers (top of the list = top of the map)', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
-    final list = tester.widget<ReorderableListView>(find.byType(ReorderableListView));
-    // Сверху вниз: OSM (z20), затем Гибрид (z10). Гибрид — наверх.
-    list.onReorderItem!(1, 0);
+  testWidgets('a long press on a layer or on the base map opens the layer menu', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await tester.longPress(find.text('Яндекс Гибрид'));
     await tester.pumpAndSettle();
-    expect(h.state.overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
+    expect(find.byType(LayerContextMenu), findsOneWidget);
+    expect(find.byType(LayersPanel), findsOneWidget, reason: 'the menu opens over the panel');
+    await tester.tap(find.byKey(const Key('layer_menu_cancel')));
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('Базовая карта'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayerContextMenu), findsOneWidget);
+    expect(find.byType(AvailableMapsScreen), findsNothing);
   });
 
   testWidgets('«Добавить слой» opens the catalog in overlay-picking mode', (tester) async {

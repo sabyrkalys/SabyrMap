@@ -58,7 +58,7 @@ class LayerRowBackground extends ConsumerWidget {
 String opacityLabel(double opacity) => '${(opacity * 100).round()} % непрозрачн.';
 
 /// Строка наложенного слоя: глазик, имя и непрозрачность, кнопки
-/// непрозрачности и меню. Тап по строке — непрозрачность.
+/// непрозрачности и меню. Тап по строке — непрозрачность, долгий тап — меню.
 class OnScreenLayerRow extends StatelessWidget {
   const OnScreenLayerRow({
     super.key,
@@ -82,6 +82,7 @@ class OnScreenLayerRow extends StatelessWidget {
     source: source,
     child: InkWell(
       onTap: onOpacity,
+      onLongPress: onMenu,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
@@ -135,6 +136,7 @@ class OnScreenLayerBaseRow extends StatelessWidget {
     source: source,
     child: InkWell(
       onTap: onTap,
+      onLongPress: onMenu,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(

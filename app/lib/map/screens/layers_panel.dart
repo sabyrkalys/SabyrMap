@@ -16,9 +16,9 @@ const Color onScreenPanelBackground = Color(0xFFEEF1F5);
 
 /// Все источники каталога по id, с их поставщиком.
 Map<String, ({MapProvider provider, MapSource source})> catalogIndex(List<MapProvider> providers) => {
-      for (final p in providers)
-        for (final s in p.sources) s.id: (provider: p, source: s),
-    };
+  for (final p in providers)
+    for (final s in p.sources) s.id: (provider: p, source: s),
+};
 
 /// Выполняет изменение слоёв; отказ карты ([LayerException]) — SnackBar.
 Future<void> runLayerChange(BuildContext context, Future<void> Function() action) async {
@@ -40,12 +40,12 @@ class LayersPanel extends ConsumerWidget {
   static const String defaultBaseId = CatalogRepository.defaultBaseSourceId;
 
   static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black12,
-        builder: (_) => const LayersPanel(),
-      );
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black12,
+    builder: (_) => const LayersPanel(),
+  );
 
   /// Панель прячется, пока открыта шторка непрозрачности (карта видна
   /// целиком), и возвращается, когда шторку закрыли.
@@ -62,7 +62,9 @@ class LayersPanel extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text(LayerManager.isolatedMessage)));
       return;
     }
-    await Navigator.of(context).push(MaterialPageRoute<bool>(builder: (_) => const AvailableMapsScreen(pickOverlay: true)));
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<bool>(builder: (_) => const AvailableMapsScreen(pickOverlay: true)));
   }
 
   @override
@@ -98,33 +100,23 @@ class LayersPanel extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Перетаскивание — долгим нажатием на строку.
-                        ReorderableListView(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          onReorderItem: (oldIndex, newIndex) {
-                            final order = shown.map((l) => l.sourceId).toList();
-                            order.insert(newIndex, order.removeAt(oldIndex));
-                            runLayerChange(context, () => notifier.reorderOverlays(order.reversed.toList()));
-                          },
-                          children: [
-                            for (final layer in shown)
-                              OnScreenLayerRow(
-                                key: ValueKey(layer.sourceId),
-                                layer: layer,
-                                name: index[layer.sourceId]?.source.name ?? layer.sourceId,
-                                source: index[layer.sourceId]?.source,
-                                onVisible: (v) => runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
-                                onOpacity: () => _openOpacity(context, layer.sourceId),
-                                onMenu: () => LayerContextMenu.show(context, layer.sourceId),
-                              ),
-                          ],
-                        ),
+                        // Долгий тап — меню слоя; порядок — «Переместить вверх» в меню.
+                        for (final layer in shown)
+                          OnScreenLayerRow(
+                            key: ValueKey(layer.sourceId),
+                            layer: layer,
+                            name: index[layer.sourceId]?.source.name ?? layer.sourceId,
+                            source: index[layer.sourceId]?.source,
+                            onVisible: (v) => runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
+                            onOpacity: () => _openOpacity(context, layer.sourceId),
+                            onMenu: () => LayerContextMenu.show(context, layer.sourceId),
+                          ),
                         OnScreenLayerBaseRow(
                           name: index[baseId]?.source.name ?? baseId,
                           source: index[baseId]?.source,
-                          onTap: () => Navigator.of(context)
-                              .push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
+                          onTap: () => Navigator.of(
+                            context,
+                          ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
                           onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId),
                         ),
                         Align(
