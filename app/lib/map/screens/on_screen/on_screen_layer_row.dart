@@ -64,7 +64,7 @@ String opacityLabel(double opacity) => '${(opacity * 100).round()} % непро�
 class OnScreenLayerRow extends StatelessWidget {
   const OnScreenLayerRow({
     super.key,
-    required this.index,
+    this.index,
     required this.layer,
     required this.name,
     this.source,
@@ -73,8 +73,9 @@ class OnScreenLayerRow extends StatelessWidget {
     required this.onMenu,
   });
 
-  /// Место в [ReorderableListView] — для ручки перетаскивания.
-  final int index;
+  /// Место в [ReorderableListView] — для ручки перетаскивания; null —
+  /// строку не перетащить (ортофотопланы).
+  final int? index;
   final ActiveLayer layer;
   final String name;
   final MapSource? source;
@@ -92,15 +93,18 @@ class OnScreenLayerRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
-            ReorderableDragStartListener(
-              key: Key('layer_drag_${layer.sourceId}'),
-              index: index,
-              child: const SizedBox(
-                width: _handleWidth,
-                height: 48,
-                child: Icon(Icons.drag_handle, size: 22, color: _ink),
-              ),
-            ),
+            if (index case final index?)
+              ReorderableDragStartListener(
+                key: Key('layer_drag_${layer.sourceId}'),
+                index: index,
+                child: const SizedBox(
+                  width: _handleWidth,
+                  height: 48,
+                  child: Icon(Icons.drag_handle, size: 22, color: _ink),
+                ),
+              )
+            else
+              const SizedBox(width: _handleWidth),
             IconButton(
               key: Key('layer_visible_${layer.sourceId}'),
               icon: Icon(layer.visible ? Icons.visibility : Icons.visibility_off, size: 22, color: _accent),

@@ -66,11 +66,24 @@ final providers = [
   const MapProvider(id: 'osm', name: 'OpenStreetMap Maps', sources: [liberty, osm]),
   const MapProvider(id: 'google', name: 'Google Maps', isolated: true, sources: [googleSat]),
   const MapProvider(id: 'yandex', name: 'Яндекс', sources: [yHybrid, ySat]),
+  const MapProvider(id: CatalogRepository.orthophotoProviderId, name: 'Ортофотопланы', sources: [dobro]),
 ];
+
+const dobro = MapSource(
+  id: 'ortho-Доброполье.mbtiles',
+  name: 'Доброполье',
+  format: TileFormat.raster,
+  storageMode: StorageMode.offlineRegion,
+  tileUrlTemplate: 'mbtiles:///o/Доброполье.mbtiles',
+  canBeOverlay: true,
+);
 
 class FixedCatalog extends CatalogNotifier {
   @override
   Future<List<MapProvider>> build() async => providers;
+
+  @override
+  Future<void> reload() async => state = AsyncData(providers);
 }
 
 

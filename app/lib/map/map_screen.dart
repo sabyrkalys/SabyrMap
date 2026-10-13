@@ -339,7 +339,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       );
       return;
     }
-    if (on) await _updateOrthophotos();
+    // Включённые ортофотопланы ставит на карту ref.listen в build.
   }
 
   /// Ортофотопланы вокруг экрана (видимая область и соседние участки) — на
@@ -893,6 +893,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     // still has to reach this screen's own sync loop.
     ref.listen<bool>(tracksVisibilityControllerProvider, (previous, next) {
       _requestSync();
+    });
+
+    // Ортофотопланы включают кнопка и глазик в «Картах на экране».
+    ref.listen<bool>(mapLayersProvider.select((state) => state.orthophotosOn), (previous, next) {
+      if (next && previous == false) unawaited(_updateOrthophotos());
     });
 
     ref.listen<MapFocusRequest?>(mapFocusProvider, (previous, next) {

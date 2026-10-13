@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../../maps/color/layer_color_settings.dart';
+import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
 import 'google_tiles_service.dart';
 import 'hybrid_road_style.dart';
@@ -163,6 +164,7 @@ class LayerManager {
   static const int tileSize = 256;
   static const String glyphsUrl = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
   static const String isolatedMessage = 'Поверх карт Google нельзя накладывать другие карты';
+  static const String orthophotoOverlayMessage = 'Ортофотопланы включаются кнопкой ортофотопланов';
 
   final MapLayerHost _host;
   final LayerCatalog _catalog;
@@ -178,6 +180,10 @@ class LayerManager {
   final List<MapSource> _orthophotos = [];
   Future<void> _tail = Future.value();
 
+  /// Opacity and colour shared by all orthophotos.
+  double _orthophotoOpacity = 1;
+  LayerColorSettings _orthophotoColor = const LayerColorSettings();
+
   /// Colour correction of overlays, by source id; kept while the overlay is
   /// on the map (also across base changes), dropped when it is removed.
   final Map<String, LayerColorSettings> _colors = {};
@@ -188,6 +194,16 @@ class LayerManager {
     final settings = _colors[sourceId];
     return settings == null ? RasterColor.none : RasterColor.of(settings);
   }
+
+  /// Opacity and/or colour of all orthophotos, now and for those put on
+  /// the map later.
+  Future<void> setOrthophotoPaint({double? opacity, LayerColorSettings? color}) => _serial(() async {
+        if (opacity != null) _orthophotoOpacity = opacity.clamp(0.0, 1.0);
+        if (color != null) _orthophotoColor = color;
+        for (final source in _orthophotos) {
+          await _host.setRasterOpacity(layerIdOf(source.id), _orthophotoOpacity, color: RasterColor.of(_orthophotoColor));
+        }
+      });
 
   /// Colour correction of [sourceId]; for an overlay not on the map yet it
   /// applies once it is added.
@@ -253,7 +269,13 @@ class LayerManager {
         );
         // Each one right under the roads: above the overlays and the
         // orthophotos added before it.
-        await _host.addRasterLayer(source.id, layerIdOf(source.id), opacity: 1, belowLayerId: ceiling);
+        await _host.addRasterLayer(
+          source.id,
+          layerIdOf(source.id),
+          opacity: _orthophotoOpacity,
+          color: RasterColor.of(_orthophotoColor),
+          belowLayerId: ceiling,
+        );
         _orthophotos.add(source);
       } on Exception catch (e) {
         problems.add('${source.name}: $e');
@@ -403,6 +425,9 @@ class LayerManager {
     if (base != null && _catalog.isIsolated(base.id)) throw const LayerException(isolatedMessage);
     if (_catalog.isIsolated(source.id) || !source.canBeOverlay || source.format != TileFormat.raster) {
       throw LayerException('«${source.name}» нельзя добавить как слой');
+    }
+    if (_catalog.providerIdOf(source.id) == CatalogRepository.orthophotoProviderId) {
+      throw const LayerException(orthophotoOverlayMessage);
     }
     if (_overlays.any((l) => l.sourceId == source.id)) throw LayerException('Слой «${source.name}» уже добавлен');
     if (_orthophotos.any((s) => s.id == source.id)) {

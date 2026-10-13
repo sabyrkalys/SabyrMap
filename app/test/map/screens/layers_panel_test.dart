@@ -8,6 +8,7 @@ import 'dart:io';
 
 import 'package:app/map/screens/on_screen/on_screen_layer_row.dart';
 import 'package:app/map/services/map_previews.dart';
+import 'package:app/map/state/map_layers_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -143,6 +144,51 @@ void main() {
     tester.widget<ReorderableListView>(find.byType(ReorderableListView)).onReorderItem!(0, 1);
     await tester.pumpAndSettle();
     expect(h.state.overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
+  });
+
+  testWidgets('orthophotos: one row above the layers; its eye is the map switch', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    const key = MapStateNotifier.orthophotosKey;
+    expect(find.text('Ортофотопланы'), findsOneWidget);
+    expect(tester.getTopLeft(find.text('Ортофотопланы')).dy < tester.getTopLeft(find.text('Яндекс Гибрид')).dy, isTrue);
+    expect(find.byKey(const Key('layer_drag_$key')), findsNothing);
+    final eye = find.byKey(const Key('layer_visible_$key'));
+    expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility_off)), findsOneWidget);
+
+    await tester.tap(eye);
+    await tester.pumpAndSettle();
+    expect(h.state.orthophotosOn, isTrue);
+    expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility)), findsOneWidget);
+    await tester.tap(eye);
+    await tester.pumpAndSettle();
+    expect(h.state.orthophotosOn, isFalse);
+  });
+
+  testWidgets('orthophotos: the slider sets the opacity of all of them', (tester) async {
+    await h.pump(tester);
+    await tester.tap(find.text('Ортофотопланы'));
+    await tester.pumpAndSettle();
+    expect(find.text('Непрозрачность · Ортофотопланы'), findsOneWidget);
+    tester.widget<Slider>(find.byKey(const Key('opacity_slider'))).onChangeEnd!(60);
+    await tester.pumpAndSettle();
+    expect(h.state.orthophotoOpacity, 0.6);
+  });
+
+  testWidgets('orthophotos: the menu changes only their look', (tester) async {
+    await h.pump(tester);
+    await tester.tap(find.byKey(const Key('layer_menu_${MapStateNotifier.orthophotosKey}')));
+    await tester.pumpAndSettle();
+    bool enabled(String key) =>
+        tester.widget<InkWell>(find.descendant(of: find.byKey(Key(key)), matching: find.byType(InkWell)).first).onTap != null;
+    for (final key in ['layer_menu_remove', 'layer_menu_remove_others', 'layer_menu_move_up', 'layer_menu_force_refresh']) {
+      expect(enabled(key), isFalse, reason: key);
+    }
+    for (final key in ['layer_menu_details', 'layer_menu_opacity', 'layer_menu_color', 'layer_menu_invert']) {
+      expect(enabled(key), isTrue, reason: key);
+    }
+    await tester.tap(find.byKey(const Key('layer_menu_invert')));
+    await tester.pumpAndSettle();
+    expect(h.container.read(layerLooksProvider)[MapStateNotifier.orthophotosKey]!.color.inverted, isTrue);
   });
 
   testWidgets('«Добавить слой» opens the catalog in overlay-picking mode', (tester) async {

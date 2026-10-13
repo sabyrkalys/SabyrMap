@@ -48,6 +48,9 @@ final mapStateStoreProvider = Provider<MapStateStore>((ref) => SecureMapStateSto
 /// hands the manager over with [attach] once the map exists; that also puts
 /// back the stack saved in the previous run.
 class MapStateNotifier extends Notifier<MapState> {
+  /// Key of all orthophotos together in [layerLooksProvider] and preset looks.
+  static const String orthophotosKey = '@orthophotos';
+
   LayerManager? _manager;
   late final Future<void> _loaded;
 
@@ -113,7 +116,13 @@ class MapStateNotifier extends Notifier<MapState> {
     } on LayerException catch (e) {
       return LayerChangeResult([e.message]);
     }
-    final result = await manager.restoreOverlays(saved.overlays);
+    // Orthophotos added as overlays by earlier versions now belong to the
+    // orthophoto switch.
+    final orthophotoIds = {for (final s in await _orthophotoSources()) s.id};
+    final overlays = [for (final l in saved.overlays) if (!orthophotoIds.contains(l.sourceId)) l];
+    if (overlays.length != saved.overlays.length) state = state.copyWith(orthophotosOn: true);
+    await manager.setOrthophotoPaint(opacity: state.orthophotoOpacity);
+    final result = await manager.restoreOverlays(overlays);
     _syncOverlays();
     // Orthophotos (when on) come with the first [updateOrthophotos]: only the
     // ones around the screen are put on the map.
@@ -132,25 +141,24 @@ class MapStateNotifier extends Notifier<MapState> {
   /// Turns orthophotos on or off; remembered. Turning on re-reads the
   /// folder (new territories dropped in) and returns how many files there
   /// are; the map then calls [updateOrthophotos] for the screen.
-  /// Orthophotos added as overlays («Карты на экране») follow the switch
-  /// too: they are shown or hidden, not removed.
   Future<int> setOrthophotosOn(bool on) async {
     _publish(state.copyWith(orthophotosOn: on));
-    if (on) await ref.read(catalogProvider.notifier).reload();
-    final sources = await _orthophotoSources();
-    final manager = _manager;
-    if (manager != null) {
-      final ids = {for (final s in sources) s.id};
-      var changed = false;
-      for (final layer in manager.getActiveLayers()) {
-        if (!ids.contains(layer.sourceId) || layer.visible == on) continue;
-        await manager.setVisibility(layer.sourceId, on);
-        changed = true;
-      }
-      if (changed) _syncOverlays();
-      if (!on) await manager.setOrthophotos(const []);
+    if (!on) {
+      await _manager?.setOrthophotos(const []);
+      return 0;
     }
-    return on ? sources.length : 0;
+    await ref.read(catalogProvider.notifier).reload();
+    return (await _orthophotoSources()).length;
+  }
+
+  /// Opacity of all orthophotos while a slider is dragged;
+  /// [setOrthophotoOpacity] stores the final value.
+  Future<void> previewOrthophotoOpacity(double opacity) async =>
+      _manager?.setOrthophotoPaint(opacity: opacity);
+
+  Future<void> setOrthophotoOpacity(double opacity) async {
+    await _manager?.setOrthophotoPaint(opacity: opacity);
+    _publish(state.copyWith(orthophotoOpacity: opacity.clamp(0.0, 1.0)));
   }
 
   /// Puts on the map the orthophotos around [viewport] (the screen and its
@@ -176,15 +184,9 @@ class MapStateNotifier extends Notifier<MapState> {
     return result;
   }
 
-  /// An orthophoto added as an overlay turns the orthophoto switch on, so
-  /// the switch can hide it again.
   Future<void> addOverlay(MapSource source, {double? opacity}) async {
     await _requireManager().addOverlay(source, opacity: opacity);
-    final isOrthophoto = (await _orthophotoSources()).any((s) => s.id == source.id);
-    _publish(state.copyWith(
-      overlays: _requireManager().getActiveLayers(),
-      orthophotosOn: state.orthophotosOn || isOrthophoto,
-    ));
+    _syncOverlays();
   }
 
   Future<void> removeOverlay(String sourceId) async {
@@ -206,7 +208,10 @@ class MapStateNotifier extends Notifier<MapState> {
     final looks = ref.read(layerLooksProvider.notifier);
     final before = looks.of(sourceId);
     looks.put(sourceId, look);
-    if (before.color != look.color) await _requireManager().setColor(sourceId, look.color);
+    if (before.color == look.color) return;
+    sourceId == orthophotosKey
+        ? await _requireManager().setOrthophotoPaint(color: look.color)
+        : await _requireManager().setColor(sourceId, look.color);
   }
 
   Future<void> setVisibility(String sourceId, bool visible) async {
@@ -235,8 +240,9 @@ class MapStateNotifier extends Notifier<MapState> {
     for (final layer in manager.getActiveLayers()) {
       await manager.removeOverlay(layer.sourceId);
     }
+    await manager.setOrthophotoPaint(color: (preset.looks[orthophotosKey] ?? const LayerLook()).color);
     for (final entry in preset.looks.entries) {
-      await manager.setColor(entry.key, entry.value.color);
+      if (entry.key != orthophotosKey) await manager.setColor(entry.key, entry.value.color);
     }
     final result = await manager.restoreOverlays(preset.overlays);
     ref.read(layerLooksProvider.notifier).replaceAll(preset.looks);
@@ -288,10 +294,12 @@ class LayerLooksNotifier extends Notifier<Map<String, LayerLook>> {
 
   void replaceAll(Map<String, LayerLook> looks) => state = Map.unmodifiable(looks);
 
-  /// Drops the looks of overlays no longer on the map.
+  /// Drops the looks of overlays no longer on the map; the orthophotos'
+  /// look always stays.
   void retain(Set<String> sourceIds) {
-    if (state.keys.every(sourceIds.contains)) return;
-    state = {for (final e in state.entries) if (sourceIds.contains(e.key)) e.key: e.value};
+    bool keep(String id) => id == MapStateNotifier.orthophotosKey || sourceIds.contains(id);
+    if (state.keys.every(keep)) return;
+    state = {for (final e in state.entries) if (keep(e.key)) e.key: e.value};
   }
 }
 

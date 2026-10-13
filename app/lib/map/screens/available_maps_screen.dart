@@ -432,7 +432,9 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     /// MapLibre's tile cache holds for them.
     Widget card(MapSource source, {int? sizeBytes, MapSource? origin}) {
       final cached = sizeBytes == null ? tileCache.bytesOf([source.id]) : 0;
+      // Ортофотопланы — только кнопкой ортофотопланов, не слоями.
       final canOverlay = source.canBeOverlay &&
+          !source.id.startsWith(CatalogRepository.orthophotoPrefix) &&
           source.format == TileFormat.raster &&
           !isolatedIds.contains(source.id) &&
           !baseIsolated;

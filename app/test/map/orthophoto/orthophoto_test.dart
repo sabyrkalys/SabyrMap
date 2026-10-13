@@ -1,5 +1,7 @@
 import 'package:app/map/catalog/catalog_repository.dart';
+import 'package:app/map/models/layer_look.dart';
 import 'package:app/map/models/map_models.dart';
+import 'package:app/maps/color/layer_color_settings.dart';
 import 'package:app/map/orthophoto/orthophoto_extent.dart';
 import 'package:app/map/services/google_tiles_service.dart';
 import 'package:app/map/services/layer_manager.dart';
@@ -214,32 +216,54 @@ void main() {
       expect(host.sources.keys, contains(dobro.id));
     });
 
-    test('one added as an overlay turns the switch on; the switch hides and shows it, keeping the layer', () async {
+    test('an orthophoto is not added as an overlay: the switch shows it', () async {
       final c = await attached();
-      final notifier = c.read(mapLayersProvider.notifier);
-      await notifier.addOverlay(dobro);
-      expect(c.read(mapLayersProvider).orthophotosOn, isTrue);
-      final layerId = LayerManager.layerIdOf(dobro.id);
-      expect(host.opacities[layerId], 1);
-
-      await notifier.setOrthophotosOn(false);
-      expect(c.read(mapLayersProvider).overlays.single.visible, isFalse);
-      expect(host.opacities[layerId], 0);
-      expect(host.sources.keys, contains(dobro.id), reason: 'the overlay stays, only hidden');
-
-      await notifier.setOrthophotosOn(true);
-      expect(c.read(mapLayersProvider).overlays.single.visible, isTrue);
-      expect(host.opacities[layerId], 1);
+      await expectLater(
+        c.read(mapLayersProvider.notifier).addOverlay(dobro),
+        throwsA(isA<LayerException>().having((e) => e.message, 'message', LayerManager.orthophotoOverlayMessage)),
+      );
     });
 
-    test('turning on also shows an orthophoto overlay hidden with its eye', () async {
+    test('one saved as an overlay by an earlier version moves to the switch', () async {
+      const old = ActiveLayer(sourceId: 'ortho-Доброполье.mbtiles', type: MapLayerType.overlay, opacity: 1, visible: true, zIndex: 10);
+      final c = await attached(saved: const MapState(baseSourceId: null, overlays: [old], favoriteIds: [], presets: []));
+      expect(c.read(mapLayersProvider).overlays, isEmpty);
+      expect(c.read(mapLayersProvider).orthophotosOn, isTrue);
+    });
+
+    test('opacity and colour go to every orthophoto, also to ones put on the map later', () async {
       final c = await attached();
       final notifier = c.read(mapLayersProvider.notifier);
-      await notifier.setOrthophotosOn(false);
-      await notifier.addOverlay(avd);
-      await notifier.setVisibility(avd.id, false);
       await notifier.setOrthophotosOn(true);
-      expect(c.read(mapLayersProvider).overlays.single.visible, isTrue);
+      await notifier.updateOrthophotos(overDobro, 15);
+      await notifier.setOrthophotoOpacity(0.5);
+      await notifier.setLook(MapStateNotifier.orthophotosKey, const LayerLook(color: LayerColorSettings(inverted: true)));
+      final dobroLayer = LayerManager.layerIdOf(dobro.id);
+      expect(host.opacities[dobroLayer], 0.5);
+      expect(host.colors[dobroLayer]!.brightnessMin, 1);
+      expect(c.read(mapLayersProvider).orthophotoOpacity, 0.5);
+
+      const overAvd = GeoBox(west: 37.68, south: 48.10, east: 37.80, north: 48.17);
+      await notifier.updateOrthophotos(overAvd, 15);
+      final avdLayer = LayerManager.layerIdOf(avd.id);
+      expect(host.opacities[avdLayer], 0.5);
+      expect(host.colors[avdLayer]!.brightnessMin, 1);
+      expect(c.read(layerLooksProvider).keys, [MapStateNotifier.orthophotosKey], reason: 'kept with no overlays');
+    });
+
+    test('the opacity is remembered and applied after a restart', () async {
+      final c = await attached(
+        saved: const MapState(
+          baseSourceId: null,
+          overlays: [],
+          favoriteIds: [],
+          presets: [],
+          orthophotosOn: true,
+          orthophotoOpacity: 0.3,
+        ),
+      );
+      await c.read(mapLayersProvider.notifier).updateOrthophotos(overDobro, 15);
+      expect(host.opacities[LayerManager.layerIdOf(dobro.id)], 0.3);
     });
   });
 }

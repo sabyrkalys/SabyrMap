@@ -46,7 +46,7 @@ abstract class LayerLookSheetState<T extends LayerLookSheet> extends ConsumerSta
 
   @override
   Widget build(BuildContext context) {
-    final name = catalogIndex(ref.watch(catalogProvider).value ?? const [])[widget.sourceId]?.source.name ?? widget.sourceId;
+    final name = layerName(ref.watch(catalogProvider).value ?? const [], widget.sourceId);
     final look = this.look;
     final navigator = Navigator.of(context);
     return SheetMenu(

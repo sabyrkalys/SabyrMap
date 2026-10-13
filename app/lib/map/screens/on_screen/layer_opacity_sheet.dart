@@ -34,11 +34,18 @@ class _LayerOpacitySheetState extends ConsumerState<LayerOpacitySheet> {
 
   @override
   Widget build(BuildContext context) {
-    final layer = ref.watch(mapLayersProvider).overlays.where((l) => l.sourceId == widget.sourceId).firstOrNull;
-    final providers = ref.watch(catalogProvider).value ?? const [];
-    final name = catalogIndex(providers)[widget.sourceId]?.source.name ?? widget.sourceId;
+    final state = ref.watch(mapLayersProvider);
+    final isOrthophotos = widget.sourceId == MapStateNotifier.orthophotosKey;
+    final opacity = isOrthophotos
+        ? state.orthophotoOpacity
+        : state.overlays.where((l) => l.sourceId == widget.sourceId).firstOrNull?.opacity;
+    final name = layerName(ref.watch(catalogProvider).value ?? const [], widget.sourceId);
     final notifier = ref.read(mapLayersProvider.notifier);
-    final value = (_dragging ?? layer?.opacity ?? 1.0) * 100;
+    Future<void> preview(double v) =>
+        isOrthophotos ? notifier.previewOrthophotoOpacity(v) : notifier.previewOpacity(widget.sourceId, v);
+    Future<void> store(double v) =>
+        isOrthophotos ? notifier.setOrthophotoOpacity(v) : notifier.setOpacity(widget.sourceId, v);
+    final value = (_dragging ?? opacity ?? 1.0) * 100;
 
     return SafeArea(
       top: false,
@@ -93,16 +100,16 @@ class _LayerOpacitySheetState extends ConsumerState<LayerOpacitySheet> {
                 min: 0,
                 max: 100,
                 value: value.clamp(0, 100),
-                onChanged: layer == null
+                onChanged: opacity == null
                     ? null
                     : (v) {
                         setState(() => _dragging = v / 100);
-                        runLayerChange(context, () => notifier.previewOpacity(widget.sourceId, v / 100));
+                        runLayerChange(context, () => preview(v / 100));
                       },
-                onChangeEnd: layer == null
+                onChangeEnd: opacity == null
                     ? null
                     : (v) => runLayerChange(context, () async {
-                          await notifier.setOpacity(widget.sourceId, v / 100);
+                          await store(v / 100);
                           if (mounted) setState(() => _dragging = null);
                         }),
               ),

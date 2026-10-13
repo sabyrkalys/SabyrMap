@@ -20,6 +20,10 @@ Map<String, ({MapProvider provider, MapSource source})> catalogIndex(List<MapPro
     for (final s in p.sources) s.id: (provider: p, source: s),
 };
 
+/// Имя слоя [id] для заголовков: карта каталога или «Ортофотопланы».
+String layerName(List<MapProvider> providers, String id) =>
+    id == MapStateNotifier.orthophotosKey ? 'Ортофотопланы' : catalogIndex(providers)[id]?.source.name ?? id;
+
 /// Выполняет изменение слоёв; отказ карты ([LayerException]) — SnackBar.
 Future<void> runLayerChange(BuildContext context, Future<void> Function() action) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
@@ -75,6 +79,10 @@ class LayersPanel extends ConsumerWidget {
     final index = catalogIndex(providers);
     final baseId = state.baseSourceId ?? defaultBaseId;
     final baseIsolated = index[baseId]?.provider.isolated ?? false;
+    final orthophotos = [
+      for (final p in providers)
+        if (p.id == CatalogRepository.orthophotoProviderId) ...p.sources,
+    ];
     // Сверху вниз, т. е. с наибольшего zIndex.
     final shown = state.overlays.reversed.toList();
 
@@ -100,6 +108,24 @@ class LayersPanel extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // Все ортофотопланы — одна строка над слоями (на карте они
+                        // выше слоёв); глазик — та же кнопка, что на карте.
+                        if (orthophotos.isNotEmpty)
+                          OnScreenLayerRow(
+                            key: const ValueKey(MapStateNotifier.orthophotosKey),
+                            layer: ActiveLayer(
+                              sourceId: MapStateNotifier.orthophotosKey,
+                              type: MapLayerType.overlay,
+                              opacity: state.orthophotoOpacity,
+                              visible: state.orthophotosOn,
+                              zIndex: 0,
+                            ),
+                            name: 'Ортофотопланы',
+                            source: orthophotos.first,
+                            onVisible: (v) => runLayerChange(context, () => notifier.setOrthophotosOn(v)),
+                            onOpacity: () => _openOpacity(context, MapStateNotifier.orthophotosKey),
+                            onMenu: () => LayerContextMenu.show(context, MapStateNotifier.orthophotosKey),
+                          ),
                         // Порядок — ручкой ≡ (долгий тап по строке открывает меню).
                         ReorderableListView(
                           shrinkWrap: true,
