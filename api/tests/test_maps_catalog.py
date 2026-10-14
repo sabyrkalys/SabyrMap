@@ -18,11 +18,24 @@ def test_catalog_is_public_and_lists_server_maps(client, seeded):
 
     assert response.status_code == 200
     providers = response.json()["providers"]
-    assert [p["id"] for p in providers] == ["server", "server-layers"]
+    assert [p["id"] for p in providers] == ["server", "server-layers", "server-imagery"]
     assert providers[0]["name"] == "Сервер карт"
     ids = [s["id"] for s in providers[0]["sources"]]
     assert ids == ["server-hybrid-day", "server-hybrid-day-nobuildings", "server-hybrid-night", "server-vector-day",
                    "server-vector-night", "server-satellite"]
+
+
+def test_imagery_is_a_raster_map_of_its_own_group(client, seeded):
+    providers = {p["id"]: p for p in client.get("/maps").json()["providers"]}
+
+    imagery = providers["server-imagery"]
+    assert imagery["name"] == "Снимки"
+    [snapshot] = imagery["sources"]
+    assert snapshot["id"] == "server-zolotoj-kolodez"
+    assert snapshot["tileUrlTemplate"] == "https://maps.test/tiles/zolotoj-kolodez/{z}/{x}/{y}"
+    assert (snapshot["minZoom"], snapshot["maxZoom"]) == (8, 18)
+    assert snapshot["canBeOverlay"] is True
+    assert "extraParams" not in snapshot
 
 
 def test_yandex_roads_are_a_layer_only_map_of_their_own_group(client, seeded):
@@ -89,7 +102,7 @@ def test_seed_names_maps_after_the_region_and_is_idempotent(seeded):
     seed(seeded, version="v1", region="Казахстан")
 
     entries = seeded.query(MapCatalogEntry).all()
-    assert len(entries) == 7
+    assert len(entries) == 8
     hybrid = seeded.get(MapCatalogEntry, "server-hybrid-day")
     assert hybrid.name == "Казахстан · спутник + дороги"
     assert hybrid.version == "v1"

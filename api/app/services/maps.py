@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.map_catalog import MapCatalogEntry
 
-PROVIDER_NAMES = {"server": "Сервер карт", "server-layers": "Яндекс"}
+PROVIDER_NAMES = {"server": "Сервер карт", "server-layers": "Яндекс", "server-imagery": "Снимки"}
 
 # Maps that are only laid over another map (roads without imagery): the app
 # offers them as layers only.

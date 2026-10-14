@@ -35,6 +35,14 @@ _LAYERS = [
 ]
 LAYERS_PROVIDER = "server-layers"
 
+# Our own imagery (a satellite pass over one area, transparent outside it),
+# shown in the app under «Снимки»; a map or a layer over another map.
+_IMAGERY = [
+    ("server-zolotoj-kolodez", "Золотой Колодезь · снимок 19.09.2026", "zolotoj-kolodez/{z}/{x}/{y}", "raster", 8, 18,
+     True),
+]
+IMAGERY_PROVIDER = "server-imagery"
+
 
 def _strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", text))).strip()
@@ -54,7 +62,8 @@ def _attribution(entry: MapCatalogEntry) -> str | None:
 
 def seed(db: Session, *, version: str, region: str) -> list[MapCatalogEntry]:
     entries = []
-    maps = [("server", m) for m in _MAPS] + [(LAYERS_PROVIDER, m) for m in _LAYERS]
+    maps = ([("server", m) for m in _MAPS] + [(LAYERS_PROVIDER, m) for m in _LAYERS]
+            + [(IMAGERY_PROVIDER, m) for m in _IMAGERY])
     for sort, (provider, (map_id, name, style_path, fmt, min_zoom, max_zoom, overlay)) in enumerate(maps):
         entry = db.get(MapCatalogEntry, map_id) or MapCatalogEntry(id=map_id)
         entry.provider_id = provider
