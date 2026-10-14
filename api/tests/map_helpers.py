@@ -65,6 +65,23 @@ def style(name: str, *, hybrid: bool, base="http://tiles.test") -> dict:
     }
 
 
+def roads_style(base="http://tiles.test") -> dict:
+    return {
+        "version": 8,
+        "name": "roads",
+        "glyphs": f"{base}/font/{{fontstack}}/{{range}}",
+        "sources": {
+            "roads": {"type": "vector", "tiles": [f"{base}/roads/{{z}}/{{x}}/{{y}}"], "maxzoom": 17},
+            "osm": {"type": "vector", "tiles": [f"{base}/osm/{{z}}/{{x}}/{{y}}"], "maxzoom": 14},
+        },
+        "layers": [
+            {"id": "roads", "type": "line", "source": "roads", "source-layer": "roads"},
+            {"id": "roads-name", "type": "symbol", "source": "osm", "source-layer": "transportation_name",
+             "layout": {"text-field": ["get", "name"], "text-font": ["Noto Sans Regular"]}},
+        ],
+    }
+
+
 @pytest.fixture()
 def map_server(tmp_path, monkeypatch):
     """TILES_PATH with v1 archives and styles; REGIONS_PATH empty."""
@@ -81,6 +98,11 @@ def map_server(tmp_path, monkeypatch):
     )
     for name in ("hybrid-day", "hybrid-day-nobuildings", "hybrid-night", "vector-day", "vector-night"):
         (v1 / "styles" / f"{name}.json").write_text(json.dumps(style(name, hybrid=name.startswith("hybrid"))))
+    # Yandex roads layer: its own tileset plus OSM street names.
+    (v1 / "roads.pmtiles").write_bytes(
+        pmtiles_header(tile_type="mvt", max_zoom=17, bounds=OSM_BOUNDS, tile_data_length=3_000_000)
+    )
+    (v1 / "styles" / "roads.json").write_text(json.dumps(roads_style()))
     regions = tmp_path / "regions"
     regions.mkdir()
     monkeypatch.setattr(settings, "TILES_PATH", str(tiles))

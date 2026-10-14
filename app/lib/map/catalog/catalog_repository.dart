@@ -201,9 +201,10 @@ class CatalogRepository {
     );
   }
 
-  /// Карты-слои нашего сервера, разложенные отдельно от гибридов: дороги и
-  /// подписи стиля hybrid-day без спутника — только слоем поверх карты.
-  /// Пока лежат в группе «Яндекс» как пример раскладки.
+  /// Карты-слои нашего сервера: дороги Яндекса z0–17 с названиями улиц из
+  /// OSM (стиль roads) — только слоем поверх карты, в группе «Яндекс».
+  /// Встроенная копия на случай, когда каталог сервера ещё не пришёл; тот
+  /// же провайдер из каталога сервера её заменяет.
   static const String roadsProviderId = 'server-layers';
   static const String roadsSourceId = 'server-roads';
 
@@ -214,11 +215,11 @@ class CatalogRepository {
           MapSource(
             id: roadsSourceId,
             name: 'Яндекс дороги (слой)',
-            styleUrl: '$_mapServerBaseUrl/style/hybrid-day',
+            styleUrl: '$_mapServerBaseUrl/style/roads',
             format: TileFormat.vector,
             storageMode: StorageMode.onlineCache,
             minZoom: 0,
-            maxZoom: 20,
+            maxZoom: 17,
             canBeOverlay: true,
             defaultOpacity: 1,
             extraParams: const {'overlayOnly': 'true'},

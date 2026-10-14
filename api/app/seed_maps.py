@@ -27,6 +27,13 @@ _MAPS = [
     ("server-satellite", "{region} · спутник", "satellite/{z}/{x}/{y}", "raster", 0, 17, True),
 ]
 
+# Maps that are only layers over another map, under their own provider (shown
+# in the app as «Яндекс»): Yandex roads z0–17 with OSM street names.
+_LAYERS = [
+    ("server-roads", "Яндекс дороги (слой)", "style/roads", "vector", 0, 17, True),
+]
+LAYERS_PROVIDER = "server-layers"
+
 
 def _strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", "", text))).strip()
@@ -46,9 +53,10 @@ def _attribution(entry: MapCatalogEntry) -> str | None:
 
 def seed(db: Session, *, version: str, region: str) -> list[MapCatalogEntry]:
     entries = []
-    for sort, (map_id, name, style_path, fmt, min_zoom, max_zoom, overlay) in enumerate(_MAPS):
+    maps = [("server", m) for m in _MAPS] + [(LAYERS_PROVIDER, m) for m in _LAYERS]
+    for sort, (provider, (map_id, name, style_path, fmt, min_zoom, max_zoom, overlay)) in enumerate(maps):
         entry = db.get(MapCatalogEntry, map_id) or MapCatalogEntry(id=map_id)
-        entry.provider_id = "server"
+        entry.provider_id = provider
         entry.name = name.format(region=region)
         entry.style_path = style_path
         entry.format = fmt

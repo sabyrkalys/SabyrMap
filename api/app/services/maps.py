@@ -10,7 +10,11 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.map_catalog import MapCatalogEntry
 
-PROVIDER_NAMES = {"server": "Сервер карт"}
+PROVIDER_NAMES = {"server": "Сервер карт", "server-layers": "Яндекс"}
+
+# Maps that are only laid over another map (roads without imagery): the app
+# offers them as layers only.
+OVERLAY_ONLY_PROVIDERS = {"server-layers"}
 
 # A Martin tile template: ".../<source>/{z}/{x}/{y}".
 _TILE_TEMPLATE = re.compile(r"/([^/{}]+)/\{z\}/\{x\}/\{y\}$")
@@ -82,6 +86,8 @@ def _source_json(entry: MapCatalogEntry) -> dict:
         source["styleUrl"] = f"{base}/{entry.style_path}"
     else:
         source["tileUrlTemplate"] = f"{base}/{entry.style_path}"
+    if entry.provider_id in OVERLAY_ONLY_PROVIDERS:
+        source["extraParams"] = {"overlayOnly": "true"}
     return {k: v for k, v in source.items() if v is not None}
 
 

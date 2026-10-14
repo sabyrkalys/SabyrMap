@@ -18,11 +18,33 @@ def test_catalog_is_public_and_lists_server_maps(client, seeded):
 
     assert response.status_code == 200
     providers = response.json()["providers"]
-    assert [p["id"] for p in providers] == ["server"]
+    assert [p["id"] for p in providers] == ["server", "server-layers"]
     assert providers[0]["name"] == "Сервер карт"
     ids = [s["id"] for s in providers[0]["sources"]]
     assert ids == ["server-hybrid-day", "server-hybrid-day-nobuildings", "server-hybrid-night", "server-vector-day",
                    "server-vector-night", "server-satellite"]
+
+
+def test_yandex_roads_are_a_layer_only_map_of_their_own_group(client, seeded):
+    providers = {p["id"]: p for p in client.get("/maps").json()["providers"]}
+
+    layers = providers["server-layers"]
+    assert layers["name"] == "Яндекс"
+    [roads] = layers["sources"]
+    assert roads["id"] == "server-roads"
+    assert roads["name"] == "Яндекс дороги (слой)"
+    assert roads["styleUrl"] == "https://maps.test/tiles/style/roads"
+    assert roads["canBeOverlay"] is True
+    assert roads["extraParams"] == {"overlayOnly": "true"}
+    assert roads["storageMode"] == "onlineCache"
+    assert "extraParams" not in providers["server"]["sources"][0]
+
+
+def test_an_offline_region_of_the_roads_takes_their_tiles_and_the_osm_names(seeded):
+    from app.models.map_catalog import MapCatalogEntry
+    from app.services import maps
+
+    assert maps.tilesets_for(seeded.get(MapCatalogEntry, "server-roads")) == ["osm", "roads"]
 
 
 def test_catalog_matches_the_client_format(client, seeded):
@@ -66,7 +88,7 @@ def test_seed_names_maps_after_the_region_and_is_idempotent(seeded):
     seed(seeded, version="v1", region="Казахстан")
 
     entries = seeded.query(MapCatalogEntry).all()
-    assert len(entries) == 6
+    assert len(entries) == 7
     hybrid = seeded.get(MapCatalogEntry, "server-hybrid-day")
     assert hybrid.name == "Казахстан · спутник + дороги"
     assert hybrid.version == "v1"

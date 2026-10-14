@@ -367,7 +367,7 @@ void main() {
     expect(roads.name, 'Яндекс дороги (слой)');
     expect(roads.format, TileFormat.vector);
     expect(roads.canBeOverlay, isTrue);
-    expect(roads.styleUrl, endsWith('/style/hybrid-day'));
+    expect(roads.styleUrl, endsWith('/style/roads'));
     expect(roads.extraParams, {'overlayOnly': 'true'});
   });
 
