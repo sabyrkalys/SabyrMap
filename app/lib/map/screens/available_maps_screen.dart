@@ -1,5 +1,4 @@
 import 'package:collection/collection.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -245,11 +244,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         await ref.read(catalogProvider.notifier).reload();
       });
 
-  Future<void> _addMap() async {
-    final added = await showDialog<bool>(context: context, builder: (_) => const _AddMapDialog());
-    if (added == true) await ref.read(catalogProvider.notifier).reload();
-  }
-
   void _toggleGroup(String id) => setState(() => _openGroups = {..._openGroups, id: !(_openGroups[id] ?? false)});
 
   void _toggleDrawer() => setState(() {
@@ -298,7 +292,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final showAdd = !widget.pickOverlay && _section == MapsSection.available;
     // System back leaves the search first, then the screen.
     return PopScope(
       canPop: !_isSearchActive,
@@ -306,9 +299,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         if (!didPop) _exitSearch();
       },
       child: Scaffold(
-        floatingActionButton: showAdd
-            ? FloatingActionButton(key: const Key('add_map_button'), onPressed: _addMap, child: const Icon(Icons.add))
-            : null,
         body: Column(
           children: [
             MapsAppBar(
@@ -324,7 +314,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
                 children: [
                   Positioned.fill(
                     child: _section == MapsSection.available
-                        ? _mapList(bottomInset: MediaQuery.viewPaddingOf(context).bottom + (showAdd ? 88 : 16))
+                        ? _mapList(bottomInset: MediaQuery.viewPaddingOf(context).bottom + 16)
                         : const Center(
                             child: Card(
                               child: Padding(padding: EdgeInsets.all(24), child: Text('Раздел в разработке')),
@@ -816,73 +806,6 @@ class _SaveRegionDialogState extends State<_SaveRegionDialog> {
           onPressed: () => Navigator.of(context).pop(_SaveRegionRequest(_name.text.trim(), _zooms.start, _zooms.end)),
           child: const Text('Сохранить'),
         ),
-      ],
-    );
-  }
-}
-
-/// «+»: a style by URL, or a style JSON file.
-class _AddMapDialog extends ConsumerStatefulWidget {
-  const _AddMapDialog();
-
-  @override
-  ConsumerState<_AddMapDialog> createState() => _AddMapDialogState();
-}
-
-class _AddMapDialogState extends ConsumerState<_AddMapDialog> {
-  final _name = TextEditingController();
-  final _url = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _url.dispose();
-    super.dispose();
-  }
-
-  Future<void> _addUrl() async {
-    try {
-      await ref.read(catalogRepositoryProvider).addStyleUrl(name: _name.text, url: _url.text);
-      if (mounted) Navigator.of(context).pop(true);
-    } on CatalogException catch (e) {
-      setState(() => _error = e.message);
-    }
-  }
-
-  Future<void> _pickJson() async {
-    final result = await FilePicker.pickFiles(type: FileType.custom, allowedExtensions: const ['json']);
-    final path = result?.files.firstOrNull?.path;
-    if (path == null) return;
-    try {
-      await ref.read(catalogRepositoryProvider).importStyleFile(path);
-      if (mounted) Navigator.of(context).pop(true);
-    } on CatalogException catch (e) {
-      setState(() => _error = e.message);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Добавить карту'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(key: const Key('add_map_name'), controller: _name, decoration: const InputDecoration(labelText: 'Название')),
-          TextField(
-            key: const Key('add_map_url'),
-            controller: _url,
-            keyboardType: TextInputType.url,
-            decoration: InputDecoration(labelText: 'Style URL', errorText: _error),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(key: const Key('add_map_json'), onPressed: _pickJson, child: const Text('JSON-файл')),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
-        TextButton(key: const Key('add_map_confirm'), onPressed: _addUrl, child: const Text('Добавить')),
       ],
     );
   }
