@@ -70,16 +70,26 @@ void main() {
     expect(h.state.overlays.map((l) => l.sourceId), ['yandex-hybrid']);
   });
 
-  testWidgets('for the map «Убрать остальные» removes nothing and says why', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+  testWidgets('for the map «Убрать остальные» asks, then removes all the layers', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
     await openMenu(tester, 'base');
     expect(enabled(tester, 'layer_menu_remove'), isTrue);
     expect(enabled(tester, 'layer_menu_opacity'), isTrue);
     expect(enabled(tester, 'layer_menu_color'), isTrue);
     await tester.tap(find.byKey(const Key('layer_menu_remove_others')));
     await tester.pumpAndSettle();
-    expect(find.text('Карта остаётся всегда — её можно только сменить'), findsOneWidget);
-    expect(h.state.overlays, hasLength(1));
+    await tester.tap(find.byKey(const Key('confirm_dialog_ok')));
+    await tester.pumpAndSettle();
+    expect(h.state.overlays, isEmpty);
+    expect(h.state.baseSourceId, 'ofm-liberty');
+  });
+
+  testWidgets('a map alone: no «Сравнить...», «Переместить» or «Убрать остальные»', (tester) async {
+    await h.pump(tester);
+    await openMenu(tester, 'base');
+    for (final key in ['layer_menu_compare', 'layer_menu_move_up', 'layer_menu_remove_others']) {
+      expect(enabled(tester, key), isFalse, reason: key);
+    }
   });
 
   testWidgets('«Убрать» on the map removes its row; the base map and layers stay', (tester) async {
@@ -96,13 +106,13 @@ void main() {
     expect(find.text('Яндекс Гибрид'), findsOneWidget);
   });
 
-  testWidgets('without a map: remembered on the next start; a layer compares with the base map', (tester) async {
+  testWidgets('without a map: remembered on the next start; a layer alone has nothing to compare with', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer], base: LayerManager.noMapId));
     expect(h.state.baseSourceId, LayerManager.noMapId);
     expect(h.host.style, contains('"background"'));
     expect(find.byKey(const Key('layer_base_row')), findsNothing);
     await openMenu(tester, 'yandex-hybrid');
-    expect(enabled(tester, 'layer_menu_compare'), isTrue);
+    expect(enabled(tester, 'layer_menu_compare'), isFalse);
   });
 
   testWidgets('picking a map in «Доступные карты» brings its row back', (tester) async {
@@ -164,16 +174,14 @@ void main() {
     await tester.tap(find.byKey(const Key('layer_menu_compare')));
     await tester.pumpAndSettle();
     expect(find.byType(CompareSelectDialog), findsOneWidget);
-    await tester.tap(find.byKey(const Key('compare_select_osm-standard')));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('compare_select_ok')));
+        await tester.tap(find.byKey(const Key('compare_select_ok')));
     await tester.pumpAndSettle();
     expect(find.byType(LayersPanel), findsNothing);
     expect(h.container.read(compareRequestProvider), ['osm-standard', 'yandex-hybrid']);
   });
 
-  testWidgets('the map compares with the base map even without layers; not for the orthophotos', (tester) async {
-    await h.pump(tester);
+  testWidgets('the map compares with a layer; the orthophotos never', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'base');
     expect(enabled(tester, 'layer_menu_compare'), isTrue);
     await tester.tap(find.byKey(const Key('layer_menu_cancel')));

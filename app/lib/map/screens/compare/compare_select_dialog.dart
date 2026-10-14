@@ -9,15 +9,14 @@ import '../../state/map_layers_controller.dart';
 import '../layers_panel.dart';
 import '../on_screen/layer_context_menu.dart';
 
-/// Что можно сравнить: наложенные слои сверху вниз, выбранную карту
-/// ([LayerContextMenu.baseId]) и встроенную «Базовую карту»; ортофотопланы не
-/// сравниваются.
+/// Что можно сравнить: наложенные слои сверху вниз и выбранную карту
+/// ([LayerContextMenu.baseId]); ортофотопланы и базовая карта не
+/// сравниваются (на базовой нет своих сведений).
 List<({String id, String name})> compareCandidates(MapState state, List<MapProvider> providers) {
   final baseId = state.baseSourceId ?? LayersPanel.defaultBaseId;
   return [
     for (final layer in state.overlays.reversed) (id: layer.sourceId, name: layerName(providers, layer.sourceId)),
     if (baseId != LayerManager.noMapId) (id: LayerContextMenu.baseId, name: '${layerName(providers, baseId)} (карта)'),
-    (id: MapStateNotifier.worldKey, name: 'Базовая карта'),
   ];
 }
 
@@ -64,7 +63,14 @@ class CompareSelectDialog extends ConsumerStatefulWidget {
 }
 
 class _CompareSelectDialogState extends ConsumerState<CompareSelectDialog> {
-  late final Set<String> _selected = {widget.sourceId};
+  /// Этот слой и верхний из остальных.
+  late final Set<String> _selected = {
+    widget.sourceId,
+    ...compareCandidates(ref.read(mapLayersProvider), ref.read(catalogProvider).value ?? const [])
+        .map((c) => c.id)
+        .where((id) => id != widget.sourceId)
+        .take(1),
+  };
 
   @override
   Widget build(BuildContext context) {

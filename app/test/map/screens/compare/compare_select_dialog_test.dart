@@ -35,7 +35,8 @@ void main() {
       .widget<Checkbox>(find.descendant(of: find.byKey(Key('compare_select_$id')), matching: find.byType(Checkbox)))
       .value!;
 
-  testWidgets('every layer top → bottom and the base map; no orthophotos; only the source is ticked', (tester) async {
+  testWidgets('layers top → bottom and the map; no orthophotos or base map; the source and the top one are ticked',
+      (tester) async {
     await open(tester, 'yandex-hybrid');
     expect(find.text('Сравнить...'), findsOneWidget);
     final osmY = tester.getTopLeft(find.text('OSM Standard Raster')).dy;
@@ -43,13 +44,16 @@ void main() {
     final baseY = tester.getTopLeft(find.text('OpenFreeMap Liberty (карта)')).dy;
     expect(osmY < hybridY && hybridY < baseY, isTrue);
     expect(find.text('Ортофотопланы'), findsNothing);
+    expect(find.text('Базовая карта'), findsNothing);
     expect(checked(tester, 'yandex-hybrid'), isTrue);
-    expect(checked(tester, 'osm-standard'), isFalse);
+    expect(checked(tester, 'osm-standard'), isTrue);
     expect(checked(tester, LayerContextMenu.baseId), isFalse);
   });
 
   testWidgets('ОК with one layer says so and stays open', (tester) async {
     await open(tester, 'yandex-hybrid');
+    await tester.tap(find.text('OSM Standard Raster'));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('compare_select_ok')));
     await tester.pumpAndSettle();
     expect(find.text('Выберите хотя бы 2 слоя'), findsOneWidget);
@@ -60,7 +64,6 @@ void main() {
   testWidgets('ОК with two or more returns their ids top → bottom', (tester) async {
     await open(tester, 'yandex-hybrid');
     await tester.tap(find.text('OpenFreeMap Liberty (карта)'));
-    await tester.tap(find.text('OSM Standard Raster'));
     await tester.pump();
     await tester.tap(find.byKey(const Key('compare_select_ok')));
     await tester.pumpAndSettle();

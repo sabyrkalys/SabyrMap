@@ -68,7 +68,6 @@ class LayerContextMenu extends ConsumerWidget {
     final editable = !_isBase && onMap;
     final lookEditable = editable || isOrthophotos || (_isBase && hasMap);
     final navigator = Navigator.of(context);
-    final messenger = ScaffoldMessenger.of(context);
 
     /// Закрывает меню и открывает под-шторку над тем же экраном.
     void openSheet(Future<void> Function(BuildContext context) open) {
@@ -87,12 +86,8 @@ class LayerContextMenu extends ConsumerWidget {
       if (under.mounted) await LayersPanel.show(under);
     }
 
+    /// У слоя — убрать другие слои, у карты — все слои.
     Future<void> removeOthers() async {
-      if (_isBase) {
-        navigator.pop();
-        messenger.showSnackBar(const SnackBar(content: Text('Карта остаётся всегда — её можно только сменить')));
-        return;
-      }
       if (!await showConfirmDialog(context, title: 'Убрать остальные слои?')) return;
       navigator.pop();
       for (final id in ids.where((id) => id != sourceId)) {
@@ -135,7 +130,8 @@ class LayerContextMenu extends ConsumerWidget {
           color: SheetMenuColors.accent,
           label: 'Сравнить...',
           // Всегда есть с чем сравнить: хотя бы с «Базовой картой».
-          onTap: !isOrthophotos && !isWorld && !noMap ? startCompare : null,
+          // Сравнивают слои и карту между собой; одной карте сравнивать не с чем.
+          onTap: movable ? startCompare : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_force_refresh'),
@@ -170,7 +166,8 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.layers_clear,
           color: SheetMenuColors.accent,
           label: 'Убрать остальные',
-          onTap: _isBase || (onMap && ids.length > 1) ? removeOthers : null,
+          // Есть что убирать: у карты — хоть один слой, у слоя — другие слои.
+          onTap: (_isBase && hasMap && ids.isNotEmpty) || (onMap && ids.length > 1) ? removeOthers : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_move_up'),
