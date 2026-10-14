@@ -30,6 +30,7 @@ import 'point_info_sheet.dart';
 import 'prefetch/neighbor_prefetcher.dart';
 import 'services/google_tiles_service.dart';
 import 'services/layer_manager.dart';
+import 'services/style_cache.dart';
 import 'services/maplibre_layer_host.dart';
 import 'services/yandex_tiles_service.dart';
 import 'state/map_layers_controller.dart';
@@ -317,6 +318,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       catalog: LayerCatalog(providers),
       google: ref.read(googleTilesServiceProvider),
       yandex: ref.read(yandexTilesServiceProvider),
+      fetchText: ref.read(styleCacheProvider).fetch,
     );
     final result = await ref.read(mapLayersProvider.notifier).attach(manager);
     if (!result.ok && mounted) {
