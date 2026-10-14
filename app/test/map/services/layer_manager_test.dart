@@ -5,9 +5,13 @@ import 'package:app/map/models/map_models.dart';
 import 'package:app/maps/color/layer_color_settings.dart';
 import 'package:app/map/services/google_tiles_service.dart';
 import 'package:app/map/services/hybrid_road_style.dart';
+import 'dart:convert' as convert;
+
 import 'package:app/map/services/layer_manager.dart';
 import 'package:app/map/services/yandex_tiles_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'vector_overlay_test.dart' show hybridStyle;
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
@@ -83,6 +87,30 @@ class FakeHost implements MapLayerHost {
 
   /// Hidden layers (any, also the style's own).
   final hidden = <String>{};
+
+  /// Style-JSON layers added or re-set, by id.
+  final styleLayers_ = <String, Map<String, dynamic>>{};
+
+  @override
+  Future<void> addStyleSource(String sourceId, Map<String, dynamic> source) async {
+    calls.add('addStyleSource $sourceId');
+    sources[sourceId] = '${source['url'] ?? (source['tiles'] as List?)?.first}';
+  }
+
+  @override
+  Future<void> addStyleLayer(Map<String, dynamic> layer, {String? belowLayerId}) async {
+    final layerId = layer['id'] as String;
+    calls.add('addStyleLayer $layerId below ${belowLayerId ?? 'top'}');
+    final index = belowLayerId == null ? -1 : layers.indexOf(belowLayerId);
+    index == -1 ? layers.add(layerId) : layers.insert(index, layerId);
+    styleLayers_[layerId] = layer;
+  }
+
+  @override
+  Future<void> setStyleLayerProperties(Map<String, dynamic> layer) async {
+    calls.add('styleLayer ${layer['id']}');
+    styleLayers_[layer['id'] as String] = layer;
+  }
 
   @override
   Future<void> setLayerVisibility(String layerId, bool visible) async {
@@ -626,6 +654,70 @@ void main() {
       await m.setWorld(null);
       await m.setBaseSource(liberty);
       expect(host.sources.keys, isNot(contains(LayerManager.worldSourceId)));
+    });
+  });
+
+  group('vector overlay', () {
+    const roads = MapSource(
+      id: 'server-roads',
+      name: 'Дороги',
+      styleUrl: 'https://t/style/hybrid-day',
+      format: TileFormat.vector,
+      storageMode: StorageMode.onlineCache,
+      canBeOverlay: true,
+    );
+
+    LayerManager vectorManager() => LayerManager(
+          host: host,
+          catalog: LayerCatalog([
+            const MapProvider(id: 'osm', name: 'OSM', sources: [liberty, osm]),
+            const MapProvider(id: 'server-layers', name: 'Слои', sources: [roads]),
+          ]),
+          google: GoogleTilesService(apiKey: '', httpClient: MockClient((_) async => http.Response('', 500))),
+          yandex: YandexTilesService(apiKey: '', httpClient: MockClient((_) async => http.Response('', 500))),
+          fetchText: (url) async {
+            expect(url.toString(), 'https://t/style/hybrid-day');
+            return convert.jsonEncode(hybridStyle);
+          },
+        );
+
+    test('lays its roads and labels under the annotations, without its background and imagery', () async {
+      final m = vectorManager();
+      await m.setBaseSource(liberty);
+      await m.addOverlay(roads);
+      expect(host.sources.keys, contains('server-roads~osm'));
+      expect(host.sources.keys, isNot(contains('server-roads~satellite')));
+      expect(host.layers, ['server-roads~building', 'server-roads~road-main', 'server-roads~place-label']);
+      expect(host.calls, contains('addStyleLayer server-roads~road-main below lines_0'));
+      expect(m.getActiveLayers().single.sourceId, 'server-roads');
+    });
+
+    test('opacity scales each layer; the eye hides them; removing takes all of it away', () async {
+      final m = vectorManager();
+      await m.setBaseSource(liberty);
+      await m.addOverlay(roads);
+      await m.setOpacity(roads.id, 0.5);
+      expect((host.styleLayers_['server-roads~building']!['paint'] as Map)['fill-opacity'], 0.25);
+      await m.setVisibility(roads.id, false);
+      expect(host.hidden, {'server-roads~building', 'server-roads~road-main', 'server-roads~place-label'});
+      await m.removeOverlay(roads.id);
+      expect(host.layers, isEmpty);
+      expect(host.sources.keys, isNot(contains('server-roads~osm')));
+    });
+
+    test('reorders with raster overlays and comes back after a base change', () async {
+      final m = vectorManager();
+      await m.setBaseSource(liberty);
+      await m.addOverlay(roads);
+      await m.addOverlay(osm);
+      expect(host.layers.last, LayerManager.layerIdOf(osm.id));
+      await m.reorderOverlays([osm.id, roads.id]);
+      expect(host.layers.first, LayerManager.layerIdOf(osm.id));
+      expect(host.layers.last, 'server-roads~place-label');
+
+      await m.setBaseSource(liberty);
+      expect(host.layers.first, LayerManager.layerIdOf(osm.id));
+      expect(host.layers.last, 'server-roads~place-label');
     });
   });
 }

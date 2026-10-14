@@ -30,6 +30,8 @@ class MapGroup {
   'osm' => ('osm', 'OPENSTREETMAP'),
   CatalogRepository.serverProviderId || 'google' => ('google', 'GOOGLE MAPS'),
   CatalogRepository.localProviderId => (ownGroupId, ownGroupTitle),
+  // Слои нашего сервера (дороги без спутника) пока показаны как пример в «Яндексе».
+  CatalogRepository.roadsProviderId || 'yandex' => ('yandex', 'ЯНДЕКС'),
   _ => (provider.id, provider.name.toUpperCase()),
 };
 

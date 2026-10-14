@@ -34,6 +34,9 @@ import 'available_maps/storage_bar.dart';
 export '../../format_bytes.dart' show formatBytes;
 
 /// 🌐 online only / 💾 cache / 📦 offline file.
+/// Карта, которую можно только наложить слоем (дороги без спутника).
+bool isOverlayOnly(MapSource source) => source.extraParams?['overlayOnly'] == 'true';
+
 String storageModeLabel(StorageMode mode) => switch (mode) {
       StorageMode.onlineOnly => '🌐 Онлайн',
       StorageMode.onlineCache => '💾 Кэш',
@@ -323,6 +326,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
       favorite: favorite,
       canOverlay: canOverlay,
       canClearCache: canClearCache,
+      canShow: !isOverlayOnly(source),
     );
     if (action == null || !mounted) return;
     switch (action) {
@@ -425,7 +429,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
       // Ортофотопланы — только кнопкой ортофотопланов, не слоями.
       final canOverlay = source.canBeOverlay &&
           !source.id.startsWith(CatalogRepository.orthophotoPrefix) &&
-          source.format == TileFormat.raster &&
           !isolatedIds.contains(source.id) &&
           !baseIsolated;
       final favorite = mapState.favoriteIds.contains(source.id);
@@ -438,7 +441,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         favorite: favorite,
         selected: mapState.baseSourceId == source.id,
         pickOverlay: widget.pickOverlay,
-        onTap: widget.pickOverlay ? () => _addOverlay(source) : () => _show(source),
+        onTap: widget.pickOverlay || isOverlayOnly(source) ? () => _addOverlay(source) : () => _show(source),
         onMenu: () => _openCardMenu(
           source,
           active: mapState.baseSourceId == source.id || mapState.overlays.any((o) => o.sourceId == source.id),

@@ -87,6 +87,49 @@ class MapLibreLayerHost implements MapLayerHost {
       );
 
   @override
+  Future<void> addStyleSource(String sourceId, Map<String, dynamic> source) =>
+      _controller.addSource(sourceId, VectorSourceProperties.fromJson(source));
+
+  /// The style JSON's layout and paint, flattened as maplibre_gl wants them.
+  static LayerProperties? _properties(Map<String, dynamic> layer) {
+    final json = <String, dynamic>{
+      ...?(layer['layout'] as Map<String, dynamic>?),
+      ...?(layer['paint'] as Map<String, dynamic>?),
+    };
+    return switch (layer['type']) {
+      'line' => LineLayerProperties.fromJson(json),
+      'symbol' => SymbolLayerProperties.fromJson(json),
+      'fill' => FillLayerProperties.fromJson(json),
+      'circle' => CircleLayerProperties.fromJson(json),
+      'fill-extrusion' => FillExtrusionLayerProperties.fromJson(json),
+      _ => null,
+    };
+  }
+
+  @override
+  Future<void> addStyleLayer(Map<String, dynamic> layer, {String? belowLayerId}) async {
+    final properties = _properties(layer);
+    if (properties == null) return;
+    await _controller.addLayer(
+      layer['source'] as String,
+      layer['id'] as String,
+      properties,
+      belowLayerId: belowLayerId,
+      enableInteraction: false,
+      sourceLayer: layer['source-layer'] as String?,
+      minzoom: (layer['minzoom'] as num?)?.toDouble(),
+      maxzoom: (layer['maxzoom'] as num?)?.toDouble(),
+      filter: layer['filter'],
+    );
+  }
+
+  @override
+  Future<void> setStyleLayerProperties(Map<String, dynamic> layer) async {
+    final properties = _properties(layer);
+    if (properties != null) await _controller.setLayerProperties(layer['id'] as String, properties);
+  }
+
+  @override
   Future<void> setLayerVisibility(String layerId, bool visible) => _controller.setLayerVisibility(layerId, visible);
 
   /// Every property not given here is reset to MapLibre's default, so the

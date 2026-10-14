@@ -112,7 +112,7 @@ abstract final class LayerDetailsModelBuilder {
         name: source.name,
         type: [kind, source.format == TileFormat.raster ? 'Растр' : 'Вектор', isFile ? 'Файл' : 'Онлайн'].join(' · '),
         canBeAddedAsLayer:
-            source.canBeOverlay && source.format == TileFormat.raster && !provider.isolated && !isOrthophoto,
+            source.canBeOverlay && !provider.isolated && !isOrthophoto,
       ),
       projection: LayerProjectionSection(
         name: LayerProjectionSection.webMercator.name,

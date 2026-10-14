@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:app/map/catalog/catalog_repository.dart';
 import 'package:app/map/models/map_models.dart';
 import 'package:app/map/regions/server_region_service.dart' show StorageInfo;
@@ -27,6 +28,7 @@ import 'package:http/testing.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng, LatLngBounds;
 
 import '../services/layer_manager_test.dart' show FakeHost;
+import '../services/vector_overlay_test.dart' show hybridStyle;
 import '../services/offline_service_test.dart' show FakeOfflineBackend, status;
 import '../state/map_layers_controller_test.dart' show MemoryMapStateStore;
 
@@ -69,7 +71,19 @@ final providers = [
   const MapProvider(id: 'google', name: 'Google Maps', isolated: true, sources: [googleSat]),
   const MapProvider(id: 'yandex', name: 'Яндекс', sources: [yHybrid]),
   const MapProvider(id: CatalogRepository.localProviderId, name: 'Установленные карты', sources: [localMbtiles]),
+  const MapProvider(id: CatalogRepository.roadsProviderId, name: 'Яндекс', sources: [roads]),
 ];
+
+const roads = MapSource(
+  id: CatalogRepository.roadsSourceId,
+  name: 'Яндекс дороги (слой)',
+  styleUrl: 'https://t/style/hybrid-day',
+  format: TileFormat.vector,
+  storageMode: StorageMode.onlineCache,
+  canBeOverlay: true,
+  defaultOpacity: 1,
+  extraParams: {'overlayOnly': 'true'},
+);
 
 class _FixedCatalog extends CatalogNotifier {
   @override
@@ -112,6 +126,7 @@ void main() {
             catalog: LayerCatalog(providers),
             google: GoogleTilesService(apiKey: '', httpClient: MockClient((_) async => http.Response('', 500))),
             yandex: YandexTilesService(apiKey: 'Y', httpClient: MockClient((_) async => http.Response.bytes(const [1], 200))),
+            fetchText: (_) async => jsonEncode(hybridStyle),
           ),
         );
     await tester.pumpWidget(
@@ -167,7 +182,7 @@ void main() {
       expect(find.text(title), findsOneWidget);
     }
     expect(inGroup('google', find.text('Только онлайн')), findsOneWidget);
-    expect(inGroup('yandex', find.text('Только онлайн')), findsOneWidget);
+    expect(inGroup('yandex', find.text('Только онлайн')), findsNothing, reason: 'the roads layer is cached');
     expect(inGroup('osm', find.text('Только онлайн')), findsNothing);
     expect(find.text('Кэш: 0 Б'), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('cache_indicator')), matching: find.text('238 ГБ / 487 ГБ')),
@@ -612,6 +627,24 @@ void main() {
     expect(formatBytes(2048), '2 КБ');
     expect(formatBytes(3 * 1024 * 1024), '3.0 МБ');
   });
+
+  testWidgets('«Яндекс дороги (слой)»: only a layer — «Показать» is off, a tap lays the roads over the map',
+      (tester) async {
+    await pump(tester);
+    await toggle(tester, 'yandex');
+    expect(inGroup('yandex', find.text('Яндекс дороги (слой)')), findsOneWidget);
+    expect(await menuItems(tester, CatalogRepository.roadsSourceId),
+        ['Показать (off)', 'Добавить как слой', 'Сохранить в избранные', 'Детали']);
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Яндекс дороги (слой)'));
+    await tester.pumpAndSettle();
+    expect(container.read(mapLayersProvider).overlays.single.sourceId, CatalogRepository.roadsSourceId);
+    expect(container.read(mapLayersProvider).baseSourceId, isNot(CatalogRepository.roadsSourceId));
+    expect(host.layers, contains('${CatalogRepository.roadsSourceId}~road-main'));
+  });
+
 }
 
 final _bounds = LatLngBounds(southwest: const LatLng(47.9, 37.7), northeast: const LatLng(48.1, 37.9));

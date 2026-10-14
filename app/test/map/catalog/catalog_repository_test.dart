@@ -103,7 +103,7 @@ void main() {
     await r.refreshFromUrl(Uri.parse('http://api.test/maps'));
     final providers = await r.load();
 
-    expect(providers.map((p) => p.id), ['server', 'osm']);
+    expect(providers.map((p) => p.id), ['server', 'osm', 'server-layers']);
     final hybrid = providers.first.sources.first;
     expect(hybrid.id, 'server-hybrid-day');
     expect(hybrid.name, 'Украина · спутник + дороги');
@@ -161,14 +161,14 @@ void main() {
     final providers = await r.refreshFromUrl(Uri.parse('https://example.org/catalog.json'));
     expect(providers.single.sources.single.id, 'ofm-bright');
     final loaded = await r.load();
-    expect(loaded.map((p) => p.id), ['server', 'osm', 'google', 'yandex'], reason: 'others stay');
+    expect(loaded.map((p) => p.id), ['server', 'osm', 'google', 'yandex', 'server-layers'], reason: 'others stay');
     expect(loaded[1].sources.single.id, 'ofm-bright', reason: 'later loads use the refreshed provider');
   });
 
   test('a failed or broken refresh keeps the current catalog and reports the error', () async {
     final r = repo(client: MockClient((_) async => http.Response('not json', 200)));
     await expectLater(r.refreshFromUrl(Uri.parse('https://example.org/c.json')), throwsA(isA<CatalogException>()));
-    expect((await r.load()).map((p) => p.id), ['server', 'osm', 'google', 'yandex']);
+    expect((await r.load()).map((p) => p.id), ['server', 'osm', 'google', 'yandex', 'server-layers']);
 
     final down = repo(client: MockClient((_) async => http.Response('', 503)));
     await expectLater(down.refreshFromUrl(Uri.parse('https://example.org/c.json')), throwsA(isA<CatalogException>()));
@@ -187,7 +187,7 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    expect((await container.read(catalogProvider.future)).map((p) => p.id), ['server', 'osm', 'google', 'yandex']);
+    expect((await container.read(catalogProvider.future)).map((p) => p.id), ['server', 'osm', 'google', 'yandex', 'server-layers']);
     await container.read(catalogProvider.notifier).refresh(Uri.parse('https://example.org/c.json'));
     expect(container.read(catalogProvider).value![1].sources.single.id, 'ofm-bright');
   });
@@ -355,7 +355,20 @@ void main() {
 
   test('hidden providers (Google, Яндекс for now) are left out of load()', () async {
     final providers = await repo(hidden: const {'google', 'yandex'}).load();
-    expect(providers.map((p) => p.id), ['server', 'osm']);
+    expect(providers.map((p) => p.id), ['server', 'osm', 'server-layers']);
+  });
+
+  test('«Яндекс» holds the server roads without the satellite: a vector map that is only a layer', () async {
+    final providers = await repo(hidden: const {'google', 'yandex'}).load();
+    final layers = providers.singleWhere((p) => p.id == CatalogRepository.roadsProviderId);
+    expect(layers.name, 'Яндекс');
+    final roads = layers.sources.single;
+    expect(roads.id, CatalogRepository.roadsSourceId);
+    expect(roads.name, 'Яндекс дороги (слой)');
+    expect(roads.format, TileFormat.vector);
+    expect(roads.canBeOverlay, isTrue);
+    expect(roads.styleUrl, endsWith('/style/hybrid-day'));
+    expect(roads.extraParams, {'overlayOnly': 'true'});
   });
 
   test('every .mbtiles of the orthophoto folder is a territory under «Ортофотопланы»', () async {

@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:http/http.dart' as http;
+
 import '../../maps/color/layer_color_settings.dart';
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
 import 'google_tiles_service.dart';
 import 'hybrid_road_style.dart';
+import 'vector_overlay.dart';
 import 'yandex_tiles_service.dart';
 
 /// What the layer manager needs from the map; implemented over
@@ -39,6 +42,16 @@ abstract class MapLayerHost {
   /// Sets a raster layer's opacity together with its [color]: MapLibre
   /// resets every paint property not given, so both always go together.
   Future<void> setRasterOpacity(String layerId, double opacity, {RasterColor color = RasterColor.none});
+
+  /// A source given as style JSON (a vector overlay's tiles).
+  Future<void> addStyleSource(String sourceId, Map<String, dynamic> source);
+
+  /// A layer given as style JSON (id, type, source, layout, paint, filter…).
+  Future<void> addStyleLayer(Map<String, dynamic> layer, {String? belowLayerId});
+
+  /// Re-applies a style-JSON layer's layout and paint (all of them: MapLibre
+  /// resets what is not given).
+  Future<void> setStyleLayerProperties(Map<String, dynamic> layer);
 
   /// Shows or hides any layer (also one that came with the style).
   Future<void> setLayerVisibility(String layerId, bool visible);
@@ -159,7 +172,9 @@ class LayerManager {
     required GoogleTilesService google,
     required YandexTilesService yandex,
     this.maxRasterOverlays = 3,
-  })  : _host = host,
+    Future<String> Function(Uri url)? fetchText,
+  })  : _fetchText = fetchText ?? _httpText,
+        _host = host,
         _catalog = catalog,
         _styles = MapStyleResolver(catalog: catalog, google: google, yandex: yandex);
 
@@ -192,6 +207,56 @@ class LayerManager {
   static const String orthophotoOverlayMessage = 'Ортофотопланы включаются кнопкой ортофотопланов';
 
   final MapLayerHost _host;
+  final Future<String> Function(Uri url) _fetchText;
+
+  /// Vector overlays on the map, by source id.
+  final Map<String, VectorOverlay> _vectors = {};
+
+  static Future<String> _httpText(Uri url) async {
+    final response = await http.get(url);
+    if (response.statusCode != 200) throw LayerException('Стиль не загрузился (${response.statusCode})');
+    return utf8.decode(response.bodyBytes);
+  }
+
+  /// Lowest map layer of overlay [sourceId].
+  String _bottomLayerOf(String sourceId) => _vectors[sourceId]?.bottomLayerId ?? layerIdOf(sourceId);
+
+  /// Puts overlay [layer]'s map layers under [below].
+  Future<void> _addLayersOf(ActiveLayer layer, String? below) async {
+    final vector = _vectors[layer.sourceId];
+    if (vector == null) {
+      await _host.addRasterLayer(
+        layer.sourceId,
+        layerIdOf(layer.sourceId),
+        opacity: layer.visible ? layer.opacity : 0.0,
+        color: _colorOf(layer.sourceId),
+        belowLayerId: below,
+      );
+      return;
+    }
+    for (final json in vector.layers) {
+      await _host.addStyleLayer(VectorOverlay.withOpacity(json, layer.opacity), belowLayerId: below);
+      if (!layer.visible) await _host.setLayerVisibility(json['id'] as String, false);
+    }
+  }
+
+  Future<void> _removeLayersOf(String sourceId) async {
+    final vector = _vectors[sourceId];
+    if (vector == null) {
+      await _host.removeLayer(layerIdOf(sourceId));
+      return;
+    }
+    for (final json in vector.layers.reversed) {
+      await _host.removeLayer(json['id'] as String);
+    }
+  }
+
+  Future<Map<String, dynamic>> _styleJson(MapSource source) async {
+    final style = source.styleUrl;
+    if (style == null || style.isEmpty) throw LayerException('У карты «${source.name}» нет адреса стиля');
+    final text = style.trimLeft().startsWith('{') ? style : await _fetchText(Uri.parse(style));
+    return jsonDecode(text) as Map<String, dynamic>;
+  }
   final LayerCatalog _catalog;
   final MapStyleResolver _styles;
   final int maxRasterOverlays;
@@ -304,7 +369,7 @@ class LayerManager {
   Future<void> setColor(String sourceId, LayerColorSettings settings) => _serial(() async {
         settings.isIdentity ? _colors.remove(sourceId) : _colors[sourceId] = settings;
         final index = _overlays.indexWhere((l) => l.sourceId == sourceId);
-        if (index == -1) return;
+        if (index == -1 || _vectors.containsKey(sourceId)) return;
         final layer = _overlays[index];
         await _host.setRasterOpacity(layerIdOf(sourceId), layer.visible ? layer.opacity : 0.0, color: _colorOf(sourceId));
       });
@@ -416,6 +481,7 @@ class LayerManager {
         await _addWorld();
         if (!_mapVisible) await _applyMapVisible();
         _overlays.clear();
+        _vectors.clear();
         _orthophotos.clear();
         if (_catalog.isIsolated(source.id)) {
           _colors.clear();
@@ -450,10 +516,13 @@ class LayerManager {
   Future<void> removeOverlay(String sourceId) => _serial(() async {
         final index = _overlays.indexWhere((l) => l.sourceId == sourceId);
         if (index == -1) return;
-        await _host.removeLayer(layerIdOf(sourceId));
-        await _host.removeSource(sourceId);
+        await _removeLayersOf(sourceId);
+        for (final id in _vectors[sourceId]?.sources.keys ?? [sourceId]) {
+          await _host.removeSource(id);
+        }
         _overlays.removeAt(index);
         _colors.remove(sourceId);
+        _vectors.remove(sourceId);
       });
 
   Future<void> setOpacity(String sourceId, double opacity) => _serial(() async {
@@ -461,7 +530,14 @@ class LayerManager {
         final layer = _overlays[index];
         final clamped = opacity.clamp(0.0, 1.0);
         _overlays[index] = layer.copyWith(opacity: clamped);
-        if (layer.visible) await _host.setRasterOpacity(layerIdOf(sourceId), clamped, color: _colorOf(sourceId));
+        final vector = _vectors[sourceId];
+        if (vector != null) {
+          for (final json in vector.layers) {
+            await _host.setStyleLayerProperties(VectorOverlay.withOpacity(json, clamped));
+          }
+        } else if (layer.visible) {
+          await _host.setRasterOpacity(layerIdOf(sourceId), clamped, color: _colorOf(sourceId));
+        }
       });
 
   /// Hiding sets the map opacity to 0 but keeps the chosen opacity.
@@ -469,7 +545,14 @@ class LayerManager {
         final index = _indexOf(sourceId);
         final layer = _overlays[index];
         _overlays[index] = layer.copyWith(visible: visible);
-        await _host.setRasterOpacity(layerIdOf(sourceId), visible ? layer.opacity : 0.0, color: _colorOf(sourceId));
+        final vector = _vectors[sourceId];
+        if (vector != null) {
+          for (final json in vector.layers) {
+            await _host.setLayerVisibility(json['id'] as String, visible);
+          }
+        } else {
+          await _host.setRasterOpacity(layerIdOf(sourceId), visible ? layer.opacity : 0.0, color: _colorOf(sourceId));
+        }
       });
 
   /// [orderedIds] bottom → top; must name exactly the current overlays.
@@ -479,20 +562,14 @@ class LayerManager {
           throw ArgumentError.value(orderedIds, 'orderedIds', 'must list exactly the current overlays');
         }
         for (final layer in _overlays) {
-          await _host.removeLayer(layerIdOf(layer.sourceId));
+          await _removeLayersOf(layer.sourceId);
         }
         _overlays.clear();
         for (var i = 0; i < orderedIds.length; i++) {
           final layer = current[orderedIds[i]]!.copyWith(zIndex: (i + 1) * zStep);
           // Added bottom → top, each right under the annotations, so each
           // new one sits above the previous.
-          await _host.addRasterLayer(
-            layer.sourceId,
-            layerIdOf(layer.sourceId),
-            opacity: layer.visible ? layer.opacity : 0.0,
-            color: _colorOf(layer.sourceId),
-            belowLayerId: _overlayCeiling,
-          );
+          await _addLayersOf(layer, _overlayCeiling);
           _overlays.add(layer);
         }
       });
@@ -524,7 +601,7 @@ class LayerManager {
   Future<ActiveLayer> _add(MapSource source, {required double opacity, required bool visible, int? zIndex}) async {
     final base = _base;
     if (base != null && _catalog.isIsolated(base.id)) throw const LayerException(isolatedMessage);
-    if (_catalog.isIsolated(source.id) || !source.canBeOverlay || source.format != TileFormat.raster) {
+    if (_catalog.isIsolated(source.id) || !source.canBeOverlay) {
       throw LayerException('«${source.name}» нельзя добавить как слой');
     }
     if (_catalog.providerIdOf(source.id) == CatalogRepository.orthophotoProviderId) {
@@ -538,12 +615,34 @@ class LayerManager {
       throw LayerException('Можно наложить не больше $maxRasterOverlays слоёв');
     }
 
-    final url = await _styles.tileUrl(source);
     final z = zIndex ?? (_overlays.isEmpty ? zStep : _overlays.last.zIndex + zStep);
     final above = _overlays.where((l) => l.zIndex > z).toList();
-    final below = above.isEmpty ? _overlayCeiling : layerIdOf(above.first.sourceId);
+    final below = above.isEmpty ? _overlayCeiling : _bottomLayerOf(above.first.sourceId);
     final clamped = opacity.clamp(0.0, 1.0);
+    final layer = ActiveLayer(sourceId: source.id, type: MapLayerType.overlay, opacity: clamped, visible: visible, zIndex: z);
 
+    if (source.format == TileFormat.vector) {
+      final VectorOverlay vector;
+      try {
+        vector = VectorOverlay.fromStyle(source.id, await _styleJson(source));
+      } on LayerException {
+        rethrow;
+      } catch (e) {
+        throw LayerException('Не удалось загрузить «${source.name}»: $e');
+      }
+      if (vector.layers.isEmpty) throw LayerException('В «${source.name}» нечего наложить');
+      for (final entry in vector.sources.entries) {
+        await _host.addStyleSource(entry.key, entry.value);
+      }
+      _vectors[source.id] = vector;
+      await _addLayersOf(layer, below);
+      _overlays
+        ..add(layer)
+        ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+      return layer;
+    }
+
+    final url = await _styles.tileUrl(source);
     await _host.addRasterSource(
       source.id,
       tileUrl: url,
@@ -559,7 +658,6 @@ class LayerManager {
       color: _colorOf(source.id),
       belowLayerId: below,
     );
-    final layer = ActiveLayer(sourceId: source.id, type: MapLayerType.overlay, opacity: clamped, visible: visible, zIndex: z);
     _overlays
       ..add(layer)
       ..sort((a, b) => a.zIndex.compareTo(b.zIndex));

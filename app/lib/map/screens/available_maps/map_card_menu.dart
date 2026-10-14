@@ -18,6 +18,7 @@ Future<MapCardAction?> showMapCardMenu(
   required bool favorite,
   required bool canOverlay,
   required bool canClearCache,
+  bool canShow = true,
 }) {
   return showGeneralDialog<MapCardAction>(
     context: context,
@@ -31,6 +32,7 @@ Future<MapCardAction?> showMapCardMenu(
       favorite: favorite,
       canOverlay: canOverlay,
       canClearCache: canClearCache,
+      canShow: canShow,
     ),
     transitionBuilder: (context, animation, _, child) {
       final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
@@ -50,6 +52,7 @@ class MapCardMenu extends StatelessWidget {
     required this.favorite,
     required this.canOverlay,
     required this.canClearCache,
+    this.canShow = true,
   });
 
   final String mapName;
@@ -57,6 +60,9 @@ class MapCardMenu extends StatelessWidget {
   final bool favorite;
   final bool canOverlay;
   final bool canClearCache;
+
+  /// False for a map that is only a layer (дороги без спутника).
+  final bool canShow;
 
   @override
   Widget build(BuildContext context) {
@@ -96,7 +102,7 @@ class MapCardMenu extends StatelessWidget {
                     action: MapCardAction.show,
                     icon: const AppIcon(AppIcons.eye, color: _teal),
                     label: 'Показать',
-                    onTap: pick,
+                    onTap: canShow ? pick : null,
                   ),
                   _Item(
                     action: MapCardAction.addOverlay,

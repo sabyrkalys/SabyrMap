@@ -201,6 +201,31 @@ class CatalogRepository {
     );
   }
 
+  /// Карты-слои нашего сервера, разложенные отдельно от гибридов: дороги и
+  /// подписи стиля hybrid-day без спутника — только слоем поверх карты.
+  /// Пока лежат в группе «Яндекс» как пример раскладки.
+  static const String roadsProviderId = 'server-layers';
+  static const String roadsSourceId = 'server-roads';
+
+  MapProvider _layersProvider() => MapProvider(
+        id: roadsProviderId,
+        name: 'Яндекс',
+        sources: [
+          MapSource(
+            id: roadsSourceId,
+            name: 'Яндекс дороги (слой)',
+            styleUrl: '$_mapServerBaseUrl/style/hybrid-day',
+            format: TileFormat.vector,
+            storageMode: StorageMode.onlineCache,
+            minZoom: 0,
+            maxZoom: 20,
+            canBeOverlay: true,
+            defaultOpacity: 1,
+            extraParams: const {'overlayOnly': 'true'},
+          ),
+        ],
+      );
+
   /// The server's providers (or the built-in «Сервер карт» until its
   /// catalog arrived), the other built-in providers, then «Установленные
   /// карты» when mediafile/maps has files.
@@ -211,6 +236,7 @@ class CatalogRepository {
       if (!remoteIds.contains(serverProviderId)) _serverProvider(),
       for (final p in [...remote, ...(await loadBuiltin()).where((p) => !remoteIds.contains(p.id))])
         if (!hiddenProviderIds.contains(p.id)) p,
+      if (!remoteIds.contains(roadsProviderId)) _layersProvider(),
     ];
     final local = [...await _localSources(), ...await _userSources.load()];
     final orthophotos = await _orthophotoSources();
