@@ -40,7 +40,7 @@ class MapCard extends StatelessWidget {
       opacity: enabled ? 1 : 0.4,
       child: Container(
         height: 56,
-        margin: const EdgeInsets.only(bottom: 20),
+        margin: const EdgeInsets.only(bottom: 18),
         decoration: BoxDecoration(
           borderRadius: radius,
           border: selected ? Border.all(color: Theme.of(context).colorScheme.primary, width: 3) : null,
