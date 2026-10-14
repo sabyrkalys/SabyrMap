@@ -32,6 +32,13 @@ class MediaFileFolderService {
     return _fileSystem.directory('${base.path}/mediafile/$subfolder');
   }
 
+  /// The service for the subfolder [name] inside this one.
+  MediaFileFolderService child(String name) => MediaFileFolderService(
+    subfolder: subfolder.isEmpty ? name : '$subfolder/$name',
+    fileSystem: _fileSystem,
+    baseDirectoryPath: baseDirectoryPath == null ? null : '$baseDirectoryPath/$name',
+  );
+
   /// The folder itself (created if missing).
   Future<Directory> directory() async {
     final dir = await _resolveDirectory();

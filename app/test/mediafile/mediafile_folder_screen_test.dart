@@ -45,6 +45,26 @@ void main() {
     expect(find.byKey(const Key('mediafile_entry_camp.png')), findsOneWidget);
   });
 
+  testWidgets('lists subfolders before files; a tap opens the subfolder', (tester) async {
+    final fs = MemoryFileSystem();
+    final service = _serviceWith(fs, fileNames: ['camp.png']);
+    fs.file('/base/mediafile/custom-types/БЛА/drone.svg').createSync(recursive: true);
+
+    await tester.pumpWidget(_harness(service));
+    await tester.pump();
+
+    final titles = [for (final tile in tester.widgetList<ListTile>(find.byType(ListTile))) (tile.title! as Text).data];
+    expect(titles, ['БЛА', 'camp.png']);
+
+    await tester.tap(find.byKey(const Key('mediafile_subfolder_БЛА')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('mediafile_entry_drone.svg')), findsOneWidget);
+    final screen = tester.widget<MediaFileFolderScreen>(find.byType(MediaFileFolderScreen).last);
+    expect(screen.subfolder, 'custom-types/БЛА');
+    expect(screen.allowedExtensions, ['png', 'jpg', 'jpeg', 'svg']);
+  });
+
   testWidgets('canceling the delete confirmation keeps the file', (tester) async {
     final service = _serviceWith(MemoryFileSystem(), fileNames: ['marker.svg']);
 

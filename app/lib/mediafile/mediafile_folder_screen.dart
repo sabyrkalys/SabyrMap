@@ -7,6 +7,8 @@ import '../format_bytes.dart';
 import '../widgets/app_icon.dart';
 import '../app_icons.dart';
 
+typedef _Contents = ({List<String> folders, List<MediaFileEntry> files});
+
 class MediaFileFolderScreen extends StatefulWidget {
   const MediaFileFolderScreen({
     super.key,
@@ -29,13 +31,31 @@ class MediaFileFolderScreen extends StatefulWidget {
 class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
   late final MediaFileFolderService _service =
       widget.service ?? MediaFileFolderService(subfolder: widget.subfolder);
-  late Future<List<MediaFileEntry>> _future = _service.list();
+  late Future<_Contents> _future = _load();
+
+  /// Subfolders first (each opens as its own list), then the files.
+  Future<_Contents> _load() async =>
+      (folders: [for (final dir in await _service.listDirectories()) dir.basename], files: await _service.list());
 
   void _reload() {
-    final next = _service.list();
+    final next = _load();
     setState(() {
       _future = next;
     });
+  }
+
+  Future<void> _openFolder(String name) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => MediaFileFolderScreen(
+          title: name,
+          subfolder: widget.subfolder.isEmpty ? name : '${widget.subfolder}/$name',
+          allowedExtensions: widget.allowedExtensions,
+          service: _service.child(name),
+        ),
+      ),
+    );
+    if (mounted) _reload();
   }
 
   Future<void> _import() async {
@@ -104,7 +124,7 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<List<MediaFileEntry>>(
+      body: FutureBuilder<_Contents>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
@@ -113,14 +133,23 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
-          final entries = snapshot.data!;
-          if (entries.isEmpty) {
+          final (:folders, files: entries) = snapshot.data!;
+          if (folders.isEmpty && entries.isEmpty) {
             return const Center(child: Text('Здесь пока нет файлов'));
           }
           return ListView.builder(
-            itemCount: entries.length,
+            itemCount: folders.length + entries.length,
             itemBuilder: (context, index) {
-              final entry = entries[index];
+              if (index < folders.length) {
+                final name = folders[index];
+                return ListTile(
+                  key: Key('mediafile_subfolder_$name'),
+                  leading: const AppIcon(AppIcons.folder),
+                  title: Text(name),
+                  onTap: () => _openFolder(name),
+                );
+              }
+              final entry = entries[index - folders.length];
               return ListTile(
                 key: Key('mediafile_entry_${entry.fileName}'),
                 title: Text(entry.fileName),
