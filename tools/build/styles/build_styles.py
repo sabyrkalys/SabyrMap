@@ -324,8 +324,9 @@ def style(name, theme, hybrid, tiles_base, buildings=True):
 
 def roads_style(tiles_base):
     """Дороги Яндекса отдельным векторным слоем (z0–17, без классов и названий):
-    светлая линия в тёмной обводке, видна и на спутнике, и на схеме. Фона нет —
-    приложение кладёт этот стиль слоем поверх любой карты."""
+    светлая линия в тёмной обводке, видна и на спутнике, и на схеме; названия
+    улиц — из OSM. Фона нет — приложение кладёт этот стиль слоем поверх любой
+    карты."""
     def road(id_, color, width, opacity):
         return {
             "id": id_, "type": "line", "source": "roads", "source-layer": "roads",
@@ -344,10 +345,28 @@ def roads_style(tiles_base):
                 "minzoom": 0, "maxzoom": 17,
                 "attribution": "© Яндекс",
             },
+            "osm": {
+                "type": "vector",
+                "tiles": [f"{tiles_base}/osm/{{z}}/{{x}}/{{y}}"],
+                "minzoom": 0, "maxzoom": 14,
+                "attribution": "© OpenMapTiles © OpenStreetMap contributors",
+            },
         },
         "layers": [
             road("roads-casing", "#3b3326", zoom(8, 0.6, 12, 2.2, 16, 6, 19, 12), zoom(6, 0, 9, 0.6, 12, 0.8)),
             road("roads", "#f3d27a", zoom(8, 0.4, 12, 1.2, 16, 4, 19, 9), zoom(6, 0, 8, 0.7, 12, 1)),
+            # Названий у дорог Яндекса нет — подписи улиц из OSM (до z14,
+            # дальше растягиваются), белые с тёмным ореолом поверх любой карты.
+            {
+                "id": "roads-name", "type": "symbol", "source": "osm",
+                "source-layer": "transportation_name", "minzoom": 13,
+                "layout": {
+                    "symbol-placement": "line", "text-field": NAME, "text-font": FONT,
+                    "text-size": zoom(13, 10, 18, 14),
+                },
+                "paint": {"text-color": "#ffffff", "text-halo-color": "rgba(0,0,0,0.75)",
+                          "text-halo-width": 1.4, "text-halo-blur": 0.3},
+            },
         ],
     }
 
