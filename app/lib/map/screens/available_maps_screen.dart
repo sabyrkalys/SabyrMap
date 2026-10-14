@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app_icons.dart';
 import '../../format_bytes.dart';
 import '../../landmarks/settings/settings_keys.dart';
+import '../../mediafile/mediafile_folder_screen.dart';
+import '../../mediafile/mediafile_folder_service.dart';
+import '../../mediafile/mediafile_subfolders.dart';
 import '../../widgets/app_icon.dart';
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
@@ -244,6 +248,41 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         await ref.read(catalogProvider.notifier).reload();
       });
 
+  /// An app folder opens as a file list; «Мои загрузки» picks a .mbtiles
+  /// through the system picker and copies it into the maps folder.
+  Future<void> _openFolder(DeviceFolder folder) async {
+    setState(() => _isDrawerOpen = false);
+    final subfolder = folder.subfolder;
+    if (subfolder != null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => MediaFileFolderScreen(
+            title: folder.name,
+            subfolder: subfolder,
+            allowedExtensions: const ['mbtiles'],
+          ),
+        ),
+      );
+    } else {
+      // FileType.any: Android doesn't know the .mbtiles MIME type.
+      final result = await FilePicker.pickFiles(type: FileType.any);
+      final path = result?.files.firstOrNull?.path;
+      if (path == null) return;
+      if (!path.toLowerCase().endsWith('.mbtiles')) {
+        _message('Нужен файл карты .mbtiles');
+        return;
+      }
+      try {
+        await MediaFileFolderService(subfolder: kMapsSubfolder).importFile(path);
+        _message('Карта добавлена в «Карты»');
+      } catch (_) {
+        _message('Не удалось скопировать файл');
+        return;
+      }
+    }
+    if (mounted) await ref.read(catalogProvider.notifier).reload();
+  }
+
   void _toggleGroup(String id) => setState(() => _openGroups = {..._openGroups, id: !(_openGroups[id] ?? false)});
 
   void _toggleDrawer() => setState(() {
@@ -326,8 +365,9 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
                       isOpen: _isDrawerOpen,
                       activeSection: _section,
                       storage: ref.watch(deviceStorageProvider).value,
-                      folders: mockDeviceFolders,
+                      folders: deviceFolders,
                       onSectionSelected: _selectSection,
+                      onFolderSelected: _openFolder,
                       onClose: () => setState(() => _isDrawerOpen = false),
                     ),
                   ),

@@ -1,3 +1,4 @@
+import '../../../mediafile/mediafile_subfolders.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../models/map_models.dart';
 
@@ -56,10 +57,14 @@ List<MapGroup> groupProviders(List<MapProvider> providers) {
 
 /// A folder under «КАРТЫ НА УСТРОЙСТВЕ» in the side drawer.
 class DeviceFolder {
-  const DeviceFolder({required this.name, required this.path});
+  const DeviceFolder({required this.name, required this.path, this.subfolder});
 
   final String name;
   final String path;
+
+  /// Subfolder under mediafile; null — not a folder of the app, a file is
+  /// picked through the system picker instead.
+  final String? subfolder;
 }
 
 /// Space on the volume holding the maps folder.
@@ -105,10 +110,10 @@ class MapsFilter {
   }
 }
 
-// Stub until the app opens the device's file browser.
+/// Folders in the side panel under «Карты на устройстве».
 
-const mockDeviceFolders = [
-  DeviceFolder(name: 'SabyrMap Maps', path: '/SabyrMap/Maps/'),
-  DeviceFolder(name: 'Медиафайлы', path: 'Android/media/com.sabyrmap.app/'),
-  DeviceFolder(name: 'Мои загрузки', path: 'Download/'),
+const deviceFolders = [
+  DeviceFolder(name: 'Карты', path: 'mediafile/$kMapsSubfolder/', subfolder: kMapsSubfolder),
+  DeviceFolder(name: 'Ортофото', path: 'mediafile/$kOrthophotoSubfolder/', subfolder: kOrthophotoSubfolder),
+  DeviceFolder(name: 'Мои загрузки', path: 'Download/ — выбрать файл .mbtiles'),
 ];

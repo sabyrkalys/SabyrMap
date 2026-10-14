@@ -5,7 +5,9 @@ import 'package:app/map/models/map_models.dart';
 import 'package:app/map/regions/server_region_service.dart' show StorageInfo;
 import 'package:app/map/screens/available_maps/available_maps_models.dart';
 import 'package:app/map/screens/available_maps/device_storage.dart';
+import 'package:app/mediafile/mediafile_folder_screen.dart';
 import 'package:app/mediafile/mediafile_folder_service.dart';
+import 'package:app/mediafile/mediafile_subfolders.dart';
 import 'package:file/memory.dart';
 import 'package:app/map/screens/available_maps/map_card.dart';
 import 'package:app/map/screens/available_maps/maps_app_bar.dart';
@@ -710,6 +712,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Раздел в разработке'), findsOneWidget);
     expect(find.byKey(const Key('add_map_button')), findsNothing);
+  });
+
+  testWidgets('drawer: «Карты» opens the maps folder as a file list', (tester) async {
+    await pump(tester);
+    await tester.tap(find.byKey(const Key('maps_menu_button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drawer_folder_Ортофото')), findsOneWidget);
+    expect(find.byKey(const Key('drawer_folder_Мои загрузки')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('drawer_folder_Карты')));
+    await tester.pumpAndSettle();
+    final screen = tester.widget<MediaFileFolderScreen>(find.byType(MediaFileFolderScreen));
+    expect(screen.subfolder, kMapsSubfolder);
+    expect(screen.allowedExtensions, ['mbtiles']);
   });
 
   test('our server\'s maps are grouped under GOOGLE MAPS, OSM under OPENSTREETMAP', () {

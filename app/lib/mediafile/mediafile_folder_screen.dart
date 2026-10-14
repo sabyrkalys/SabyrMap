@@ -37,12 +37,20 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
   }
 
   Future<void> _import() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: widget.allowedExtensions,
-    );
+    // FileType.any + own check: Android greys out files whose MIME type it
+    // doesn't know (.mbtiles) under a custom filter.
+    final result = await FilePicker.pickFiles(type: FileType.any);
     final path = result?.files.firstOrNull?.path;
     if (path == null) return;
+    final extension = path.split('.').last.toLowerCase();
+    if (!widget.allowedExtensions.contains(extension)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Подходят файлы: ${widget.allowedExtensions.join(', ')}')),
+        );
+      }
+      return;
+    }
     try {
       await _service.importFile(path);
       if (!mounted) return;

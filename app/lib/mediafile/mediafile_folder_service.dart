@@ -71,9 +71,9 @@ class MediaFileFolderService {
     if (!dir.existsSync()) {
       dir.createSync(recursive: true);
     }
+    // copy, not readAsBytes: map files run to gigabytes.
     final source = _fileSystem.file(sourcePath);
-    final bytes = await source.readAsBytes();
-    await dir.childFile(source.basename).writeAsBytes(bytes);
+    await source.copy(dir.childFile(source.basename).path);
   }
 
   Future<void> delete(String fileName) async {

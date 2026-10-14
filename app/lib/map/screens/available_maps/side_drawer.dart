@@ -13,6 +13,7 @@ class SideDrawer extends StatelessWidget {
     required this.storage,
     required this.folders,
     required this.onSectionSelected,
+    required this.onFolderSelected,
     required this.onClose,
   });
 
@@ -21,6 +22,7 @@ class SideDrawer extends StatelessWidget {
   final StorageUsage? storage;
   final List<DeviceFolder> folders;
   final ValueChanged<MapsSection> onSectionSelected;
+  final ValueChanged<DeviceFolder> onFolderSelected;
   final VoidCallback onClose;
 
   static const _duration = Duration(milliseconds: 220);
@@ -80,8 +82,7 @@ class SideDrawer extends StatelessWidget {
                           leading: const Icon(Icons.folder_outlined),
                           title: Text(folder.name),
                           subtitle: Text(folder.path, maxLines: 1, overflow: TextOverflow.ellipsis),
-                          // Stub until the device file browser is wired in.
-                          onTap: () => debugPrint('Open folder: ${folder.path}'),
+                          onTap: () => onFolderSelected(folder),
                         ),
                     ],
                   ),
