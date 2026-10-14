@@ -657,6 +657,20 @@ void main() {
     });
   });
 
+  group('chosen map paint', () {
+    test('a raster map: opacity and colour on its one layer; reset for another map', () async {
+      final m = manager();
+      await m.setBaseSource(ySat);
+      await m.setMapPaint(opacity: 0.5, color: const LayerColorSettings(saturation: 0));
+      final layer = LayerManager.layerIdOf(ySat.id);
+      expect(host.opacities[layer], 0.5);
+      expect(host.colors[layer]!.saturation, -1);
+      host.calls.clear();
+      await m.setBaseSource(yHybrid);
+      expect(host.calls.where((c) => c.startsWith('opacity ')), isEmpty, reason: 'a new map starts as is');
+    });
+  });
+
   group('vector overlay', () {
     const roads = MapSource(
       id: 'server-roads',

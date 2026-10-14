@@ -103,6 +103,7 @@ class MapLibreLayerHost implements MapLayerHost {
       'fill' => FillLayerProperties.fromJson(json),
       'circle' => CircleLayerProperties.fromJson(json),
       'fill-extrusion' => FillExtrusionLayerProperties.fromJson(json),
+      'raster' => RasterLayerProperties.fromJson(json),
       _ => null,
     };
   }

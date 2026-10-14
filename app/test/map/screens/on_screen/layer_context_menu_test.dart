@@ -79,8 +79,8 @@ void main() {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'base');
     expect(enabled(tester, 'layer_menu_remove'), isTrue);
-    expect(enabled(tester, 'layer_menu_opacity'), isFalse);
-    expect(enabled(tester, 'layer_menu_color'), isFalse);
+    expect(enabled(tester, 'layer_menu_opacity'), isTrue);
+    expect(enabled(tester, 'layer_menu_color'), isTrue);
     await tester.tap(find.byKey(const Key('layer_menu_remove_others')));
     await tester.pumpAndSettle();
     expect(find.text('Карта остаётся всегда — её можно только сменить'), findsOneWidget);
@@ -241,6 +241,32 @@ void main() {
     expect(find.byType(LayerBlendingSheet), findsNothing);
     expect(h.container.read(layerLooksProvider)['yandex-hybrid']!.blending, LayerBlending.multiply);
     expect(find.text('Режим: Умножение'), findsOneWidget);
+  });
+
+  testWidgets('the chosen map has its own opacity and colour, reset when another map is chosen', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer], base: 'osm-standard'));
+    await openMenu(tester, 'base');
+    await tester.tap(find.byKey(const Key('layer_menu_opacity')));
+    await tester.pumpAndSettle();
+    expect(find.text('Непрозрачность · OSM Standard Raster'), findsOneWidget);
+    tester.widget<Slider>(find.byKey(const Key('opacity_slider'))).onChangeEnd!(40);
+    await tester.pumpAndSettle();
+    expect(h.state.mapOpacity, 0.4);
+    expect(h.host.opacities[LayerManager.layerIdOf('osm-standard')], 0.4);
+    await tester.tap(find.byKey(const Key('opacity_done')));
+    await tester.pumpAndSettle();
+    expect(find.text('Карта · 40 % непрозрачн.'), findsOneWidget);
+
+    await openMenu(tester, 'base');
+    await tester.tap(find.byKey(const Key('layer_menu_invert')));
+    await tester.pumpAndSettle();
+    expect(h.container.read(layerLooksProvider)[MapStateNotifier.mapKey]!.color.inverted, isTrue);
+    expect(h.host.colors[LayerManager.layerIdOf('osm-standard')]!.brightnessMin, 1);
+
+    await h.container.read(mapLayersProvider.notifier).setBase(ySat);
+    await tester.pumpAndSettle();
+    expect(h.state.mapOpacity, 1);
+    expect(h.container.read(layerLooksProvider)[MapStateNotifier.mapKey], isNull);
   });
 
   testWidgets('removing a layer drops its look', (tester) async {

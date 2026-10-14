@@ -25,7 +25,7 @@ class LayerColorScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final look = ref.watch(layerLooksProvider)[sourceId] ?? const LayerLook();
     final color = look.color;
-    final name = layerName(ref.watch(catalogProvider).value ?? const [], sourceId);
+    final name = layerTitle(ref.watch(mapLayersProvider), ref.watch(catalogProvider).value ?? const [], sourceId);
     // Берёт вид слоя на момент изменения: несколько изменений до перерисовки
     // не затирают друг друга.
     void apply(LayerColorSettings Function(LayerColorSettings current) change) {

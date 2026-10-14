@@ -200,7 +200,7 @@ void main() {
     final mapY = tester.getTopLeft(find.byKey(const Key('layer_base_row'))).dy;
     final worldY = tester.getTopLeft(find.byKey(const Key('layer_world_row'))).dy;
     expect(mapY < worldY, isTrue);
-    expect(find.descendant(of: find.byKey(const Key('layer_base_row')), matching: find.text('Карта')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('layer_base_row')), matching: find.text('Карта · 100 % непрозрачн.')), findsOneWidget);
     expect(find.descendant(of: find.byKey(const Key('layer_world_row')), matching: find.text('100 % непрозрачн.')),
         findsOneWidget);
 

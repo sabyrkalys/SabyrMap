@@ -39,18 +39,21 @@ class _LayerOpacitySheetState extends ConsumerState<LayerOpacitySheet> {
     final opacity = switch (id) {
       MapStateNotifier.orthophotosKey => state.orthophotoOpacity,
       MapStateNotifier.worldKey => state.worldOpacity,
+      MapStateNotifier.mapKey => state.mapOpacity,
       _ => state.overlays.where((l) => l.sourceId == id).firstOrNull?.opacity,
     };
-    final name = layerName(ref.watch(catalogProvider).value ?? const [], widget.sourceId);
+    final name = layerTitle(state, ref.watch(catalogProvider).value ?? const [], widget.sourceId);
     final notifier = ref.read(mapLayersProvider.notifier);
     Future<void> preview(double v) => switch (id) {
       MapStateNotifier.orthophotosKey => notifier.previewOrthophotoOpacity(v),
       MapStateNotifier.worldKey => notifier.previewWorldOpacity(v),
+      MapStateNotifier.mapKey => notifier.previewMapOpacity(v),
       _ => notifier.previewOpacity(id, v),
     };
     Future<void> store(double v) => switch (id) {
       MapStateNotifier.orthophotosKey => notifier.setOrthophotoOpacity(v),
       MapStateNotifier.worldKey => notifier.setWorldOpacity(v),
+      MapStateNotifier.mapKey => notifier.setMapOpacity(v),
       _ => notifier.setOpacity(id, v),
     };
     final value = (_dragging ?? opacity ?? 1.0) * 100;

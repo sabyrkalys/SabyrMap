@@ -29,6 +29,13 @@ String layerName(List<MapProvider> providers, String id) => switch (id) {
   _ => catalogIndex(providers)[id]?.source.name ?? id,
 };
 
+/// Имя для заголовков экранов вида: у выбранной карты ([MapStateNotifier.mapKey]) —
+/// её название.
+String layerTitle(MapState state, List<MapProvider> providers, String id) => layerName(
+      providers,
+      id == MapStateNotifier.mapKey ? state.baseSourceId ?? LayersPanel.defaultBaseId : id,
+    );
+
 /// Выполняет изменение слоёв; отказ карты ([LayerException]) — SnackBar.
 Future<void> runLayerChange(BuildContext context, Future<void> Function() action) async {
   final messenger = ScaffoldMessenger.maybeOf(context);
@@ -165,7 +172,7 @@ class LayersPanel extends ConsumerWidget {
                             rowKey: const Key('layer_base_row'),
                             menuKey: const Key('layer_menu_base'),
                             title: layerName(providers, baseId),
-                            subtitle: 'Карта',
+                            subtitle: 'Карта · ${opacityLabel(state.mapOpacity)}',
                             source: index[baseId]?.source,
                             visible: state.mapVisible,
                             visibleKey: const Key('layer_base_visible'),

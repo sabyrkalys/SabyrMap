@@ -55,6 +55,9 @@ class MapStateNotifier extends Notifier<MapState> {
   /// The built-in world map under every map («Базовая карта»).
   static const String worldKey = '@world';
 
+  /// The chosen map («Карта») in [layerLooksProvider] and preset looks.
+  static const String mapKey = '@map';
+
   LayerManager? _manager;
   late final Future<void> _loaded;
 
@@ -122,6 +125,7 @@ class MapStateNotifier extends Notifier<MapState> {
       }
       await manager.setBaseSource(base);
       if (saved.baseSourceId != baseId) state = state.copyWith(baseSourceId: baseId);
+      if (state.mapOpacity != 1) await manager.setMapPaint(opacity: state.mapOpacity);
     } on LayerException catch (e) {
       return LayerChangeResult([e.message]);
     }
@@ -209,10 +213,26 @@ class MapStateNotifier extends Notifier<MapState> {
     return manager.setOrthophotos(orthophotosFor(sources, extents, viewport: viewport, zoom: zoom));
   }
 
+  /// Another map than the current one starts with full opacity and no look.
   Future<LayerChangeResult> setBase(MapSource source) async {
+    final changed = source.id != state.baseSourceId;
     final result = await _requireManager().setBaseSource(source);
-    _publish(state.copyWith(baseSourceId: source.id, overlays: _requireManager().getActiveLayers()));
+    if (changed) ref.read(layerLooksProvider.notifier).put(mapKey, const LayerLook());
+    _publish(state.copyWith(
+      baseSourceId: source.id,
+      overlays: _requireManager().getActiveLayers(),
+      mapOpacity: changed ? 1.0 : state.mapOpacity,
+    ));
     return result;
+  }
+
+  /// Opacity of the chosen map while a slider is dragged; [setMapOpacity]
+  /// stores the final value.
+  Future<void> previewMapOpacity(double opacity) async => _manager?.setMapPaint(opacity: opacity);
+
+  Future<void> setMapOpacity(double opacity) async {
+    await _manager?.setMapPaint(opacity: opacity);
+    _publish(state.copyWith(mapOpacity: opacity.clamp(0.0, 1.0)));
   }
 
   /// Убирает выбранную карту: остаются базовая карта, слои и ортофотопланы.
@@ -247,9 +267,14 @@ class MapStateNotifier extends Notifier<MapState> {
     final before = looks.of(sourceId);
     looks.put(sourceId, look);
     if (before.color == look.color) return;
-    sourceId == orthophotosKey
-        ? await _requireManager().setOrthophotoPaint(color: look.color)
-        : await _requireManager().setColor(sourceId, look.color);
+    switch (sourceId) {
+      case orthophotosKey:
+        await _requireManager().setOrthophotoPaint(color: look.color);
+      case mapKey:
+        await _requireManager().setMapPaint(color: look.color);
+      default:
+        await _requireManager().setColor(sourceId, look.color);
+    }
   }
 
   Future<void> setVisibility(String sourceId, bool visible) async {
@@ -279,12 +304,13 @@ class MapStateNotifier extends Notifier<MapState> {
       await manager.removeOverlay(layer.sourceId);
     }
     await manager.setOrthophotoPaint(color: (preset.looks[orthophotosKey] ?? const LayerLook()).color);
+    await manager.setMapPaint(opacity: 1, color: (preset.looks[mapKey] ?? const LayerLook()).color);
     for (final entry in preset.looks.entries) {
-      if (entry.key != orthophotosKey) await manager.setColor(entry.key, entry.value.color);
+      if (entry.key != orthophotosKey && entry.key != mapKey) await manager.setColor(entry.key, entry.value.color);
     }
     final result = await manager.restoreOverlays(preset.overlays);
     ref.read(layerLooksProvider.notifier).replaceAll(preset.looks);
-    _publish(state.copyWith(baseSourceId: base.id, overlays: manager.getActiveLayers()));
+    _publish(state.copyWith(baseSourceId: base.id, overlays: manager.getActiveLayers(), mapOpacity: 1.0));
     return result;
   }
 
@@ -335,7 +361,8 @@ class LayerLooksNotifier extends Notifier<Map<String, LayerLook>> {
   /// Drops the looks of overlays no longer on the map; the orthophotos'
   /// look always stays.
   void retain(Set<String> sourceIds) {
-    bool keep(String id) => id == MapStateNotifier.orthophotosKey || sourceIds.contains(id);
+    bool keep(String id) =>
+        id == MapStateNotifier.orthophotosKey || id == MapStateNotifier.mapKey || sourceIds.contains(id);
     if (state.keys.every(keep)) return;
     state = {for (final e in state.entries) if (keep(e.key)) e.key: e.value};
   }

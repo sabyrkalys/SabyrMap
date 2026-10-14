@@ -293,6 +293,80 @@ class LayerManager {
 
   bool get mapVisible => _mapVisible;
 
+  /// Opacity and colour of the chosen map; reset when another map is chosen.
+  double _mapOpacity = 1;
+  LayerColorSettings _mapColor = const LayerColorSettings();
+
+  /// The chosen map's style text and, for a vector map, its parsed layers.
+  String? _baseStyleText;
+  Map<String, dynamic>? _baseStyle;
+
+  /// Opacity and/or colour of the chosen map. A raster map is one layer; a
+  /// vector map gets each of its layers' opacity scaled and the colour on its
+  /// imagery (e.g. the satellite under the roads).
+  Future<void> setMapPaint({double? opacity, LayerColorSettings? color}) => _serial(() async {
+        if (opacity != null) _mapOpacity = opacity.clamp(0.0, 1.0);
+        if (color != null) _mapColor = color;
+        await _applyMapPaint();
+      });
+
+  Future<void> _applyMapPaint() async {
+    final base = _base;
+    if (base == null || base.id == noMapId) return;
+    final rasterColor = RasterColor.of(_mapColor);
+    if (base.format == TileFormat.raster) {
+      try {
+        await _host.setRasterOpacity(layerIdOf(base.id), _mapOpacity, color: rasterColor);
+      } catch (_) {}
+      return;
+    }
+    Map<String, dynamic>? style = _baseStyle;
+    if (style == null) {
+      try {
+        final text = _baseStyleText;
+        style = _baseStyle = text == null ? null : jsonDecode(text) as Map<String, dynamic>;
+      } catch (_) {
+        style = null;
+      }
+      if (style == null) {
+        try {
+          style = _baseStyle = await _styleJson(base);
+        } catch (_) {
+          return;
+        }
+      }
+    }
+    for (final raw in (style['layers'] as List<dynamic>? ?? const [])) {
+      if (raw is! Map<String, dynamic>) continue;
+      final id = raw['id'] as String?;
+      if (id == null || !_styleLayerIds.contains(id)) continue;
+      try {
+        if (raw['type'] == 'raster') {
+          await _host.setStyleLayerProperties(_rasterWithPaint(raw, _mapOpacity, _mapColor.isIdentity ? null : rasterColor));
+        } else if (VectorOverlay.drawableTypes.contains(raw['type'])) {
+          await _host.setStyleLayerProperties(VectorOverlay.withOpacity(raw, _mapOpacity));
+        }
+      } catch (_) {}
+    }
+    // Back to normal: our look of the hybrid roads comes back too.
+    final text = _baseStyleText;
+    if (_mapOpacity == 1 && text != null) await _tweakRoads(text);
+  }
+
+  /// A style raster layer with its opacity scaled and, if given, [color].
+  static Map<String, dynamic> _rasterWithPaint(Map<String, dynamic> layer, double factor, RasterColor? color) {
+    final paint = Map<String, dynamic>.of(layer['paint'] as Map<String, dynamic>? ?? const {});
+    paint['raster-opacity'] = VectorOverlay.scaleOpacity(paint['raster-opacity'], factor);
+    if (color != null) {
+      paint['raster-brightness-min'] = color.brightnessMin;
+      paint['raster-brightness-max'] = color.brightnessMax;
+      paint['raster-contrast'] = color.contrast;
+      paint['raster-saturation'] = color.saturation;
+      paint['raster-hue-rotate'] = color.hueRotate;
+    }
+    return {...layer, 'paint': paint};
+  }
+
   /// Shows or hides the chosen map: its style layers, except the background.
   /// Overlays, orthophotos and the world map stay. Kept across base changes.
   Future<void> setMapVisible(bool visible) => _serial(() async {
@@ -482,7 +556,13 @@ class LayerManager {
         final snapshot = List.of(_overlays);
         final orthophotos = List.of(_orthophotos);
         await _host.setStyleAndWait(style);
+        if (_base?.id != source.id) {
+          _mapOpacity = 1;
+          _mapColor = const LayerColorSettings();
+        }
         _base = source;
+        _baseStyleText = style.trimLeft().startsWith('{') ? style : null;
+        _baseStyle = null;
         try {
           _styleLayerIds = await _host.layerIds();
         } catch (_) {
@@ -491,6 +571,7 @@ class LayerManager {
         await _tweakRoads(style);
         await _addWorld();
         if (!_mapVisible) await _applyMapVisible();
+        if (_mapOpacity != 1 || !_mapColor.isIdentity) await _applyMapPaint();
         _overlays.clear();
         _vectors.clear();
         _orthophotos.clear();

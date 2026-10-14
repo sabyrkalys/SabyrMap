@@ -301,6 +301,7 @@ class MapState {
     this.orthophotoOpacity = 1.0,
     this.worldOpacity = 1.0,
     this.mapVisible = true,
+    this.mapOpacity = 1.0,
   });
 
   const MapState.initial()
@@ -311,7 +312,8 @@ class MapState {
         orthophotosOn = false,
         orthophotoOpacity = 1.0,
         worldOpacity = 1.0,
-        mapVisible = true;
+        mapVisible = true,
+        mapOpacity = 1.0;
 
   final String? baseSourceId;
   final List<ActiveLayer> overlays;
@@ -331,6 +333,9 @@ class MapState {
   /// orthophotos are seen).
   final bool mapVisible;
 
+  /// Opacity of the chosen map; back to 1 when another map is chosen.
+  final double mapOpacity;
+
   MapState copyWith({
     String? baseSourceId,
     List<ActiveLayer>? overlays,
@@ -340,6 +345,7 @@ class MapState {
     double? orthophotoOpacity,
     double? worldOpacity,
     bool? mapVisible,
+    double? mapOpacity,
   }) =>
       MapState(
         baseSourceId: baseSourceId ?? this.baseSourceId,
@@ -350,6 +356,7 @@ class MapState {
         orthophotoOpacity: orthophotoOpacity ?? this.orthophotoOpacity,
         worldOpacity: worldOpacity ?? this.worldOpacity,
         mapVisible: mapVisible ?? this.mapVisible,
+        mapOpacity: mapOpacity ?? this.mapOpacity,
       );
 
   factory MapState.fromJson(Map<String, dynamic> json) => MapState(
@@ -365,6 +372,7 @@ class MapState {
         orthophotoOpacity: (json['orthophotoOpacity'] as num?)?.toDouble() ?? 1.0,
         worldOpacity: (json['worldOpacity'] as num?)?.toDouble() ?? 1.0,
         mapVisible: json['mapVisible'] as bool? ?? true,
+        mapOpacity: (json['mapOpacity'] as num?)?.toDouble() ?? 1.0,
       );
 
   Map<String, dynamic> toJson() => {
@@ -376,6 +384,7 @@ class MapState {
         if (orthophotoOpacity != 1.0) 'orthophotoOpacity': orthophotoOpacity,
         if (worldOpacity != 1.0) 'worldOpacity': worldOpacity,
         if (!mapVisible) 'mapVisible': false,
+        if (mapOpacity != 1.0) 'mapOpacity': mapOpacity,
       };
 
   @override
@@ -388,7 +397,8 @@ class MapState {
       other.orthophotosOn == orthophotosOn &&
       other.orthophotoOpacity == orthophotoOpacity &&
       other.worldOpacity == worldOpacity &&
-      other.mapVisible == mapVisible;
+      other.mapVisible == mapVisible &&
+      other.mapOpacity == mapOpacity;
 
   @override
   int get hashCode =>
@@ -401,5 +411,6 @@ class MapState {
         orthophotoOpacity,
         worldOpacity,
         mapVisible,
+        mapOpacity,
       );
 }

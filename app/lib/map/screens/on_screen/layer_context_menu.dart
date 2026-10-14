@@ -45,7 +45,9 @@ class LayerContextMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(mapLayersProvider);
-    final look = ref.watch(layerLooksProvider)[sourceId] ?? const LayerLook();
+    // Вид выбранной карты хранится под своим ключом, как у слоёв — под id.
+    final lookId = sourceId == baseId ? MapStateNotifier.mapKey : sourceId;
+    final look = ref.watch(layerLooksProvider)[lookId] ?? const LayerLook();
     final notifier = ref.read(mapLayersProvider.notifier);
     final providers = ref.watch(catalogProvider).value ?? const [];
     final realId = _isBase ? (state.baseSourceId ?? LayersPanel.defaultBaseId) : sourceId;
@@ -61,7 +63,7 @@ class LayerContextMenu extends ConsumerWidget {
     // Встроенная карта мира: только непрозрачность.
     final isWorld = sourceId == MapStateNotifier.worldKey;
     final editable = !_isBase && onMap;
-    final lookEditable = editable || isOrthophotos;
+    final lookEditable = editable || isOrthophotos || (_isBase && hasMap);
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
@@ -205,28 +207,28 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.layers_outlined,
           color: SheetMenuColors.edit,
           label: 'Непрозрачность',
-          onTap: lookEditable || isWorld ? () => openOverMap((c) => LayerOpacitySheet.show(c, sourceId)) : null,
+          onTap: lookEditable || isWorld ? () => openOverMap((c) => LayerOpacitySheet.show(c, lookId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_color'),
           icon: Icons.palette_outlined,
           color: SheetMenuColors.edit,
           label: 'Изменить цвет',
-          onTap: lookEditable ? () => openOverMap((c) => LayerColorScreen.show(c, sourceId)) : null,
+          onTap: lookEditable ? () => openOverMap((c) => LayerColorScreen.show(c, lookId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_erase'),
           icon: Icons.colorize_outlined,
           color: SheetMenuColors.edit,
           label: 'Удалить цвет',
-          onTap: lookEditable ? () => openOverMap((c) => EraseColorScreen.show(c, sourceId)) : null,
+          onTap: lookEditable ? () => openOverMap((c) => EraseColorScreen.show(c, lookId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_blending'),
           icon: Icons.opacity,
           color: SheetMenuColors.edit,
           label: 'Режим смешивания слоёв',
-          onTap: lookEditable ? () => openSheet((c) => LayerBlendingSheet.show(c, sourceId)) : null,
+          onTap: lookEditable ? () => openSheet((c) => LayerBlendingSheet.show(c, lookId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_invert'),
@@ -237,7 +239,7 @@ class LayerContextMenu extends ConsumerWidget {
               ? () => runLayerChange(
                   context,
                   () => notifier.setLook(
-                    sourceId,
+                    lookId,
                     look.copyWith(color: look.color.copyWith(inverted: !look.color.inverted)),
                   ),
                 )

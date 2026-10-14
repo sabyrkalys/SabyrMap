@@ -40,7 +40,7 @@ class EraseColorScreen extends ConsumerWidget {
     final width = ref.watch(colorRangesWidthProvider);
     final ranges = eraseRanges(look.erase, width);
     final centers = [for (final r in ranges) r.center];
-    final name = layerName(ref.watch(catalogProvider).value ?? const [], sourceId);
+    final name = layerTitle(ref.watch(mapLayersProvider), ref.watch(catalogProvider).value ?? const [], sourceId);
 
     // Берёт вид слоя на момент изменения: несколько изменений до перерисовки
     // не затирают друг друга.
