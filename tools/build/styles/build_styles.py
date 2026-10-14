@@ -322,6 +322,36 @@ def style(name, theme, hybrid, tiles_base, buildings=True):
     }
 
 
+def roads_style(tiles_base):
+    """Дороги Яндекса отдельным векторным слоем (z0–17, без классов и названий):
+    светлая линия в тёмной обводке, видна и на спутнике, и на схеме. Фона нет —
+    приложение кладёт этот стиль слоем поверх любой карты."""
+    def road(id_, color, width, opacity):
+        return {
+            "id": id_, "type": "line", "source": "roads", "source-layer": "roads",
+            "layout": {"line-cap": "round", "line-join": "round"},
+            "paint": {"line-color": color, "line-width": width, "line-opacity": opacity},
+        }
+    return {
+        "version": 8,
+        "name": "SabyrMap roads",
+        "metadata": {"sabyrmap:overlay": True},
+        "glyphs": f"{tiles_base}/font/{{fontstack}}/{{range}}",
+        "sources": {
+            "roads": {
+                "type": "vector",
+                "tiles": [f"{tiles_base}/roads/{{z}}/{{x}}/{{y}}"],
+                "minzoom": 0, "maxzoom": 17,
+                "attribution": "© Яндекс",
+            },
+        },
+        "layers": [
+            road("roads-casing", "#3b3326", zoom(8, 0.6, 12, 2.2, 16, 6, 19, 12), zoom(6, 0, 9, 0.6, 12, 0.8)),
+            road("roads", "#f3d27a", zoom(8, 0.4, 12, 1.2, 16, 4, 19, 9), zoom(6, 0, 8, 0.7, 12, 1)),
+        ],
+    }
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--tiles-base", required=True,
@@ -340,6 +370,9 @@ def main():
         path.write_text(json.dumps(data, ensure_ascii=False, indent=1) + "\n",
                         encoding="utf-8")
         print(f"{path}  ({len(data['layers'])} слоёв)")
+    path = args.out / "roads.json"
+    path.write_text(json.dumps(roads_style(base), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(f"{path}  (дороги Яндекса, слой)")
 
 
 if __name__ == "__main__":
