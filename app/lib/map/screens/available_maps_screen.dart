@@ -3,9 +3,11 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLngBounds;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app_icons.dart';
 import '../../format_bytes.dart';
+import '../../landmarks/settings/settings_keys.dart';
 import '../../widgets/app_icon.dart';
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
@@ -15,6 +17,7 @@ import '../regions/server_region_service.dart';
 import '../services/layer_manager.dart';
 import '../services/map_previews.dart';
 import 'layer_details/layer_details_screen.dart';
+import 'on_screen/favorite_set_save_dialog.dart';
 import '../services/offline_service.dart';
 import '../services/tile_cache_stats.dart';
 import '../state/map_layers_controller.dart';
@@ -25,6 +28,7 @@ import 'available_maps/device_storage.dart';
 import 'available_maps/dropdown_menu.dart';
 import 'available_maps/map_card.dart';
 import 'available_maps/map_card_menu.dart';
+import 'available_maps/replace_screen_dialog.dart';
 import 'available_maps/map_source_accordion.dart';
 import 'available_maps/maps_app_bar.dart';
 import 'available_maps/maps_dialogs.dart';
@@ -118,11 +122,44 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     }
   }
 
-  Future<void> _show(MapSource source) => _run(() async {
-        final result = await ref.read(mapLayersProvider.notifier).setBase(source);
-        if (!result.ok) _message(result.problems.join('\n'));
-        if (mounted) Navigator.of(context).pop();
-      });
+  /// «Показать»: карта заменяет всё на экране, кроме базовой карты мира —
+  /// слои убираются. Если слои были, сначала предлагает сохранить их
+  /// избранным набором.
+  Future<void> _show(MapSource source) async {
+    if (!await _offerSaveScreen()) return;
+    await _run(() async {
+      final notifier = ref.read(mapLayersProvider.notifier);
+      for (final layer in ref.read(mapLayersProvider).overlays) {
+        await notifier.removeOverlay(layer.sourceId);
+      }
+      final result = await notifier.setBase(source);
+      if (!ref.read(mapLayersProvider).mapVisible) await notifier.setMapVisible(true);
+      if (!result.ok) _message(result.problems.join('\n'));
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  /// Вопрос «Сохранить её в избранном наборе карт?» перед заменой экрана,
+  /// когда на нём есть слои. «Не задавать этот вопрос» запоминает ответ.
+  /// False — «Отмена» (в вопросе или в имени набора).
+  Future<bool> _offerSaveScreen() async {
+    if (ref.read(mapLayersProvider).overlays.isEmpty) return true;
+    final prefs = await SharedPreferences.getInstance();
+    var save = prefs.getBool(SettingsKeys.mapsSaveScreenOnShow);
+    if (save == null) {
+      if (!mounted) return false;
+      final answer = await ReplaceScreenDialog.show(context);
+      if (answer == null) return false;
+      save = answer.save;
+      if (answer.remember) await prefs.setBool(SettingsKeys.mapsSaveScreenOnShow, save);
+    }
+    if (!save) return true;
+    if (!mounted) return false;
+    final name = await FavoriteSetNameDialog.ask(context, title: 'Сохранить в избранные');
+    if (name == null) return false;
+    await ref.read(mapLayersProvider.notifier).savePreset(name);
+    return true;
+  }
 
   Future<void> _addOverlay(MapSource source) => _run(() async {
         await ref.read(mapLayersProvider.notifier).addOverlay(source);
@@ -313,7 +350,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
   Future<void> _openCardMenu(
     MapSource source, {
     required bool active,
-    required bool favorite,
     required bool canOverlay,
     required bool canClearCache,
     required int sizeBytes,
@@ -323,7 +359,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
       context,
       mapName: source.name,
       active: active,
-      favorite: favorite,
       canOverlay: canOverlay,
       canClearCache: canClearCache,
       canShow: !isOverlayOnly(source),
@@ -336,9 +371,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         await _show(source);
       case MapCardAction.addOverlay:
         await _addOverlay(source);
-      case MapCardAction.favorite:
-        await ref.read(mapLayersProvider.notifier).toggleFavorite(source.id);
-        _message(favorite ? '«${source.name}» убрана из избранных' : '«${source.name}» сохранена в избранные');
       case MapCardAction.details:
         await LayerDetailsScreen.show(context, source.id, groupTitle: sourceName);
       case MapCardAction.clearCache:
@@ -445,7 +477,6 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         onMenu: () => _openCardMenu(
           source,
           active: mapState.baseSourceId == source.id || mapState.overlays.any((o) => o.sourceId == source.id),
-          favorite: favorite,
           canOverlay: canOverlay,
           // Downloaded regions and saved areas; never the user's own files.
           canClearCache: source.id.startsWith(CatalogRepository.localRegionPrefix) ||
@@ -656,6 +687,7 @@ class _SourceCard extends ConsumerWidget {
       selected: selected,
       enabled: !pickOverlay || canOverlay,
       onTap: onTap,
+      onLongPress: pickOverlay ? null : onMenu,
       menu: pickOverlay
           ? null
           : IconButton(

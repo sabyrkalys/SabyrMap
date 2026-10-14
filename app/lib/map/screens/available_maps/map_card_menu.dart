@@ -3,19 +3,18 @@ import 'package:flutter/material.dart';
 import '../../../app_icons.dart';
 import '../../../widgets/app_icon.dart';
 
-enum MapCardAction { remove, show, addOverlay, favorite, details, clearCache }
+enum MapCardAction { remove, show, addOverlay, details, clearCache }
 
 const Color _teal = Color(0xFF00897B);
 
 /// The ⋮ menu of a map card: a centred dialog titled with the map's name.
-/// A map on screen ([active]) offers «Убрать», any other «Показать» and
-/// «Добавить как слой». Pops the chosen action, or null on «Отмена» or a tap
+/// A map on screen ([active]) offers «Убрать», any other «Показать» (bold,
+/// the main action) and «Добавить как слой». Pops the chosen action, or null on «Отмена» or a tap
 /// outside.
 Future<MapCardAction?> showMapCardMenu(
   BuildContext context, {
   required String mapName,
   required bool active,
-  required bool favorite,
   required bool canOverlay,
   required bool canClearCache,
   bool canShow = true,
@@ -29,7 +28,6 @@ Future<MapCardAction?> showMapCardMenu(
     pageBuilder: (context, _, _) => MapCardMenu(
       mapName: mapName,
       active: active,
-      favorite: favorite,
       canOverlay: canOverlay,
       canClearCache: canClearCache,
       canShow: canShow,
@@ -49,7 +47,6 @@ class MapCardMenu extends StatelessWidget {
     super.key,
     required this.mapName,
     required this.active,
-    required this.favorite,
     required this.canOverlay,
     required this.canClearCache,
     this.canShow = true,
@@ -57,7 +54,6 @@ class MapCardMenu extends StatelessWidget {
 
   final String mapName;
   final bool active;
-  final bool favorite;
   final bool canOverlay;
   final bool canClearCache;
 
@@ -102,6 +98,7 @@ class MapCardMenu extends StatelessWidget {
                     action: MapCardAction.show,
                     icon: const AppIcon(AppIcons.eye, color: _teal),
                     label: 'Показать',
+                    bold: true,
                     onTap: canShow ? pick : null,
                   ),
                   _Item(
@@ -111,12 +108,6 @@ class MapCardMenu extends StatelessWidget {
                     onTap: canOverlay ? pick : null,
                   ),
                 ],
-                _Item(
-                  action: MapCardAction.favorite,
-                  icon: AppIcon(favorite ? AppIcons.star : AppIcons.bookmarkPlus, color: _teal),
-                  label: favorite ? 'Убрать из избранных' : 'Сохранить в избранные',
-                  onTap: pick,
-                ),
                 _Item(
                   action: MapCardAction.details,
                   icon: const Icon(Icons.image_search, color: _teal),
@@ -150,11 +141,12 @@ class MapCardMenu extends StatelessWidget {
 }
 
 class _Item extends StatelessWidget {
-  const _Item({required this.action, required this.icon, required this.label, required this.onTap});
+  const _Item({required this.action, required this.icon, required this.label, required this.onTap, this.bold = false});
 
   final MapCardAction action;
   final Widget icon;
   final String label;
+  final bool bold;
 
   /// Null greys the item out.
   final ValueChanged<MapCardAction>? onTap;
@@ -174,7 +166,12 @@ class _Item extends StatelessWidget {
             children: [
               SizedBox(width: 24, child: IconTheme(data: const IconThemeData(size: 24), child: icon)),
               const SizedBox(width: 16),
-              Expanded(child: Text(label, style: Theme.of(context).textTheme.bodyLarge)),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: bold ? FontWeight.bold : null),
+                ),
+              ),
             ],
           ),
         ),

@@ -19,6 +19,7 @@ class MapCard extends StatelessWidget {
     this.selected = false,
     this.enabled = true,
     this.onTap,
+    this.onLongPress,
     this.menu,
   });
 
@@ -30,6 +31,9 @@ class MapCard extends StatelessWidget {
   final bool selected;
   final bool enabled;
   final VoidCallback? onTap;
+
+  /// Долгий тап — то же меню, что и [menu].
+  final VoidCallback? onLongPress;
   final Widget? menu;
 
   @override
@@ -70,7 +74,7 @@ class MapCard extends StatelessWidget {
               Positioned.fill(
                 child: Material(
                   type: MaterialType.transparency,
-                  child: InkWell(onTap: enabled ? onTap : null),
+                  child: InkWell(onTap: enabled ? onTap : null, onLongPress: enabled ? onLongPress : null),
                 ),
               ),
               Positioned(

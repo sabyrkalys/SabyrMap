@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:app/landmarks/settings/settings_keys.dart';
 import 'package:app/map/catalog/catalog_repository.dart';
 import 'package:app/map/models/map_models.dart';
 import 'package:app/map/regions/server_region_service.dart' show StorageInfo;
@@ -26,6 +27,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng, LatLngBounds;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/layer_manager_test.dart' show FakeHost;
 import '../services/vector_overlay_test.dart' show hybridStyle;
@@ -244,7 +246,6 @@ void main() {
     expect(await menuItems(tester, 'google-satellite'), [
       'Показать',
       'Добавить как слой (off)',
-      'Сохранить в избранные',
       'Детали',
     ]);
     expect(find.text('Google Satellite'), findsNWidgets(2)); // the card and the menu's title
@@ -257,7 +258,7 @@ void main() {
     await pump(tester);
     await container.read(mapLayersProvider.notifier).addOverlay(yHybrid);
     await toggle(tester, 'yandex');
-    expect(await menuItems(tester, 'yandex-hybrid'), ['Убрать', 'Сохранить в избранные', 'Детали']);
+    expect(await menuItems(tester, 'yandex-hybrid'), ['Убрать', 'Детали']);
 
     await tester.tap(find.byKey(const Key('map_card_menu_remove')));
     await tester.pumpAndSettle();
@@ -284,16 +285,98 @@ void main() {
     expect(find.byType(AvailableMapsScreen), findsNothing);
   });
 
-  testWidgets('«Сохранить в избранные» toggles the star', (tester) async {
+  testWidgets('a long tap on a card opens the same menu as ⋮', (tester) async {
     await pump(tester);
     await toggle(tester, 'osm');
-    await tester.tap(find.byKey(const Key('source_menu_ofm-liberty')));
+    await tester.longPress(find.byKey(const Key('source_ofm-liberty')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('map_card_menu_favorite')));
-    await tester.pumpAndSettle();
-    expect(container.read(mapLayersProvider).favoriteIds, ['ofm-liberty']);
-    expect(find.text('«OpenFreeMap Liberty» сохранена в избранные'), findsOneWidget);
-    expect(tester.widget<MapCard>(find.byKey(const Key('source_ofm-liberty'))).favorite, isTrue);
+    expect(find.byKey(const Key('map_card_menu')), findsOneWidget);
+    expect(find.byKey(const Key('map_card_menu_show')), findsOneWidget);
+    expect(container.read(mapLayersProvider).baseSourceId, isNot('ofm-liberty'), reason: 'not shown yet');
+  });
+
+  group('«Показать» replaces the screen', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    Future<void> showLiberty(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('source_menu_ofm-liberty')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('map_card_menu_show')));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> withLayer(WidgetTester tester) async {
+      await pump(tester);
+      await container.read(mapLayersProvider.notifier).addOverlay(yHybrid);
+      await toggle(tester, 'osm');
+    }
+
+    testWidgets('without layers: no question, the map is shown', (tester) async {
+      await pump(tester);
+      await toggle(tester, 'osm');
+      await showLiberty(tester);
+      expect(find.byKey(const Key('replace_screen_dialog')), findsNothing);
+      expect(container.read(mapLayersProvider).baseSourceId, 'ofm-liberty');
+    });
+
+    testWidgets('«НЕТ»: the layers go, the map is shown, nothing saved', (tester) async {
+      await withLayer(tester);
+      await showLiberty(tester);
+      expect(find.text('Сохранить её в избранном наборе карт?'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('replace_screen_no')));
+      await tester.pumpAndSettle();
+      final state = container.read(mapLayersProvider);
+      expect(state.baseSourceId, 'ofm-liberty');
+      expect(state.overlays, isEmpty);
+      expect(state.presets, isEmpty);
+      expect(find.byType(AvailableMapsScreen), findsNothing);
+    });
+
+    testWidgets('«ДА»: the screen is saved as a favourite set first', (tester) async {
+      await withLayer(tester);
+      await showLiberty(tester);
+      await tester.tap(find.byKey(const Key('replace_screen_yes')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('favorite_set_name')), 'Работа');
+      await tester.tap(find.byKey(const Key('favorite_set_ok')));
+      await tester.pumpAndSettle();
+      final state = container.read(mapLayersProvider);
+      expect(state.presets.single.name, 'Работа');
+      expect(state.presets.single.overlays.single.sourceId, 'yandex-hybrid');
+      expect(state.overlays, isEmpty);
+      expect(state.baseSourceId, 'ofm-liberty');
+    });
+
+    testWidgets('«ОТМЕНА» changes nothing', (tester) async {
+      await withLayer(tester);
+      final base = container.read(mapLayersProvider).baseSourceId;
+      await showLiberty(tester);
+      await tester.tap(find.byKey(const Key('replace_screen_cancel')));
+      await tester.pumpAndSettle();
+      expect(container.read(mapLayersProvider).overlays.single.sourceId, 'yandex-hybrid');
+      expect(container.read(mapLayersProvider).baseSourceId, base);
+      expect(find.byType(AvailableMapsScreen), findsOneWidget);
+    });
+
+    testWidgets('«Не задавать этот вопрос» remembers the answer', (tester) async {
+      await withLayer(tester);
+      await showLiberty(tester);
+      await tester.tap(find.byKey(const Key('replace_screen_remember')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('replace_screen_no')));
+      await tester.pumpAndSettle();
+      expect((await SharedPreferences.getInstance()).getBool(SettingsKeys.mapsSaveScreenOnShow), isFalse);
+
+      await container.read(mapLayersProvider.notifier).addOverlay(yHybrid);
+      await tester.tap(find.text('open'));
+      await tester.pumpAndSettle();
+      await toggle(tester, 'yandex');
+      await tester.tap(find.byKey(const Key('source_yandex-hybrid')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('replace_screen_dialog')), findsNothing);
+      expect(container.read(mapLayersProvider).baseSourceId, 'yandex-hybrid');
+      expect(container.read(mapLayersProvider).overlays, isEmpty);
+    });
   });
 
   testWidgets('overlay picking: a Яндекс layer is added, Google is not selectable', (tester) async {
@@ -357,7 +440,6 @@ void main() {
     expect(await menuItems(tester, 'ofm-liberty'), [
       'Показать',
       'Добавить как слой (off)',
-      'Сохранить в избранные',
       'Детали',
       'Очистить кэш',
     ]);
@@ -634,7 +716,7 @@ void main() {
     await toggle(tester, 'yandex');
     expect(inGroup('yandex', find.text('Яндекс дороги (слой)')), findsOneWidget);
     expect(await menuItems(tester, CatalogRepository.roadsSourceId),
-        ['Показать (off)', 'Добавить как слой', 'Сохранить в избранные', 'Детали']);
+        ['Показать (off)', 'Добавить как слой', 'Детали']);
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
 

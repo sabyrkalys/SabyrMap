@@ -54,6 +54,10 @@ abstract final class SettingsKeys {
   /// Избранные наборы слоёв, JSON.
   static const String mapsFavoriteSets = 'maps.favorite_sets';
 
+  /// Запомненный ответ на «Сохранить её в избранном наборе карт?» перед
+  /// «Показать» (bool); нет ключа — спрашивать.
+  static const String mapsSaveScreenOnShow = 'maps.save_screen_on_show';
+
   /// Описания онлайн-карт (AQX), JSON.
   static const String mapsAqxDescriptors = 'maps.aqx_descriptors';
 
