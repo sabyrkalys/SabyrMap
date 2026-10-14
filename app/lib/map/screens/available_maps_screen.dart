@@ -463,14 +463,12 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
           !source.id.startsWith(CatalogRepository.orthophotoPrefix) &&
           !isolatedIds.contains(source.id) &&
           !baseIsolated;
-      final favorite = mapState.favoriteIds.contains(source.id);
       return _SourceCard(
         source: source,
         sizeBytes: sizeBytes ?? cached,
         cached: sizeBytes == null,
         kind: mapKindOf(origin ?? source),
         canOverlay: canOverlay,
-        favorite: favorite,
         selected: mapState.baseSourceId == source.id,
         pickOverlay: widget.pickOverlay,
         onTap: widget.pickOverlay || isOverlayOnly(source) ? () => _addOverlay(source) : () => _show(source),
@@ -652,7 +650,6 @@ class _SourceCard extends ConsumerWidget {
     required this.cached,
     required this.kind,
     required this.canOverlay,
-    required this.favorite,
     required this.selected,
     required this.pickOverlay,
     required this.onTap,
@@ -667,7 +664,6 @@ class _SourceCard extends ConsumerWidget {
   final bool cached;
   final MapKind kind;
   final bool canOverlay;
-  final bool favorite;
   final bool selected;
   final bool pickOverlay;
   final VoidCallback onTap;
@@ -683,7 +679,6 @@ class _SourceCard extends ConsumerWidget {
       caption: sizeBytes <= 0 ? 'Нет' : (cached ? '≈ ${formatBytes(sizeBytes)} в кэше' : formatBytes(sizeBytes)),
       kind: kind,
       thumbnail: preview != null ? FileImage(preview) : (asset != null ? AssetImage(asset) : null),
-      favorite: favorite,
       selected: selected,
       enabled: !pickOverlay || canOverlay,
       onTap: onTap,
