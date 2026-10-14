@@ -75,7 +75,7 @@ void main() {
         () async => Directory('/docs/root'),
         () async => Directory('/support/root'),
       ]);
-      expect(resolved.appRoot, '/docs/root');
+      expect(resolved.appRoot, '/docs/root/mediafile');
     });
 
     test('throws StorageException when nothing is available', () async {

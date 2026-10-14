@@ -20,7 +20,8 @@ class StoragePaths {
 
   final String _appRoot;
 
-  /// Определяет корень приложения (один раз; дальше — из кэша):
+  /// Определяет корень приложения (один раз; дальше — из кэша) — папку
+  /// [mediafileFolderName] внутри первой доступной из:
   /// 1. внешняя папка приложения (`/Android/data/<pkg>/files`);
   /// 2. папка документов приложения;
   /// 3. папка служебных данных приложения;
@@ -45,7 +46,7 @@ class StoragePaths {
     for (final candidate in candidates) {
       try {
         final dir = await candidate();
-        if (dir != null) return StoragePaths.forRoot(dir.path);
+        if (dir != null) return StoragePaths.forRoot(_posix.join(dir.path, mediafileFolderName));
       } catch (e) {
         failures.add(e);
       }
@@ -59,6 +60,9 @@ class StoragePaths {
   /// Сбросить кэш [resolve].
   @visibleForTesting
   static void resetCache() => _cached = null;
+
+  /// Папка, в которой лежит всё приложение: карты, метки, значки и прочее.
+  static const String mediafileFolderName = 'mediafile';
 
   String get appRoot => _appRoot;
   String get landmarks => _posix.join(_appRoot, 'landmarks');
@@ -85,6 +89,18 @@ class StoragePaths {
     _posix.join(landmarks, 'imported'): importDefault,
     _posix.join(landmarks, 'recorded_tracks'): recordedTracks,
   };
+
+  /// Папки, которые раньше лежали рядом с [mediafileFolderName] (прямо в
+  /// `files/`), → их место внутри неё. Пусто, если корень — не
+  /// [mediafileFolderName].
+  Map<String, String> get legacyRootFolders {
+    if (_posix.basename(_appRoot) != mediafileFolderName) return const {};
+    final parent = _posix.dirname(_appRoot);
+    return {
+      for (final name in const ['landmarks', 'datastore', 'icons', 'logs', 'maps', 'pictures'])
+        _posix.join(parent, name): _posix.join(_appRoot, name),
+    };
+  }
 
   /// Все базовые папки, которые создаёт [StorageService.ensureBaseFolders].
   List<String> get baseFolders => [

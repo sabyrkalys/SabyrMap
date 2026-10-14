@@ -15,6 +15,34 @@ class AppSettings {
   /// Все ключи настроек.
   Set<String> get keys => _prefs.getKeys();
 
+  /// Заменяет пути-префиксы [moved] (старый → новый) в ключах и строковых
+  /// значениях: папка переехала — настройки, которые на неё ссылаются
+  /// (выбранная папка, показанные метки, закладки, слои…), идут следом.
+  /// Префикс заменяется только целым сегментом пути.
+  Future<void> movePaths(Map<String, String> moved) async {
+    if (moved.isEmpty) return;
+    final pattern = RegExp('(${moved.keys.map(RegExp.escape).join('|')})(?=[/"\\\\]|\$)');
+    String fix(String s) => s.replaceAllMapped(pattern, (m) => moved[m[1]]!);
+    for (final key in _prefs.getKeys().toList()) {
+      final value = _prefs.get(key);
+      if (value == null) continue;
+      final newKey = fix(key);
+      var changed = newKey != key;
+      Object fixed = value;
+      if (value is String) {
+        fixed = fix(value);
+        changed |= fixed != value;
+      } else if (value is List) {
+        final list = [for (final e in value) fix('$e')];
+        changed |= list.join('\n') != value.join('\n');
+        fixed = list;
+      }
+      if (!changed) continue;
+      if (newKey != key) await _prefs.remove(key);
+      await importAll({newKey: fixed});
+    }
+  }
+
   /// Все настройки как есть: значения String, bool, int, double или
   /// `List<String>`.
   Map<String, Object> exportAll() => {

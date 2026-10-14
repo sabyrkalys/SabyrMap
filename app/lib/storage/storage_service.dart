@@ -73,6 +73,43 @@ class StorageService {
     return migrated;
   }
 
+  /// Переносит папки из `files/` в `files/mediafile/`
+  /// ([StoragePaths.legacyRootFolders]): переименованием, а если папка там
+  /// уже есть — сливает содержимое (подпапки сливаются, занятое имя файла
+  /// получает `_1`, `_2`…). Возвращает перенесённые папки: старый путь →
+  /// новый.
+  Future<Map<String, String>> migrateIntoMediafile() async {
+    final moved = <String, String>{};
+    for (final MapEntry(key: from, value: to) in _paths.legacyRootFolders.entries) {
+      final old = Directory(from);
+      if (!await old.exists()) continue;
+      try {
+        if (!await Directory(to).exists()) {
+          await Directory(p.dirname(to)).create(recursive: true);
+          await old.rename(to);
+        } else {
+          await _mergeInto(old, to);
+        }
+        moved[from] = to;
+      } on FileSystemException catch (e) {
+        throw StorageException('Cannot move a folder into mediafile', path: from, cause: e);
+      }
+    }
+    return moved;
+  }
+
+  static Future<void> _mergeInto(Directory from, String to) async {
+    await for (final entity in from.list(followLinks: false)) {
+      final target = p.join(to, p.basename(entity.path));
+      if (entity is Directory && await Directory(target).exists()) {
+        await _mergeInto(entity, target);
+      } else {
+        await entity.rename(await _freeName(to, p.basename(entity.path)));
+      }
+    }
+    await from.delete();
+  }
+
   static Future<String> _freeName(String dir, String name) async {
     final ext = p.extension(name);
     final stem = p.basenameWithoutExtension(name);

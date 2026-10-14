@@ -217,10 +217,12 @@ class LandmarkServices {
   }) async {
     final storagePaths = paths ?? await StoragePaths.resolve();
     final storage = StorageService(storagePaths);
+    final movedIntoMediafile = await storage.migrateIntoMediafile();
     await storage.migrateLegacyFolders();
     await storage.ensureBaseFolders();
     final repository = LandmarkRepository(storage, storagePaths, clock: clock);
     final settings = AppSettings(prefs ?? await SharedPreferences.getInstance());
+    await settings.movePaths(movedIntoMediafile);
     final icons = IconRegistry(IconResolver(storagePaths));
     await icons.refresh();
     final folders = FolderService(storagePaths, settings);
