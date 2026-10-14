@@ -10,6 +10,10 @@ pmtiles:
     satellite-hi: /srv/tiles/v1/satellite-z19.pmtiles
     osm: /srv/tiles/v1/osm.pmtiles
     overview: /srv/tiles/v1/overview.pmtiles
+    # Дороги Яндекса z0–17 одним слоем «roads» (tippecanoe из GeoJSON), стиль roads.
+    roads: /srv/tiles/v1/roads.pmtiles
+    # Снимок 19.09.2026, Золотой Колодезь (z8–18, WebP, прозрачный за краями).
+    zolotoj-kolodez: /srv/tiles/v1/zolotoj-kolodez.pmtiles
 
 # /font/{fontstack}/{range} — "Noto Sans Regular|Bold|Italic"
 fonts:
