@@ -156,21 +156,23 @@ class LayersPanel extends ConsumerWidget {
                               ),
                           ],
                         ),
-                        // Выбранная карта: под слоями, тап — сменить.
-                        OnScreenLayerBaseRow(
-                          rowKey: const Key('layer_base_row'),
-                          menuKey: const Key('layer_menu_base'),
-                          title: layerName(providers, baseId),
-                          subtitle: baseId == LayerManager.noMapId ? 'Карта · тап — выбрать' : 'Карта',
-                          source: index[baseId]?.source,
-                          visible: baseId == LayerManager.noMapId ? null : state.mapVisible,
-                          visibleKey: const Key('layer_base_visible'),
-                          onVisible: (v) => runLayerChange(context, () => notifier.setMapVisible(v)),
-                          onTap: () => Navigator.of(
-                            context,
-                          ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
-                          onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId),
-                        ),
+                        // Выбранная карта: под слоями, тап — сменить; убрана — строки нет,
+                        // карта выбирается в «Доступных картах».
+                        if (baseId != LayerManager.noMapId)
+                          OnScreenLayerBaseRow(
+                            rowKey: const Key('layer_base_row'),
+                            menuKey: const Key('layer_menu_base'),
+                            title: layerName(providers, baseId),
+                            subtitle: 'Карта',
+                            source: index[baseId]?.source,
+                            visible: state.mapVisible,
+                            visibleKey: const Key('layer_base_visible'),
+                            onVisible: (v) => runLayerChange(context, () => notifier.setMapVisible(v)),
+                            onTap: () => Navigator.of(
+                              context,
+                            ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
+                            onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId),
+                          ),
                         // Встроенная карта мира под всеми: видна, где у карты нет тайлов.
                         OnScreenLayerBaseRow(
                           rowKey: const Key('layer_world_row'),

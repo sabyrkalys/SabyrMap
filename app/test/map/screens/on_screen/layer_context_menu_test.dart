@@ -87,7 +87,7 @@ void main() {
     expect(h.state.overlays, hasLength(1));
   });
 
-  testWidgets('«Убрать» on the map leaves «Нет карты»: the base map, layers stay; a map is picked again by a tap', (tester) async {
+  testWidgets('«Убрать» on the map removes its row; the base map and layers stay', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'base');
     await tester.tap(find.byKey(const Key('layer_menu_remove')));
@@ -95,21 +95,28 @@ void main() {
     expect(h.state.baseSourceId, LayerManager.noMapId);
     expect(h.state.overlays.single.sourceId, 'yandex-hybrid');
     expect(h.store.saved!.baseSourceId, LayerManager.noMapId);
-    expect(find.text('Нет карты'), findsOneWidget);
-    expect(find.text('Карта · тап — выбрать'), findsOneWidget);
-    expect(find.byKey(const Key('layer_base_visible')), findsNothing);
-
-    await openMenu(tester, 'base');
-    expect(enabled(tester, 'layer_menu_remove'), isFalse);
-    expect(enabled(tester, 'layer_menu_details'), isFalse);
-    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+    expect(find.byKey(const Key('layer_base_row')), findsNothing);
+    expect(find.text('Нет карты'), findsNothing);
+    expect(find.byKey(const Key('layer_world_row')), findsOneWidget);
+    expect(find.text('Яндекс Гибрид'), findsOneWidget);
   });
 
-  testWidgets('«Нет карты» is remembered: the next start opens with no map', (tester) async {
+  testWidgets('without a map: remembered on the next start; a layer has nothing to compare with', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer], base: LayerManager.noMapId));
     expect(h.state.baseSourceId, LayerManager.noMapId);
     expect(h.host.style, contains('"background"'));
-    expect(find.text('Нет карты'), findsOneWidget);
+    expect(find.byKey(const Key('layer_base_row')), findsNothing);
+    await openMenu(tester, 'yandex-hybrid');
+    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+  });
+
+  testWidgets('picking a map in «Доступные карты» brings its row back', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer], base: LayerManager.noMapId));
+    await h.container.read(mapLayersProvider.notifier).setBase(ySat);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('layer_base_row')), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('layer_base_row')), matching: find.text('Яндекс Спутник')),
+        findsOneWidget);
   });
 
   testWidgets('the top layer can be moved down, the others up; a single layer cannot move', (tester) async {
