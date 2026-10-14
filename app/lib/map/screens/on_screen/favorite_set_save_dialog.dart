@@ -72,7 +72,7 @@ abstract final class FavoriteSetSaveDialog {
   static Future<void> show(BuildContext context) async {
     final container = ProviderScope.containerOf(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
-    final name = await FavoriteSetNameDialog.ask(context, title: 'Сохранить в избранное');
+    final name = await FavoriteSetNameDialog.ask(context, title: 'Сохранить в избранные');
     if (name == null) return;
     try {
       await container.read(mapLayersProvider.notifier).savePreset(name);

@@ -243,6 +243,12 @@ class MapPreset {
     required this.baseSourceId,
     required this.overlays,
     this.looks = const {},
+    this.overlaysUnderMap = 0,
+    this.mapOpacity = 1.0,
+    this.mapVisible = true,
+    this.worldOpacity = 1.0,
+    this.orthophotosOn = false,
+    this.orthophotoOpacity = 1.0,
   });
 
   final String id;
@@ -253,8 +259,27 @@ class MapPreset {
   /// Overlays' colour, erasing and blending, by source id; only changed ones.
   final Map<String, LayerLook> looks;
 
-  MapPreset copyWith({String? name}) =>
-      MapPreset(id: id, name: name ?? this.name, baseSourceId: baseSourceId, overlays: overlays, looks: looks);
+  /// The rest of the screen as it was saved (see [MapState]).
+  final int overlaysUnderMap;
+  final double mapOpacity;
+  final bool mapVisible;
+  final double worldOpacity;
+  final bool orthophotosOn;
+  final double orthophotoOpacity;
+
+  MapPreset copyWith({String? name}) => MapPreset(
+        id: id,
+        name: name ?? this.name,
+        baseSourceId: baseSourceId,
+        overlays: overlays,
+        looks: looks,
+        overlaysUnderMap: overlaysUnderMap,
+        mapOpacity: mapOpacity,
+        mapVisible: mapVisible,
+        worldOpacity: worldOpacity,
+        orthophotosOn: orthophotosOn,
+        orthophotoOpacity: orthophotoOpacity,
+      );
 
   factory MapPreset.fromJson(Map<String, dynamic> json) => MapPreset(
         id: json['id'] as String,
@@ -267,6 +292,12 @@ class MapPreset {
           for (final e in (json['looks'] as Map<String, dynamic>? ?? const {}).entries)
             e.key: LayerLook.fromJson(e.value as Map<String, dynamic>),
         },
+        overlaysUnderMap: (json['overlaysUnderMap'] as num?)?.toInt() ?? 0,
+        mapOpacity: (json['mapOpacity'] as num?)?.toDouble() ?? 1.0,
+        mapVisible: json['mapVisible'] as bool? ?? true,
+        worldOpacity: (json['worldOpacity'] as num?)?.toDouble() ?? 1.0,
+        orthophotosOn: json['orthophotosOn'] as bool? ?? false,
+        orthophotoOpacity: (json['orthophotoOpacity'] as num?)?.toDouble() ?? 1.0,
       );
 
   Map<String, dynamic> toJson() => {
@@ -275,6 +306,12 @@ class MapPreset {
         'baseSourceId': baseSourceId,
         'overlays': [for (final o in overlays) o.toJson()],
         if (looks.isNotEmpty) 'looks': {for (final e in looks.entries) e.key: e.value.toJson()},
+        if (overlaysUnderMap != 0) 'overlaysUnderMap': overlaysUnderMap,
+        if (mapOpacity != 1.0) 'mapOpacity': mapOpacity,
+        if (!mapVisible) 'mapVisible': false,
+        if (worldOpacity != 1.0) 'worldOpacity': worldOpacity,
+        if (orthophotosOn) 'orthophotosOn': true,
+        if (orthophotoOpacity != 1.0) 'orthophotoOpacity': orthophotoOpacity,
       };
 
   @override
@@ -284,7 +321,13 @@ class MapPreset {
       other.name == name &&
       other.baseSourceId == baseSourceId &&
       _listEquality.equals(other.overlays, overlays) &&
-      const MapEquality<String, LayerLook>().equals(other.looks, looks);
+      const MapEquality<String, LayerLook>().equals(other.looks, looks) &&
+      other.overlaysUnderMap == overlaysUnderMap &&
+      other.mapOpacity == mapOpacity &&
+      other.mapVisible == mapVisible &&
+      other.worldOpacity == worldOpacity &&
+      other.orthophotosOn == orthophotosOn &&
+      other.orthophotoOpacity == orthophotoOpacity;
 
   @override
   int get hashCode => Object.hash(id, name, baseSourceId, Object.hashAll(overlays));

@@ -35,8 +35,8 @@ class OnScreenLayersHeader extends StatelessWidget {
             ),
             IconButton(
               key: const Key('layers_header_save'),
-              tooltip: 'Сохранить в избранное',
-              icon: const Icon(Icons.bookmark_add_outlined, size: 22, color: _ink),
+              tooltip: 'Сохранить в избранные',
+              icon: const Icon(Icons.bookmark_add, size: 22, color: _ink),
               onPressed: () => FavoriteSetSaveDialog.show(context),
             ),
             IconButton(

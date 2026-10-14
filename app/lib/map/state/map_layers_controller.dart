@@ -334,36 +334,51 @@ class MapStateNotifier extends Notifier<MapState> {
     for (final layer in manager.getActiveLayers()) {
       await manager.removeOverlay(layer.sourceId);
     }
-    await manager.setOrthophotoPaint(color: (preset.looks[orthophotosKey] ?? const LayerLook()).color);
-    await manager.setMapPaint(opacity: 1, color: (preset.looks[mapKey] ?? const LayerLook()).color);
+    await manager.setOrthophotoPaint(
+      opacity: preset.orthophotoOpacity,
+      color: (preset.looks[orthophotosKey] ?? const LayerLook()).color,
+    );
+    await manager.setMapPaint(opacity: preset.mapOpacity, color: (preset.looks[mapKey] ?? const LayerLook()).color);
+    await manager.setMapVisible(preset.mapVisible);
+    await manager.setWorldOpacity(preset.worldOpacity);
     for (final entry in preset.looks.entries) {
       if (entry.key != orthophotosKey && entry.key != mapKey) await manager.setColor(entry.key, entry.value.color);
     }
+    manager.setOverlaysUnderMap(preset.overlaysUnderMap);
     final result = await manager.restoreOverlays(preset.overlays);
     ref.read(layerLooksProvider.notifier).replaceAll(preset.looks);
     _publish(state.copyWith(
       baseSourceId: base.id,
       overlays: manager.getActiveLayers(),
       overlaysUnderMap: manager.overlaysUnderMap,
-      mapOpacity: 1.0,
+      mapOpacity: preset.mapOpacity,
+      mapVisible: preset.mapVisible,
+      worldOpacity: preset.worldOpacity,
+      orthophotoOpacity: preset.orthophotoOpacity,
     ));
+    if (state.orthophotosOn != preset.orthophotosOn) await setOrthophotosOn(preset.orthophotosOn);
     return result;
   }
 
-  /// Stores the current base + overlays (with their looks) as a preset
-  /// named [name].
+  /// Stores the whole screen as a preset named [name]: the map, the overlays
+  /// in their order (also under the map) with their looks, the map's and the
+  /// base map's opacity, the orthophotos.
   Future<void> savePreset(String name) async {
-    final base = state.baseSourceId;
-    if (base == null) throw const LayerException('Сначала выберите карту');
     final preset = MapPreset(
       id: 'user-${DateTime.now().microsecondsSinceEpoch}',
       name: name,
-      baseSourceId: base,
+      baseSourceId: state.baseSourceId ?? CatalogRepository.defaultBaseSourceId,
       overlays: state.overlays,
       looks: {
         for (final e in ref.read(layerLooksProvider).entries)
           if (!e.value.copyWith(forceRefresh: false).isDefault) e.key: e.value.copyWith(forceRefresh: false),
       },
+      overlaysUnderMap: state.overlaysUnderMap,
+      mapOpacity: state.mapOpacity,
+      mapVisible: state.mapVisible,
+      worldOpacity: state.worldOpacity,
+      orthophotosOn: state.orthophotosOn,
+      orthophotoOpacity: state.orthophotoOpacity,
     );
     _publish(state.copyWith(presets: [...state.presets, preset]));
   }

@@ -38,7 +38,7 @@ class CompareModeBottomPanel extends StatelessWidget {
                       ),
                       IconButton(
                         key: const Key('compare_save'),
-                        tooltip: 'Сохранить в избранное',
+                        tooltip: 'Сохранить в избранные',
                         icon: const Icon(Icons.bookmark_add_outlined, size: 22, color: _ink),
                         onPressed: () => FavoriteSetSaveDialog.show(context),
                       ),
