@@ -26,7 +26,7 @@ void main() {
   String layerId(String sourceId) => LayerManager.layerIdOf(sourceId);
 
   testWidgets('title is the layer name; every item is there', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
     await openMenu(tester, 'yandex-hybrid');
     final menu = find.byType(LayerContextMenu);
     for (final text in [
@@ -37,7 +37,7 @@ void main() {
       'УПОРЯДОЧИТЬ',
       'Убрать',
       'Убрать остальные',
-      'Переместить вниз',
+      'Переместить вверх',
       'ИЗМЕНИТЬ',
       'Для сохранения изменений создайте/обновите избранную карту или набор карт.',
       'Непрозрачность',
@@ -47,6 +47,14 @@ void main() {
     ]) {
       expect(find.descendant(of: menu, matching: find.text(text)), findsOneWidget, reason: text);
     }
+  });
+
+  testWidgets('a layer with only the map: no «Убрать остальные», but it moves and compares', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await openMenu(tester, 'yandex-hybrid');
+    expect(find.byKey(const Key('layer_menu_remove_others')), findsNothing);
+    expect(find.byKey(const Key('layer_menu_move_up')), findsOneWidget);
+    expect(find.byKey(const Key('layer_menu_compare')), findsOneWidget);
   });
 
   testWidgets('«Убрать» removes the layer and closes the menu', (tester) async {
@@ -84,11 +92,11 @@ void main() {
     expect(h.state.baseSourceId, 'ofm-liberty');
   });
 
-  testWidgets('a map alone: no «Сравнить...», «Переместить» or «Убрать остальные»', (tester) async {
+  testWidgets('a map alone: «Сравнить...», «Переместить» and «Убрать остальные» are hidden', (tester) async {
     await h.pump(tester);
     await openMenu(tester, 'base');
     for (final key in ['layer_menu_compare', 'layer_menu_move_up', 'layer_menu_remove_others']) {
-      expect(enabled(tester, key), isFalse, reason: key);
+      expect(find.byKey(Key(key)), findsNothing, reason: key);
     }
   });
 
@@ -112,7 +120,7 @@ void main() {
     expect(h.host.style, contains('"background"'));
     expect(find.byKey(const Key('layer_base_row')), findsNothing);
     await openMenu(tester, 'yandex-hybrid');
-    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+    expect(find.byKey(const Key('layer_menu_compare')), findsNothing);
   });
 
   testWidgets('picking a map in «Доступные карты» brings its row back', (tester) async {
@@ -160,12 +168,12 @@ void main() {
   testWidgets('the orthophotos and the base map do not move', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, MapStateNotifier.orthophotosKey);
-    expect(enabled(tester, 'layer_menu_move_up'), isFalse);
+    expect(find.byKey(const Key('layer_menu_move_up')), findsNothing);
     await tester.tap(find.byKey(const Key('layer_menu_cancel')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('layer_menu_world')));
     await tester.pumpAndSettle();
-    expect(enabled(tester, 'layer_menu_move_up'), isFalse);
+    expect(find.byKey(const Key('layer_menu_move_up')), findsNothing);
   });
 
   testWidgets('«Сравнить...» picks layers, closes the panel and starts the compare mode', (tester) async {
@@ -187,7 +195,7 @@ void main() {
     await tester.tap(find.byKey(const Key('layer_menu_cancel')));
     await tester.pumpAndSettle();
     await openMenu(tester, MapStateNotifier.orthophotosKey);
-    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+    expect(find.byKey(const Key('layer_menu_compare')), findsNothing);
   });
 
   testWidgets('«Непрозрачность» opens the slider sheet', (tester) async {

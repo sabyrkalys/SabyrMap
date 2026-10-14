@@ -61,6 +61,8 @@ class LayerContextMenu extends ConsumerWidget {
     final stackId = _isBase ? MapStateNotifier.mapKey : sourceId;
     final movable = stack.contains(stackId) && stack.length > 1;
     final isTop = movable && stack.first == stackId;
+    // Есть что убирать: у карты — хоть один слой, у слоя — другие слои.
+    final hasOthers = (_isBase && hasMap && ids.isNotEmpty) || (onMap && ids.length > 1);
     // Ортофотопланы: только вид (непрозрачность, цвет); убираются кнопкой.
     final isOrthophotos = sourceId == MapStateNotifier.orthophotosKey;
     // Встроенная карта мира: только непрозрачность.
@@ -124,15 +126,16 @@ class LayerContextMenu extends ConsumerWidget {
           label: 'Детали',
           onTap: noMap ? null : () => openSheet((c) => LayerDetailsScreen.show(c, realId, layerMenuId: sourceId)),
         ),
-        SheetMenuItem(
-          key: const Key('layer_menu_compare'),
-          icon: Icons.compare,
-          color: SheetMenuColors.accent,
-          label: 'Сравнить...',
-          // Всегда есть с чем сравнить: хотя бы с «Базовой картой».
-          // Сравнивают слои и карту между собой; одной карте сравнивать не с чем.
-          onTap: movable ? startCompare : null,
-        ),
+        // Сравнивают слои и карту между собой; одной карте сравнивать не с
+        // чем — пункта нет, пока не добавлен ещё слой.
+        if (movable)
+          SheetMenuItem(
+            key: const Key('layer_menu_compare'),
+            icon: Icons.compare,
+            color: SheetMenuColors.accent,
+            label: 'Сравнить...',
+            onTap: startCompare,
+          ),
         SheetMenuItem(
           key: const Key('layer_menu_force_refresh'),
           icon: Icons.refresh,
@@ -161,31 +164,31 @@ class LayerContextMenu extends ConsumerWidget {
                 }
               : null,
         ),
-        SheetMenuItem(
-          key: const Key('layer_menu_remove_others'),
-          icon: Icons.layers_clear,
-          color: SheetMenuColors.accent,
-          label: 'Убрать остальные',
-          // Есть что убирать: у карты — хоть один слой, у слоя — другие слои.
-          onTap: (_isBase && hasMap && ids.isNotEmpty) || (onMap && ids.length > 1) ? removeOthers : null,
-        ),
-        SheetMenuItem(
-          key: const Key('layer_menu_move_up'),
-          // Верхний слой — только вниз, остальные — вверх.
-          icon: isTop ? Icons.arrow_downward : Icons.arrow_upward,
-          color: SheetMenuColors.accent,
-          label: isTop ? 'Переместить вниз' : 'Переместить вверх',
-          onTap: movable
-              ? () {
-                  final order = List.of(stack);
-                  final i = order.indexOf(stackId);
-                  order
-                    ..removeAt(i)
-                    ..insert(isTop ? i + 1 : i - 1, stackId);
-                  runLayerChange(context, () => notifier.reorderStack(order));
-                }
-              : null,
-        ),
+        // Без других слоёв убирать и двигать нечего — пунктов нет.
+        if (hasOthers)
+          SheetMenuItem(
+            key: const Key('layer_menu_remove_others'),
+            icon: Icons.layers_clear,
+            color: SheetMenuColors.accent,
+            label: 'Убрать остальные',
+            onTap: removeOthers,
+          ),
+        if (movable)
+          SheetMenuItem(
+            key: const Key('layer_menu_move_up'),
+            // Верхний слой — только вниз, остальные — вверх.
+            icon: isTop ? Icons.arrow_downward : Icons.arrow_upward,
+            color: SheetMenuColors.accent,
+            label: isTop ? 'Переместить вниз' : 'Переместить вверх',
+            onTap: () {
+              final order = List.of(stack);
+              final i = order.indexOf(stackId);
+              order
+                ..removeAt(i)
+                ..insert(isTop ? i + 1 : i - 1, stackId);
+              runLayerChange(context, () => notifier.reorderStack(order));
+            },
+          ),
         const SheetMenuSection('Изменить'),
         const Padding(
           key: Key('layer_menu_info'),

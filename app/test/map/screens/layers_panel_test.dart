@@ -182,8 +182,11 @@ void main() {
     await tester.pumpAndSettle();
     bool enabled(String key) =>
         tester.widget<InkWell>(find.descendant(of: find.byKey(Key(key)), matching: find.byType(InkWell)).first).onTap != null;
-    for (final key in ['layer_menu_remove', 'layer_menu_remove_others', 'layer_menu_move_up', 'layer_menu_force_refresh']) {
+    for (final key in ['layer_menu_remove', 'layer_menu_force_refresh']) {
       expect(enabled(key), isFalse, reason: key);
+    }
+    for (final key in ['layer_menu_compare', 'layer_menu_remove_others', 'layer_menu_move_up']) {
+      expect(find.byKey(Key(key)), findsNothing, reason: key);
     }
     for (final key in ['layer_menu_details', 'layer_menu_opacity', 'layer_menu_color', 'layer_menu_invert']) {
       expect(enabled(key), isTrue, reason: key);
@@ -238,15 +241,11 @@ void main() {
         tester.widget<InkWell>(find.descendant(of: find.byKey(Key(key)), matching: find.byType(InkWell)).first).onTap != null;
     expect(enabled('layer_menu_details'), isTrue);
     expect(enabled('layer_menu_opacity'), isTrue);
-    for (final key in [
-      'layer_menu_compare',
-      'layer_menu_remove',
-      'layer_menu_remove_others',
-      'layer_menu_move_up',
-      'layer_menu_color',
-      'layer_menu_invert',
-    ]) {
+    for (final key in ['layer_menu_remove', 'layer_menu_color', 'layer_menu_invert']) {
       expect(enabled(key), isFalse, reason: key);
+    }
+    for (final key in ['layer_menu_compare', 'layer_menu_remove_others', 'layer_menu_move_up']) {
+      expect(find.byKey(Key(key)), findsNothing, reason: key);
     }
   });
 
