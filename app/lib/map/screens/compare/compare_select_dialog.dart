@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../explorer/sheet_menu.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../models/map_models.dart';
+import '../../services/layer_manager.dart';
 import '../../state/map_layers_controller.dart';
 import '../layers_panel.dart';
 import '../on_screen/layer_context_menu.dart';
@@ -14,7 +15,7 @@ List<({String id, String name})> compareCandidates(MapState state, List<MapProvi
   final baseId = state.baseSourceId ?? LayersPanel.defaultBaseId;
   return [
     for (final layer in state.overlays.reversed) (id: layer.sourceId, name: layerName(providers, layer.sourceId)),
-    (id: LayerContextMenu.baseId, name: '${layerName(providers, baseId)} (карта)'),
+    if (baseId != LayerManager.noMapId) (id: LayerContextMenu.baseId, name: '${layerName(providers, baseId)} (карта)'),
   ];
 }
 
@@ -28,22 +29,20 @@ class CompareSelectTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-        onTap: () => onChanged(!selected),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: [
-              Checkbox(
-                value: selected,
-                activeColor: SheetMenuColors.accent,
-                onChanged: (v) => onChanged(v ?? false),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: Text(name, style: const TextStyle(fontSize: 16, color: SheetMenuColors.text))),
-            ],
+    onTap: () => onChanged(!selected),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Checkbox(value: selected, activeColor: SheetMenuColors.accent, onChanged: (v) => onChanged(v ?? false)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(name, style: const TextStyle(fontSize: 16, color: SheetMenuColors.text)),
           ),
-        ),
-      );
+        ],
+      ),
+    ),
+  );
 }
 
 /// «Сравнить...»: выбор 2+ слоёв; по умолчанию отмечен [sourceId].
@@ -54,9 +53,9 @@ class CompareSelectDialog extends ConsumerStatefulWidget {
   final String sourceId;
 
   static Future<List<String>?> show(BuildContext context, String sourceId) => showDialog<List<String>>(
-        context: context,
-        builder: (_) => CompareSelectDialog(sourceId: sourceId),
-      );
+    context: context,
+    builder: (_) => CompareSelectDialog(sourceId: sourceId),
+  );
 
   @override
   ConsumerState<CompareSelectDialog> createState() => _CompareSelectDialogState();
@@ -91,7 +90,10 @@ class _CompareSelectDialogState extends ConsumerState<CompareSelectDialog> {
           key: const Key('compare_select_ok'),
           style: buttonStyle,
           onPressed: () {
-            final ids = [for (final c in candidates) if (_selected.contains(c.id)) c.id];
+            final ids = [
+              for (final c in candidates)
+                if (_selected.contains(c.id)) c.id,
+            ];
             if (ids.length < 2) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Выберите хотя бы 2 слоя')));
               return;

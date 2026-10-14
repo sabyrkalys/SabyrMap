@@ -75,16 +75,41 @@ void main() {
     expect(h.state.overlays.map((l) => l.sourceId), ['yandex-hybrid']);
   });
 
-  testWidgets('for the base map «Убрать остальные» removes nothing and says why', (tester) async {
+  testWidgets('for the map «Убрать остальные» removes nothing and says why', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'base');
-    expect(enabled(tester, 'layer_menu_remove'), isFalse);
+    expect(enabled(tester, 'layer_menu_remove'), isTrue);
     expect(enabled(tester, 'layer_menu_opacity'), isFalse);
     expect(enabled(tester, 'layer_menu_color'), isFalse);
     await tester.tap(find.byKey(const Key('layer_menu_remove_others')));
     await tester.pumpAndSettle();
     expect(find.text('Карта остаётся всегда — её можно только сменить'), findsOneWidget);
     expect(h.state.overlays, hasLength(1));
+  });
+
+  testWidgets('«Убрать» on the map leaves «Нет карты»: the base map, layers stay; a map is picked again by a tap', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await openMenu(tester, 'base');
+    await tester.tap(find.byKey(const Key('layer_menu_remove')));
+    await tester.pumpAndSettle();
+    expect(h.state.baseSourceId, LayerManager.noMapId);
+    expect(h.state.overlays.single.sourceId, 'yandex-hybrid');
+    expect(h.store.saved!.baseSourceId, LayerManager.noMapId);
+    expect(find.text('Нет карты'), findsOneWidget);
+    expect(find.text('Карта · тап — выбрать'), findsOneWidget);
+    expect(find.byKey(const Key('layer_base_visible')), findsNothing);
+
+    await openMenu(tester, 'base');
+    expect(enabled(tester, 'layer_menu_remove'), isFalse);
+    expect(enabled(tester, 'layer_menu_details'), isFalse);
+    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+  });
+
+  testWidgets('«Нет карты» is remembered: the next start opens with no map', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer], base: LayerManager.noMapId));
+    expect(h.state.baseSourceId, LayerManager.noMapId);
+    expect(h.host.style, contains('"background"'));
+    expect(find.text('Нет карты'), findsOneWidget);
   });
 
   testWidgets('the top layer can be moved down, the others up; a single layer cannot move', (tester) async {

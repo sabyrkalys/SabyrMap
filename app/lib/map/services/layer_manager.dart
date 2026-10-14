@@ -166,6 +166,28 @@ class LayerManager {
   static const int zStep = 10;
   static const int tileSize = 256;
   static const String glyphsUrl = 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf';
+
+  /// «Нет карты»: пустой стиль (фон и шрифты для подписей меток) — видны
+  /// только базовая карта, слои и ортофотопланы.
+  static const String noMapId = '@none';
+  static final MapSource noMap = MapSource(
+    id: noMapId,
+    name: 'Нет карты',
+    format: TileFormat.vector,
+    storageMode: StorageMode.offlineRegion,
+    styleUrl: jsonEncode({
+      'version': 8,
+      'glyphs': glyphsUrl,
+      'sources': <String, Object>{},
+      'layers': [
+        {
+          'id': 'background',
+          'type': 'background',
+          'paint': {'background-color': '#e5e3df'},
+        },
+      ],
+    }),
+  );
   static const String isolatedMessage = 'Поверх карт Google нельзя накладывать другие карты';
   static const String orthophotoOverlayMessage = 'Ортофотопланы включаются кнопкой ортофотопланов';
 

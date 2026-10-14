@@ -5,6 +5,7 @@ import '../../../dialogs/confirm_dialog.dart';
 import '../../../explorer/sheet_menu.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../models/layer_look.dart';
+import '../../services/layer_manager.dart';
 import '../../state/map_layers_controller.dart';
 import '../compare/compare_mode_screen.dart';
 import '../compare/compare_select_dialog.dart';
@@ -27,12 +28,12 @@ class LayerContextMenu extends ConsumerWidget {
   final String sourceId;
 
   static Future<void> show(BuildContext context, String sourceId) => showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black12,
-        builder: (_) => LayerContextMenu(sourceId: sourceId),
-      );
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    barrierColor: Colors.black12,
+    builder: (_) => LayerContextMenu(sourceId: sourceId),
+  );
 
   bool get _isBase => sourceId == baseId;
 
@@ -43,6 +44,9 @@ class LayerContextMenu extends ConsumerWidget {
     final notifier = ref.read(mapLayersProvider.notifier);
     final providers = ref.watch(catalogProvider).value ?? const [];
     final realId = _isBase ? (state.baseSourceId ?? LayersPanel.defaultBaseId) : sourceId;
+    // Карта убрана — в строке карты «Нет карты».
+    final hasMap = (state.baseSourceId ?? LayersPanel.defaultBaseId) != LayerManager.noMapId;
+    final noMap = _isBase && !hasMap;
     final name = layerName(providers, realId);
     final ids = state.overlays.map((l) => l.sourceId).toList(); // снизу вверх
     final onMap = ids.contains(sourceId);
@@ -103,15 +107,15 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.info_outline,
           color: SheetMenuColors.accent,
           label: 'Детали',
-          onTap: () => openSheet((c) => LayerDetailsScreen.show(c, realId, layerMenuId: sourceId)),
+          onTap: noMap ? null : () => openSheet((c) => LayerDetailsScreen.show(c, realId, layerMenuId: sourceId)),
         ),
         SheetMenuItem(
           key: const Key('layer_menu_compare'),
           icon: Icons.compare,
           color: SheetMenuColors.accent,
           label: 'Сравнить...',
-          // Сравнивать есть что, когда кроме базовой карты есть хотя бы один слой.
-          onTap: !isOrthophotos && !isWorld && ids.isNotEmpty ? startCompare : null,
+          // Сравнивать: выбранная карта и слои, хотя бы двое.
+          onTap: !isOrthophotos && !isWorld && !noMap && ids.length + (hasMap ? 1 : 0) >= 2 ? startCompare : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_force_refresh'),
@@ -130,10 +134,13 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.close,
           color: SheetMenuColors.accent,
           label: 'Убрать',
-          onTap: editable
+          onTap: editable || (_isBase && !noMap)
               ? () {
                   navigator.pop();
-                  runLayerChange(context, () => notifier.removeOverlay(sourceId));
+                  runLayerChange(
+                    context,
+                    () async => _isBase ? await notifier.removeMap() : await notifier.removeOverlay(sourceId),
+                  );
                 }
               : null,
         ),
@@ -213,9 +220,12 @@ class LayerContextMenu extends ConsumerWidget {
           label: 'Инверсия цветов',
           onTap: lookEditable
               ? () => runLayerChange(
-                    context,
-                    () => notifier.setLook(sourceId, look.copyWith(color: look.color.copyWith(inverted: !look.color.inverted))),
-                  )
+                  context,
+                  () => notifier.setLook(
+                    sourceId,
+                    look.copyWith(color: look.color.copyWith(inverted: !look.color.inverted)),
+                  ),
+                )
               : null,
           trailing: Icon(
             look.color.inverted ? Icons.check_box : Icons.check_box_outline_blank,

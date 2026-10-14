@@ -81,6 +81,7 @@ class MapStateNotifier extends Notifier<MapState> {
   }
 
   Future<MapSource> _source(String id) async {
+    if (id == LayerManager.noMapId) return LayerManager.noMap;
     final providers = await ref.read(catalogProvider.future);
     for (final provider in providers) {
       for (final source in provider.sources) {
@@ -213,6 +214,9 @@ class MapStateNotifier extends Notifier<MapState> {
     _publish(state.copyWith(baseSourceId: source.id, overlays: _requireManager().getActiveLayers()));
     return result;
   }
+
+  /// Убирает выбранную карту: остаются базовая карта, слои и ортофотопланы.
+  Future<LayerChangeResult> removeMap() => setBase(LayerManager.noMap);
 
   Future<void> addOverlay(MapSource source, {double? opacity}) async {
     await _requireManager().addOverlay(source, opacity: opacity);

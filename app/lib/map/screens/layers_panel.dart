@@ -25,6 +25,7 @@ Map<String, ({MapProvider provider, MapSource source})> catalogIndex(List<MapPro
 String layerName(List<MapProvider> providers, String id) => switch (id) {
   MapStateNotifier.orthophotosKey => 'Ортофотопланы',
   MapStateNotifier.worldKey => 'Базовая карта',
+  LayerManager.noMapId => LayerManager.noMap.name,
   _ => catalogIndex(providers)[id]?.source.name ?? id,
 };
 
@@ -159,10 +160,10 @@ class LayersPanel extends ConsumerWidget {
                         OnScreenLayerBaseRow(
                           rowKey: const Key('layer_base_row'),
                           menuKey: const Key('layer_menu_base'),
-                          title: index[baseId]?.source.name ?? baseId,
-                          subtitle: 'Карта',
+                          title: layerName(providers, baseId),
+                          subtitle: baseId == LayerManager.noMapId ? 'Карта · тап — выбрать' : 'Карта',
                           source: index[baseId]?.source,
-                          visible: state.mapVisible,
+                          visible: baseId == LayerManager.noMapId ? null : state.mapVisible,
                           visibleKey: const Key('layer_base_visible'),
                           onVisible: (v) => runLayerChange(context, () => notifier.setMapVisible(v)),
                           onTap: () => Navigator.of(
