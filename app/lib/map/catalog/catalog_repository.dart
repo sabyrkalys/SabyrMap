@@ -176,6 +176,8 @@ class CatalogRepository {
           storageMode: StorageMode.onlineCache,
           minZoom: 0,
           maxZoom: 20,
+          // Слоем гибрид ложится целиком, со спутником.
+          canBeOverlay: true,
           downloadable: true,
         );
     return MapProvider(

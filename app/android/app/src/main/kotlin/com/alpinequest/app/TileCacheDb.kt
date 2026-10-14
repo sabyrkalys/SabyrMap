@@ -7,9 +7,9 @@ import java.io.File
 import java.util.zip.DataFormatException
 import java.util.zip.Inflater
 
-/// Read-only look into MapLibre's tile cache (files/mbgl-offline.db): how
-/// much each tile set takes, and the cached copy of a style or TileJSON.
-/// MapLibre keeps writing to the file, so every call opens it read-only
+/// A look into MapLibre's tile cache (files/mbgl-offline.db): how much each
+/// tile set takes, the cached copy of a style or TileJSON, and clearing a
+/// map's tiles. MapLibre keeps writing to the file, so every call opens it
 /// for a moment and lets a busy database surface as SQLiteException.
 class TileCacheDb(private val file: File) {
     /// Bytes per tile URL template, e.g.
@@ -32,9 +32,17 @@ class TileCacheDb(private val file: File) {
         }
     }
 
-    private fun <T> query(missing: T, block: (SQLiteDatabase) -> T): T {
+    /// Deletes the cached tiles of [templates]; tiles of downloaded regions
+    /// stay. Returns how many were deleted.
+    fun deleteTemplates(templates: List<String>): Int = query(0, SQLiteDatabase.OPEN_READWRITE) { db ->
+        templates.sumOf { template ->
+            db.delete("tiles", "url_template = ? AND id NOT IN (SELECT tile_id FROM region_tiles)", arrayOf(template))
+        }
+    }
+
+    private fun <T> query(missing: T, flags: Int = SQLiteDatabase.OPEN_READONLY, block: (SQLiteDatabase) -> T): T {
         if (!file.exists()) return missing
-        val db = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY)
+        val db = SQLiteDatabase.openDatabase(file.path, null, flags)
         try {
             return block(db)
         } finally {

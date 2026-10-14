@@ -48,17 +48,22 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-        // Per-map size of MapLibre's tile cache (TileCacheStats in Dart),
-        // read off the main thread.
+        // Per-map size of MapLibre's tile cache (TileCacheStats in Dart) and
+        // clearing a map's tiles, off the main thread.
         val tileCache = TileCacheDb(File(filesDir, "mbgl-offline.db"))
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "sabyrmap/tile_cache").setMethodCallHandler { call, result ->
             val work: (() -> Any?)? = when (call.method) {
                 "bytesByTemplate" -> { { tileCache.bytesByTemplate() } }
                 "resource" -> call.argument<String>("url")?.let { url -> { tileCache.resource(url) } }
+                "deleteTemplates" -> call.argument<List<String>>("templates")?.let { t -> { tileCache.deleteTemplates(t) } }
                 else -> null
             }
             if (work == null) {
-                if (call.method == "resource") result.error("bad_args", "url is required", null) else result.notImplemented()
+                when (call.method) {
+                    "resource" -> result.error("bad_args", "url is required", null)
+                    "deleteTemplates" -> result.error("bad_args", "templates are required", null)
+                    else -> result.notImplemented()
+                }
                 return@setMethodCallHandler
             }
             tileCacheThread.execute {

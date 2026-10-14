@@ -726,13 +726,13 @@ void main() {
           },
         );
 
-    test('lays its roads and labels under the annotations, without its background and imagery', () async {
+    test('lays its imagery, roads and labels under the annotations, without its background', () async {
       final m = vectorManager();
       await m.setBaseSource(liberty);
       await m.addOverlay(roads);
-      expect(host.sources.keys, contains('server-roads~osm'));
-      expect(host.sources.keys, isNot(contains('server-roads~satellite')));
-      expect(host.layers, ['server-roads~building', 'server-roads~road-main', 'server-roads~place-label']);
+      expect(host.sources.keys, containsAll(['server-roads~osm', 'server-roads~satellite']));
+      expect(host.layers,
+          ['server-roads~satellite', 'server-roads~building', 'server-roads~road-main', 'server-roads~place-label']);
       expect(host.calls, contains('addStyleLayer server-roads~road-main below lines_0'));
       expect(m.getActiveLayers().single.sourceId, 'server-roads');
     });
@@ -744,10 +744,12 @@ void main() {
       await m.setOpacity(roads.id, 0.5);
       expect((host.styleLayers_['server-roads~building']!['paint'] as Map)['fill-opacity'], 0.25);
       await m.setVisibility(roads.id, false);
-      expect(host.hidden, {'server-roads~building', 'server-roads~road-main', 'server-roads~place-label'});
+      expect(host.hidden,
+          {'server-roads~satellite', 'server-roads~building', 'server-roads~road-main', 'server-roads~place-label'});
       await m.removeOverlay(roads.id);
       expect(host.layers, isEmpty);
       expect(host.sources.keys, isNot(contains('server-roads~osm')));
+      expect(host.sources.keys, isNot(contains('server-roads~satellite')));
     });
 
     test('reorders with raster overlays and comes back after a base change', () async {

@@ -1,11 +1,18 @@
 /// A vector map laid over the map as a layer: the drawable layers of its
-/// style (lines, labels, areas) without its background and raster imagery,
-/// with source and layer ids prefixed so they live next to the map's own.
+/// style (lines, labels, areas, and raster imagery such as the satellite of
+/// a hybrid) without its background, with source and layer ids prefixed so
+/// they live next to the map's own.
 class VectorOverlay {
   const VectorOverlay({required this.sources, required this.layers});
 
-  /// Layer types taken from the style; background and raster stay behind.
+  /// Vector layer types; the chosen map scales their opacity too.
   static const Set<String> drawableTypes = {'line', 'symbol', 'fill', 'circle', 'fill-extrusion'};
+
+  /// Layer types taken into an overlay; the background stays behind.
+  static const Set<String> overlayTypes = {...drawableTypes, 'raster'};
+
+  /// Source types an overlay draws from.
+  static const Set<String> sourceTypes = {'vector', 'raster'};
 
   /// Opacity paint properties of each layer type.
   static const Map<String, List<String>> opacityProperties = {
@@ -14,9 +21,10 @@ class VectorOverlay {
     'fill-extrusion': ['fill-extrusion-opacity'],
     'symbol': ['text-opacity', 'icon-opacity'],
     'circle': ['circle-opacity', 'circle-stroke-opacity'],
+    'raster': ['raster-opacity'],
   };
 
-  /// Prefixed source id → its style JSON (vector sources only).
+  /// Prefixed source id → its style JSON (vector and raster sources).
   final Map<String, Map<String, dynamic>> sources;
 
   /// Prefixed layers, bottom → top, with their own opacity.
@@ -29,12 +37,12 @@ class VectorOverlay {
     final styleSources = (style['sources'] as Map<String, dynamic>? ?? const {});
     final vectorSources = {
       for (final e in styleSources.entries)
-        if ((e.value as Map<String, dynamic>)['type'] == 'vector') e.key: e.value as Map<String, dynamic>,
+        if (sourceTypes.contains((e.value as Map<String, dynamic>)['type'])) e.key: e.value as Map<String, dynamic>,
     };
     final layers = <Map<String, dynamic>>[
       for (final raw in (style['layers'] as List<dynamic>? ?? const []))
         if (raw is Map<String, dynamic> &&
-            drawableTypes.contains(raw['type']) &&
+            overlayTypes.contains(raw['type']) &&
             vectorSources.containsKey(raw['source']))
           {
             ...raw,

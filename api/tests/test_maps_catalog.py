@@ -68,7 +68,8 @@ def test_catalog_builds_absolute_urls_from_the_public_tiles_url(client, seeded):
 
     assert sources["server-hybrid-day"]["styleUrl"] == "https://maps.test/tiles/style/hybrid-day"
     assert sources["server-satellite"]["tileUrlTemplate"] == "https://maps.test/tiles/satellite/{z}/{x}/{y}"
-    assert sources["server-satellite"]["canBeOverlay"] is True
+    # Every server map can also lie over another one as a layer.
+    assert all(s["canBeOverlay"] for s in sources.values())
     assert sources["server-hybrid-day"]["storageMode"] == "onlineCache"
     assert sources["server-hybrid-day"]["version"] == "v1"
 

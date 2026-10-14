@@ -101,7 +101,7 @@ void main() {
     WidgetTester tester, {
     bool pickOverlay = false,
     Map<String, LocalMapInfo> localInfo = const {},
-    TileCacheReader cache = const _Cache({}),
+    TileCacheReader? cache,
     StorageUsage? storage = const StorageUsage(path: '/sd/maps', usedBytes: 238 * _gib, totalBytes: 487 * _gib),
     Map<String, File> previews = const {},
   }) async {
@@ -117,7 +117,7 @@ void main() {
         offlineServiceProvider.overrideWithValue(OfflineService(backend: backend)),
         localMapInfoProvider.overrideWith((ref) async => localInfo),
         deviceStorageProvider.overrideWith((ref) async => storage),
-        tileCacheReaderProvider.overrideWithValue(cache),
+        tileCacheReaderProvider.overrideWithValue(cache ?? _Cache({})),
         mapPreviewProvider.overrideWith((ref, source) async => previews[source.id]),
       ],
     );
@@ -445,7 +445,10 @@ void main() {
     ]);
     await tester.tap(find.byKey(const Key('map_card_menu_clearCache')));
     await tester.pumpAndSettle();
-    expect(find.text('Удалить сохранённые участки карты «OpenFreeMap Liberty» (3.0 МБ)?'), findsOneWidget);
+    expect(
+      find.text('Очистить кэш карты «OpenFreeMap Liberty» (3.0 МБ): просмотренные фрагменты и сохранённые участки?'),
+      findsOneWidget,
+    );
     await tester.tap(find.byKey(const Key('clear_cache_confirm')));
     await tester.pumpAndSettle();
     expect(backend.regions, isEmpty);
@@ -512,7 +515,7 @@ void main() {
   testWidgets('online maps show what MapLibre\'s tile cache holds for them', (tester) async {
     await pump(
       tester,
-      cache: const _Cache(
+      cache: _Cache(
         {'https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf': 3 * _mib, 'https://y/?x={x}&y={y}&z={z}&l=skl': _mib},
         resources: {
           'https://tiles.openfreemap.org/styles/liberty': '{"version": 8, "sources": {"ofm": {"type": "vector", '
@@ -533,6 +536,21 @@ void main() {
         findsOneWidget);
   });
 
+  testWidgets('«Очистить кэш» of an online map deletes the tiles kept while it was viewed', (tester) async {
+    final cache = _Cache({'https://y/?x={x}&y={y}&z={z}&l=skl': _mib});
+    await pump(tester, cache: cache);
+    await toggle(tester, 'yandex');
+    expect(await menuItems(tester, 'yandex-hybrid'), ['Показать', 'Добавить как слой', 'Детали', 'Очистить кэш']);
+    await tester.tap(find.byKey(const Key('map_card_menu_clearCache')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('clear_cache_confirm')));
+    await tester.pumpAndSettle();
+    expect(cache.deleted, {'https://y/?x={x}&y={y}&z={z}&l=skl'});
+    expect(find.text('Кэш очищен'), findsOneWidget);
+    expect(find.descendant(of: find.byKey(const Key('source_yandex-hybrid')), matching: find.text('Нет')),
+        findsOneWidget);
+  });
+
   test('TileCacheStats counts a tile set shared by several maps once', () async {
     const satellite = MapSource(
       id: 'sat',
@@ -549,7 +567,7 @@ void main() {
       styleUrl: 'https://s/style/hybrid-day',
     );
     final stats = await TileCacheStats.read(
-      const _Cache(
+      _Cache(
         {'https://s/satellite/{z}/{x}/{y}': 2 * _mib, 'https://s/osm/{z}/{x}/{y}': _mib},
         resources: {
           'https://s/style/hybrid-day': '{"sources": {"sat": {"type": "raster", "tiles": ["https://s/satellite/{z}/{x}/{y}"]},'
@@ -749,9 +767,10 @@ class _Storage implements StorageInfo {
 const _mib = 1024 * 1024;
 
 class _Cache implements TileCacheReader {
-  const _Cache(this.bytes, {this.resources = const {}});
+  _Cache(this.bytes, {this.resources = const {}});
 
   final Map<String, int> bytes;
+  final Set<String> deleted = {};
   final Map<String, String> resources;
 
   @override
@@ -759,6 +778,12 @@ class _Cache implements TileCacheReader {
 
   @override
   Future<String?> resource(String url) async => resources[url];
+
+  @override
+  Future<void> deleteTemplates(Set<String> templates) async {
+    deleted.addAll(templates);
+    bytes.removeWhere((t, _) => templates.contains(t));
+  }
 }
 
 /// A 1×1 transparent PNG.

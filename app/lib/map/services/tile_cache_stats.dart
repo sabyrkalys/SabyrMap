@@ -14,6 +14,10 @@ abstract class TileCacheReader {
 
   /// The cached body of a style or TileJSON [url], null when not cached.
   Future<String?> resource(String url);
+
+  /// Deletes the cached tiles of [templates] (not those of downloaded
+  /// regions). Throws [PlatformException] when the cache can't be changed.
+  Future<void> deleteTemplates(Set<String> templates);
 }
 
 class PlatformTileCacheReader implements TileCacheReader {
@@ -30,6 +34,15 @@ class PlatformTileCacheReader implements TileCacheReader {
       return const {};
     } on MissingPluginException {
       return const {};
+    }
+  }
+
+  @override
+  Future<void> deleteTemplates(Set<String> templates) async {
+    try {
+      await _channel.invokeMethod<int>('deleteTemplates', {'templates': templates.toList()});
+    } on MissingPluginException {
+      // No tile cache on this platform.
     }
   }
 
@@ -55,6 +68,9 @@ class TileCacheStats {
 
   final Map<String, Set<String>> templatesBySource;
   final Map<String, int> bytesByTemplate;
+
+  /// Tile URL templates map [sourceId] draws from (known once cached).
+  Set<String> templatesOf(String sourceId) => templatesBySource[sourceId] ?? const {};
 
   int bytesOf(Iterable<String> sourceIds) {
     final templates = {for (final id in sourceIds) ...?templatesBySource[id]};

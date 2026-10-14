@@ -89,7 +89,10 @@ class MapLibreLayerHost implements MapLayerHost {
 
   @override
   Future<void> addStyleSource(String sourceId, Map<String, dynamic> source) =>
-      _controller.addSource(sourceId, VectorSourceProperties.fromJson(source));
+      _controller.addSource(
+        sourceId,
+        source['type'] == 'raster' ? RasterSourceProperties.fromJson(source) : VectorSourceProperties.fromJson(source),
+      );
 
   /// The style JSON's layout and paint, flattened as maplibre_gl wants them.
   static LayerProperties? _properties(Map<String, dynamic> layer) {

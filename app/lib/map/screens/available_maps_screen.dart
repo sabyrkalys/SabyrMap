@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLngBounds;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -166,16 +167,25 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         if (widget.pickOverlay && mounted) Navigator.of(context).pop(true);
       });
 
-  Future<void> _clearCache(MapSource source, List<OfflineRegionInfo> regions) => _run(() async {
+  /// An online map's cache: its saved areas and the tiles MapLibre kept
+  /// while it was viewed ([templates]).
+  Future<void> _clearCache(MapSource source, List<OfflineRegionInfo> regions, Set<String> templates) =>
+      _run(() async {
         final own = regions.where((r) => r.sourceId == source.id).toList();
-        if (own.isEmpty) {
-          _message('Для этой карты нет сохранённых участков');
-          return;
-        }
         for (final region in own) {
           await ref.read(offlineServiceProvider).deleteRegion(region.id);
         }
-        await _reloadRegions();
+        if (templates.isNotEmpty) {
+          try {
+            await ref.read(tileCacheReaderProvider).deleteTemplates(templates);
+          } on PlatformException catch (e) {
+            _message('Кэш не очищен: ${e.message}');
+            return;
+          }
+          ref.invalidate(tileCacheStatsProvider);
+        }
+        if (own.isNotEmpty) await _reloadRegions();
+        _message('Кэш очищен');
       });
 
   Future<void> _saveRegion(MapSource source) async {
@@ -353,6 +363,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     required bool canOverlay,
     required bool canClearCache,
     required int sizeBytes,
+    required Set<String> cachedTemplates,
     required String sourceName,
   }) async {
     final action = await showMapCardMenu(
@@ -374,7 +385,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
       case MapCardAction.details:
         await LayerDetailsScreen.show(context, source.id, groupTitle: sourceName);
       case MapCardAction.clearCache:
-        await _confirmClearCache(source, sizeBytes);
+        await _confirmClearCache(source, sizeBytes, cachedTemplates);
     }
   }
 
@@ -391,7 +402,7 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
 
   /// «Очистить кэш»: deletes a downloaded region, or the saved areas of an
   /// online map, after a confirmation.
-  Future<void> _confirmClearCache(MapSource source, int sizeBytes) async {
+  Future<void> _confirmClearCache(MapSource source, int sizeBytes, Set<String> templates) async {
     final downloaded = source.id.startsWith(CatalogRepository.localRegionPrefix);
     if (downloaded && ref.read(mapLayersProvider).baseSourceId == source.id) {
       _message('Эта карта сейчас на экране — сначала выберите другую');
@@ -404,7 +415,8 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
         content: Text(
           downloaded
               ? 'Удалить скачанную карту «${source.name}» (${formatBytes(sizeBytes)}) с телефона?'
-              : 'Удалить сохранённые участки карты «${source.name}» (${formatBytes(sizeBytes)})?',
+              : 'Очистить кэш карты «${source.name}» (${formatBytes(sizeBytes)}): просмотренные фрагменты '
+                  'и сохранённые участки?',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Отмена')),
@@ -420,10 +432,10 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
     if (confirmed != true || !mounted) return;
     if (downloaded) {
       await _deleteLocalRegion(source);
+      _message('Кэш очищен');
     } else {
-      await _clearCache(source, _regions);
+      await _clearCache(source, _regions, templates);
     }
-    _message('Кэш очищен');
   }
 
   Widget _mapList({required double bottomInset}) {
@@ -476,10 +488,12 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
           source,
           active: mapState.baseSourceId == source.id || mapState.overlays.any((o) => o.sourceId == source.id),
           canOverlay: canOverlay,
-          // Downloaded regions and saved areas; never the user's own files.
+          // Downloaded regions, saved areas and viewed tiles; never the
+          // user's own files.
           canClearCache: source.id.startsWith(CatalogRepository.localRegionPrefix) ||
-              (!source.id.startsWith('local-') && cacheOf(source) > 0),
-          sizeBytes: sizeBytes ?? cacheOf(source),
+              (!source.id.startsWith('local-') && cacheOf(source) + tileCache.bytesOf([source.id]) > 0),
+          sizeBytes: sizeBytes ?? cacheOf(source) + tileCache.bytesOf([source.id]),
+          cachedTemplates: sizeBytes == null ? tileCache.templatesOf(source.id) : const {},
           sourceName: titles[groupFor((origin ?? source).id)]!,
         ),
       );

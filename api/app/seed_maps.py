@@ -16,14 +16,15 @@ from app.database import SessionLocal
 from app.models.map_catalog import MapCatalogEntry
 from app.services import maps, pmtiles
 
-# id, name template, style_path, format, min/max zoom, can_be_overlay
+# id, name template, style_path, format, min/max zoom, can_be_overlay (every
+# map can also lie over another one; a hybrid goes with its satellite)
 _MAPS = [
-    ("server-hybrid-day", "{region} · спутник + дороги", "style/hybrid-day", "vector", 0, 20, False),
+    ("server-hybrid-day", "{region} · спутник + дороги", "style/hybrid-day", "vector", 0, 20, True),
     ("server-hybrid-day-nobuildings", "{region} · спутник + дороги, без зданий", "style/hybrid-day-nobuildings",
-     "vector", 0, 20, False),
-    ("server-hybrid-night", "{region} · ночь", "style/hybrid-night", "vector", 0, 20, False),
-    ("server-vector-day", "{region} · только дороги", "style/vector-day", "vector", 0, 20, False),
-    ("server-vector-night", "{region} · только дороги (ночь)", "style/vector-night", "vector", 0, 20, False),
+     "vector", 0, 20, True),
+    ("server-hybrid-night", "{region} · ночь", "style/hybrid-night", "vector", 0, 20, True),
+    ("server-vector-day", "{region} · только дороги", "style/vector-day", "vector", 0, 20, True),
+    ("server-vector-night", "{region} · только дороги (ночь)", "style/vector-night", "vector", 0, 20, True),
     ("server-satellite", "{region} · спутник", "satellite/{z}/{x}/{y}", "raster", 0, 17, True),
 ]
 

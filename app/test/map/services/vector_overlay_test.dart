@@ -45,22 +45,24 @@ final hybridStyle = <String, dynamic>{
 };
 
 void main() {
-  test('takes the drawable vector layers, prefixed; background and imagery stay behind', () {
+  test('takes the drawable layers and the imagery, prefixed; the background stays behind', () {
     final overlay = VectorOverlay.fromStyle('roads', hybridStyle);
-    expect(overlay.layers.map((l) => l['id']), ['roads~building', 'roads~road-main', 'roads~place-label']);
-    expect(overlay.layers.map((l) => l['source']).toSet(), {'roads~osm'});
-    expect(overlay.layers[1]['source-layer'], 'transportation');
-    expect(overlay.sources.keys, ['roads~osm']);
-    expect(overlay.bottomLayerId, 'roads~building');
+    expect(overlay.layers.map((l) => l['id']),
+        ['roads~satellite', 'roads~building', 'roads~road-main', 'roads~place-label']);
+    expect(overlay.layers.map((l) => l['source']).toSet(), {'roads~satellite', 'roads~osm'});
+    expect(overlay.layers[2]['source-layer'], 'transportation');
+    expect(overlay.sources.keys, ['roads~osm', 'roads~satellite']);
+    expect(overlay.bottomLayerId, 'roads~satellite');
   });
 
   test('opacity scales numbers, zoom curves and missing values', () {
     final overlay = VectorOverlay.fromStyle('roads', hybridStyle);
     final half = [for (final l in overlay.layers) VectorOverlay.withOpacity(l, 0.5)];
-    expect((half[0]['paint'] as Map)['fill-opacity'], 0.25);
-    expect((half[1]['paint'] as Map)['line-opacity'], ['interpolate', ['linear'], ['zoom'], 8, 0.2, 14, 0.5]);
-    expect((half[2]['paint'] as Map)['text-opacity'], 0.5);
-    expect((half[2]['paint'] as Map)['icon-opacity'], 0.5);
+    expect((half[0]['paint'] as Map)['raster-opacity'], 0.5);
+    expect((half[1]['paint'] as Map)['fill-opacity'], 0.25);
+    expect((half[2]['paint'] as Map)['line-opacity'], ['interpolate', ['linear'], ['zoom'], 8, 0.2, 14, 0.5]);
+    expect((half[3]['paint'] as Map)['text-opacity'], 0.5);
+    expect((half[3]['paint'] as Map)['icon-opacity'], 0.5);
     expect(VectorOverlay.scaleOpacity(['step', ['zoom'], 0, 10, 1], 0.5), ['step', ['zoom'], 0, 10, 0.5]);
     expect(VectorOverlay.scaleOpacity(['get', 'o'], 0.5), ['*', ['get', 'o'], 0.5]);
   });
