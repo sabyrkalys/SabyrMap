@@ -84,6 +84,7 @@ class MapLibreLayerHost implements MapLayerHost {
         rasterBrightnessMax: color.brightnessMax,
         rasterContrast: color.contrast,
         rasterSaturation: color.saturation,
+        rasterHueRotate: color.hueRotate,
       );
 
   @override

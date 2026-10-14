@@ -2,15 +2,14 @@ import 'package:app/maps/layer_stack/layer_blending.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('all 7 blending modes, in a fixed order', () {
+  test('6 blending modes, in the order of the menu', () {
     expect(LayerBlending.values.map((b) => b.name), [
       'normal',
-      'multiply',
+      'lighten',
       'screen',
       'overlay',
+      'multiply',
       'darken',
-      'lighten',
-      'softLight',
     ]);
   });
 }

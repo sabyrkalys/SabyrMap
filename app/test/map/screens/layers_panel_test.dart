@@ -8,7 +8,9 @@ import 'dart:io';
 
 import 'package:app/map/screens/on_screen/on_screen_layer_row.dart';
 import 'package:app/map/services/map_previews.dart';
+import 'package:app/map/models/layer_look.dart';
 import 'package:app/map/state/map_layers_controller.dart';
+import 'package:app/maps/color/erase_color_settings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -248,6 +250,20 @@ void main() {
     ]) {
       expect(enabled(key), isFalse, reason: key);
     }
+  });
+
+  testWidgets('a layer with «Удалить цвет» on shows it in red under its opacity', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    expect(find.byKey(const Key('layer_status_erase')), findsNothing);
+    await h.container
+        .read(mapLayersProvider.notifier)
+        .setLook('yandex-hybrid', LayerLook(erase: EraseColorSettings.fromColor(0xFF3A152D)));
+    await tester.pumpAndSettle();
+    final status = find.byKey(const Key('layer_status_erase'));
+    expect(status, findsOneWidget);
+    expect(tester.widget<Text>(status).data, 'Удалить цвет');
+    expect(find.descendant(of: find.ancestor(of: find.text('Яндекс Гибрид'), matching: find.byType(Column)).first, matching: status),
+        findsOneWidget);
   });
 
   testWidgets('«Добавить слой» opens the catalog in overlay-picking mode', (tester) async {

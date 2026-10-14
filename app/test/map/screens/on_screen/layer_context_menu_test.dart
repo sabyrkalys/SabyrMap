@@ -1,11 +1,11 @@
 import 'package:app/map/screens/compare/compare_mode_screen.dart';
 import 'package:app/map/screens/compare/compare_select_dialog.dart';
 import 'package:app/map/screens/layer_details/layer_details_screen.dart';
+import 'package:app/map/screens/layer_look/erase_color_screen.dart';
+import 'package:app/map/screens/layer_look/layer_color_screen.dart';
 import 'package:app/map/screens/layers_panel.dart';
 import 'package:app/map/screens/on_screen/layer_blending_sheet.dart';
-import 'package:app/map/screens/on_screen/layer_color_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_context_menu.dart';
-import 'package:app/map/screens/on_screen/layer_erase_color_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_opacity_sheet.dart';
 import 'package:app/map/services/layer_manager.dart';
 import 'package:app/map/state/map_layers_controller.dart';
@@ -211,60 +211,26 @@ void main() {
     );
   });
 
-  testWidgets('«Изменить цвет»: sliders change the map at once, ОТМЕНА puts it back', (tester) async {
+  testWidgets('«Изменить цвет» and «Удалить цвет» open their screens and hide the panel until ✓', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'yandex-hybrid');
     await tester.tap(find.byKey(const Key('layer_menu_color')));
     await tester.pumpAndSettle();
-    expect(find.byType(LayerColorSheet), findsOneWidget);
+    expect(find.byType(LayerColorScreen), findsOneWidget);
+    expect(find.byType(LayersPanel), findsNothing);
+    await tester.tap(find.byKey(const Key('look_done')));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayerColorScreen), findsNothing);
+    expect(find.byType(LayersPanel), findsOneWidget);
 
-    final saturation = find.descendant(of: find.byKey(const Key('color_saturation')), matching: find.byType(Slider));
-    tester.widget<Slider>(saturation).onChanged!(0);
-    await tester.pumpAndSettle();
-    expect(h.host.colors[layerId('yandex-hybrid')]!.saturation, -1);
-
-    await tester.tap(find.byKey(const Key('look_cancel')));
-    await tester.pumpAndSettle();
-    expect(find.byType(LayerColorSheet), findsNothing);
-    expect(h.host.colors[layerId('yandex-hybrid')], RasterColor.none);
-  });
-
-  testWidgets('«Изменить цвет»: СБРОСИТЬ returns the defaults, ОК keeps the change', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer]));
-    await openMenu(tester, 'yandex-hybrid');
-    await tester.tap(find.byKey(const Key('layer_menu_color')));
-    await tester.pumpAndSettle();
-    final brightness = find.descendant(of: find.byKey(const Key('color_brightness')), matching: find.byType(Slider));
-    tester.widget<Slider>(brightness).onChanged!(50);
-    await tester.pumpAndSettle();
-    expect(h.host.colors[layerId('yandex-hybrid')]!.brightnessMin, 0.5);
-    await tester.tap(find.byKey(const Key('look_reset')));
-    await tester.pumpAndSettle();
-    expect(h.host.colors[layerId('yandex-hybrid')], RasterColor.none);
-    tester.widget<Slider>(brightness).onChanged!(-50);
-    await tester.tap(find.byKey(const Key('look_ok')));
-    await tester.pumpAndSettle();
-    expect(h.container.read(layerLooksProvider)['yandex-hybrid']!.color.brightness, -0.5);
-  });
-
-  testWidgets('«Удалить цвет»: switch and channel sliders are kept for the session', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'yandex-hybrid');
     await tester.tap(find.byKey(const Key('layer_menu_erase')));
     await tester.pumpAndSettle();
-    expect(find.byType(LayerEraseColorSheet), findsOneWidget);
-    await tester.tap(find.byKey(const Key('erase_enabled')));
-    await tester.pumpAndSettle();
-    final red = find.descendant(of: find.byKey(const Key('erase_channel_0')), matching: find.byType(Slider));
-    tester.widget<Slider>(red).onChanged!(200);
-    await tester.pumpAndSettle();
-    final erase = h.container.read(layerLooksProvider)['yandex-hybrid']!.erase;
-    expect(erase.enabled, isTrue);
-    expect(erase.ranges.map((r) => r.center), [200, 255, 255]);
-    expect(erase.screenCenterHex, '#C8FFFF');
+    expect(find.byType(EraseColorScreen), findsOneWidget);
+    expect(find.byType(LayersPanel), findsNothing);
   });
 
-  testWidgets('«Режим смешивания слоёв»: one mode is picked and the sheet closes', (tester) async {
+  testWidgets('«Режим смешивания слоёв»: one mode is picked, the sheet closes, the mode is told', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'yandex-hybrid');
     await tester.tap(find.byKey(const Key('layer_menu_blending')));
@@ -274,6 +240,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(LayerBlendingSheet), findsNothing);
     expect(h.container.read(layerLooksProvider)['yandex-hybrid']!.blending, LayerBlending.multiply);
+    expect(find.text('Режим: Умножение'), findsOneWidget);
   });
 
   testWidgets('removing a layer drops its look', (tester) async {

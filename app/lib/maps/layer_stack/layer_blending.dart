@@ -1,2 +1,2 @@
 /// Режим наложения слоя (порядок фиксирован).
-enum LayerBlending { normal, multiply, screen, overlay, darken, lighten, softLight }
+enum LayerBlending { normal, lighten, screen, overlay, multiply, darken }

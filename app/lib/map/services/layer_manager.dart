@@ -70,7 +70,13 @@ abstract class MapLayerHost {
 
 /// A raster layer's colour correction in MapLibre's terms.
 class RasterColor {
-  const RasterColor({this.brightnessMin = 0, this.brightnessMax = 1, this.contrast = 0, this.saturation = 0});
+  const RasterColor({
+    this.brightnessMin = 0,
+    this.brightnessMax = 1,
+    this.contrast = 0,
+    this.saturation = 0,
+    this.hueRotate = 0,
+  });
 
   static const RasterColor none = RasterColor();
 
@@ -86,6 +92,7 @@ class RasterColor {
       brightnessMax: s.inverted ? low : high,
       contrast: (s.contrast - 1).clamp(-1.0, 1.0),
       saturation: (s.saturation - 1).clamp(-1.0, 1.0),
+      hueRotate: s.hue.clamp(-1.0, 1.0) * 180,
     );
   }
 
@@ -98,16 +105,20 @@ class RasterColor {
   /// −1..1, 0 — unchanged.
   final double saturation;
 
+  /// Degrees, 0 — unchanged.
+  final double hueRotate;
+
   @override
   bool operator ==(Object other) =>
       other is RasterColor &&
       other.brightnessMin == brightnessMin &&
       other.brightnessMax == brightnessMax &&
       other.contrast == contrast &&
-      other.saturation == saturation;
+      other.saturation == saturation &&
+      other.hueRotate == hueRotate;
 
   @override
-  int get hashCode => Object.hash(brightnessMin, brightnessMax, contrast, saturation);
+  int get hashCode => Object.hash(brightnessMin, brightnessMax, contrast, saturation, hueRotate);
 }
 
 /// Whether [url] points at a whole tileset (TileJSON-like, e.g. a local

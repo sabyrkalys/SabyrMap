@@ -80,6 +80,7 @@ class LayersPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final providers = ref.watch(catalogProvider).value ?? const <MapProvider>[];
     final state = ref.watch(mapLayersProvider);
+    final looks = ref.watch(layerLooksProvider);
     final notifier = ref.read(mapLayersProvider.notifier);
     final index = catalogIndex(providers);
     final baseId = state.baseSourceId ?? defaultBaseId;
@@ -129,7 +130,7 @@ class LayersPanel extends ConsumerWidget {
                             source: orthophotos.first,
                             onVisible: (v) => runLayerChange(context, () => notifier.setOrthophotosOn(v)),
                             onOpacity: () => _openOpacity(context, MapStateNotifier.orthophotosKey),
-                            onMenu: () => LayerContextMenu.show(context, MapStateNotifier.orthophotosKey),
+                            onMenu: () => LayerContextMenu.show(context, MapStateNotifier.orthophotosKey, fromPanel: true),
                           ),
                         // Порядок — ручкой ≡ (долгий тап по строке открывает меню).
                         ReorderableListView(
@@ -149,10 +150,11 @@ class LayersPanel extends ConsumerWidget {
                                 layer: layer,
                                 name: index[layer.sourceId]?.source.name ?? layer.sourceId,
                                 source: index[layer.sourceId]?.source,
+                                erasing: looks[layer.sourceId]?.erase.enabled ?? false,
                                 onVisible: (v) =>
                                     runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
                                 onOpacity: () => _openOpacity(context, layer.sourceId),
-                                onMenu: () => LayerContextMenu.show(context, layer.sourceId),
+                                onMenu: () => LayerContextMenu.show(context, layer.sourceId, fromPanel: true),
                               ),
                           ],
                         ),
@@ -171,7 +173,7 @@ class LayersPanel extends ConsumerWidget {
                             onTap: () => Navigator.of(
                               context,
                             ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
-                            onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId),
+                            onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId, fromPanel: true),
                           ),
                         // Встроенная карта мира под всеми: видна, где у карты нет тайлов.
                         OnScreenLayerBaseRow(
@@ -181,7 +183,7 @@ class LayersPanel extends ConsumerWidget {
                           subtitle: opacityLabel(state.worldOpacity),
                           image: const AssetImage(WorldBaseMap.preview),
                           onTap: () => _openOpacity(context, MapStateNotifier.worldKey),
-                          onMenu: () => LayerContextMenu.show(context, MapStateNotifier.worldKey),
+                          onMenu: () => LayerContextMenu.show(context, MapStateNotifier.worldKey, fromPanel: true),
                         ),
                         Align(
                           alignment: Alignment.centerLeft,

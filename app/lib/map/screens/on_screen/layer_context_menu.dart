@@ -10,30 +10,35 @@ import '../../state/map_layers_controller.dart';
 import '../compare/compare_mode_screen.dart';
 import '../compare/compare_select_dialog.dart';
 import '../layer_details/layer_details_screen.dart';
+import '../layer_look/erase_color_screen.dart';
+import '../layer_look/layer_color_screen.dart';
 import '../layers_panel.dart';
 import 'force_refresh_dialog.dart';
 import 'layer_blending_sheet.dart';
-import 'layer_color_sheet.dart';
-import 'layer_erase_color_sheet.dart';
 import 'layer_opacity_sheet.dart';
 
 /// Меню слоя «Карт на экране»: детали, порядок и вид слоя. Для базовой
 /// карты ([baseId]) доступны только детали: её не убрать и не изменить.
 class LayerContextMenu extends ConsumerWidget {
-  const LayerContextMenu({super.key, required this.sourceId});
+  const LayerContextMenu({super.key, required this.sourceId, this.fromPanel = false});
 
   /// Вместо id источника — базовая карта.
   static const String baseId = '';
 
   final String sourceId;
 
-  static Future<void> show(BuildContext context, String sourceId) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black12,
-    builder: (_) => LayerContextMenu(sourceId: sourceId),
-  );
+  /// Открыто из «Карт на экране»: экраны непрозрачности и цвета прячут
+  /// панель, чтобы карта была видна, и возвращают её после.
+  final bool fromPanel;
+
+  static Future<void> show(BuildContext context, String sourceId, {bool fromPanel = false}) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black12,
+        builder: (_) => LayerContextMenu(sourceId: sourceId, fromPanel: fromPanel),
+      );
 
   bool get _isBase => sourceId == baseId;
 
@@ -65,6 +70,16 @@ class LayerContextMenu extends ConsumerWidget {
       final under = navigator.context;
       navigator.pop();
       open(under);
+    }
+
+    /// Как [openSheet], но на время экрана прячет «Карты на экране».
+    Future<void> openOverMap(Future<void> Function(BuildContext context) open) async {
+      final under = navigator.context;
+      navigator.pop();
+      if (!fromPanel) return open(under);
+      navigator.pop();
+      await open(under);
+      if (under.mounted) await LayersPanel.show(under);
     }
 
     Future<void> removeOthers() async {
@@ -190,21 +205,21 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.layers_outlined,
           color: SheetMenuColors.edit,
           label: 'Непрозрачность',
-          onTap: lookEditable || isWorld ? () => openSheet((c) => LayerOpacitySheet.show(c, sourceId)) : null,
+          onTap: lookEditable || isWorld ? () => openOverMap((c) => LayerOpacitySheet.show(c, sourceId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_color'),
           icon: Icons.palette_outlined,
           color: SheetMenuColors.edit,
           label: 'Изменить цвет',
-          onTap: lookEditable ? () => openSheet((c) => LayerColorSheet.show(c, sourceId)) : null,
+          onTap: lookEditable ? () => openOverMap((c) => LayerColorScreen.show(c, sourceId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_erase'),
           icon: Icons.colorize_outlined,
           color: SheetMenuColors.edit,
           label: 'Удалить цвет',
-          onTap: lookEditable ? () => openSheet((c) => LayerEraseColorSheet.show(c, sourceId)) : null,
+          onTap: lookEditable ? () => openOverMap((c) => EraseColorScreen.show(c, sourceId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_blending'),

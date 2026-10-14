@@ -7,6 +7,18 @@ import 'color_range.dart';
 class EraseColorSettings {
   const EraseColorSettings({this.enabled = false, this.ranges = const [], this.screenCenterHex});
 
+  /// Выключено, три диапазона вокруг чёрного шириной по умолчанию.
+  factory EraseColorSettings.empty() => const EraseColorSettings(
+        ranges: [
+          ColorRange(channel: 0, center: 0),
+          ColorRange(channel: 1, center: 0),
+          ColorRange(channel: 2, center: 0),
+        ],
+      );
+
+  /// Включено и есть хотя бы один диапазон.
+  bool get isActive => enabled && ranges.isNotEmpty;
+
   /// Диапазоны вокруг цвета [argb] по трём каналам.
   factory EraseColorSettings.fromColor(int argb, {int width = ColorRange.defaultWidth, bool enabled = true}) =>
       EraseColorSettings(

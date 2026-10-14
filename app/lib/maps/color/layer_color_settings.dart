@@ -6,6 +6,7 @@ class LayerColorSettings {
     this.saturation = 1.0,
     this.tint,
     this.inverted = false,
+    this.hue = 0.0,
   });
 
   /// Без изменений.
@@ -24,6 +25,9 @@ class LayerColorSettings {
   final int? tint;
   final bool inverted;
 
+  /// Поворот цветового круга, −1..1 (−180°..180°), 0 — без изменений.
+  final double hue;
+
   bool get isIdentity => this == const LayerColorSettings();
 
   static const Object _keep = Object();
@@ -34,12 +38,14 @@ class LayerColorSettings {
     double? saturation,
     Object? tint = _keep,
     bool? inverted,
+    double? hue,
   }) => LayerColorSettings(
     contrast: contrast ?? this.contrast,
     brightness: brightness ?? this.brightness,
     saturation: saturation ?? this.saturation,
     tint: identical(tint, _keep) ? this.tint : tint as int?,
     inverted: inverted ?? this.inverted,
+    hue: hue ?? this.hue,
   );
 
   Map<String, Object?> toJson() => {
@@ -48,6 +54,7 @@ class LayerColorSettings {
     'saturation': saturation,
     'tint': tint,
     'inverted': inverted,
+    'hue': hue,
   };
 
   factory LayerColorSettings.fromJson(Map<String, dynamic> json) => LayerColorSettings(
@@ -56,6 +63,7 @@ class LayerColorSettings {
     saturation: (json['saturation'] as num?)?.toDouble() ?? 1.0,
     tint: json['tint'] as int?,
     inverted: json['inverted'] as bool? ?? false,
+    hue: (json['hue'] as num?)?.toDouble() ?? 0.0,
   );
 
   @override
@@ -65,8 +73,9 @@ class LayerColorSettings {
       other.brightness == brightness &&
       other.saturation == saturation &&
       other.tint == tint &&
-      other.inverted == inverted;
+      other.inverted == inverted &&
+      other.hue == hue;
 
   @override
-  int get hashCode => Object.hash(contrast, brightness, saturation, tint, inverted);
+  int get hashCode => Object.hash(contrast, brightness, saturation, tint, inverted, hue);
 }

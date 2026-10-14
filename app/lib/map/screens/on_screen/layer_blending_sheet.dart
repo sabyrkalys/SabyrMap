@@ -9,13 +9,12 @@ import '../layers_panel.dart';
 
 /// Подпись режима смешивания.
 String blendingLabel(LayerBlending mode) => switch (mode) {
-      LayerBlending.normal => 'Обычный',
-      LayerBlending.multiply => 'Умножение',
-      LayerBlending.screen => 'Осветление (экран)',
-      LayerBlending.overlay => 'Перекрытие',
-      LayerBlending.darken => 'Замена тёмным',
+      LayerBlending.normal => 'Нормальный (по умолчанию)',
       LayerBlending.lighten => 'Замена светлым',
-      LayerBlending.softLight => 'Мягкий свет',
+      LayerBlending.screen => 'Экран',
+      LayerBlending.overlay => 'Перекрытие',
+      LayerBlending.multiply => 'Умножение',
+      LayerBlending.darken => 'Затенение',
     };
 
 /// «Режим смешивания слоёв»: один режим из [LayerBlending].
@@ -42,8 +41,10 @@ class LayerBlendingSheet extends ConsumerWidget {
           groupValue: look.blending,
           onChanged: (mode) {
             if (mode == null) return;
+            final messenger = ScaffoldMessenger.of(context);
             runLayerChange(context, () => ref.read(mapLayersProvider.notifier).setLook(sourceId, look.copyWith(blending: mode)));
             navigator.pop();
+            messenger.showSnackBar(SnackBar(content: Text('Режим: ${blendingLabel(mode)}')));
           },
           child: Column(
             children: [

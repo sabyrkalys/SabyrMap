@@ -72,6 +72,7 @@ class OnScreenLayerRow extends StatelessWidget {
     required this.layer,
     required this.name,
     this.source,
+    this.erasing = false,
     required this.onVisible,
     required this.onOpacity,
     required this.onMenu,
@@ -83,6 +84,9 @@ class OnScreenLayerRow extends StatelessWidget {
   final ActiveLayer layer;
   final String name;
   final MapSource? source;
+
+  /// У слоя включено «Удалить цвет» — красная строка-статус.
+  final bool erasing;
   final ValueChanged<bool> onVisible;
   final VoidCallback onOpacity;
   final VoidCallback onMenu;
@@ -121,6 +125,12 @@ class OnScreenLayerRow extends StatelessWidget {
                 children: [
                   Text(name, style: _titleStyle, maxLines: 1, overflow: TextOverflow.ellipsis),
                   Text(opacityLabel(layer.opacity), style: _subtitleStyle),
+                  if (erasing)
+                    const Text(
+                      'Удалить цвет',
+                      key: Key('layer_status_erase'),
+                      style: TextStyle(fontSize: 11, color: Color(0xFFD32F2F)),
+                    ),
                 ],
               ),
             ),
