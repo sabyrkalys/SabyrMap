@@ -10,11 +10,9 @@ import '../../state/map_layers_controller.dart';
 import '../compare/compare_mode_screen.dart';
 import '../compare/compare_select_dialog.dart';
 import '../layer_details/layer_details_screen.dart';
-import '../layer_look/erase_color_screen.dart';
 import '../layer_look/layer_color_screen.dart';
 import '../layers_panel.dart';
 import 'force_refresh_dialog.dart';
-import 'layer_blending_sheet.dart';
 import 'layer_opacity_sheet.dart';
 
 /// Меню слоя «Карт на экране»: детали, порядок и вид слоя. Для базовой
@@ -215,20 +213,6 @@ class LayerContextMenu extends ConsumerWidget {
           color: SheetMenuColors.edit,
           label: 'Изменить цвет',
           onTap: lookEditable ? () => openOverMap((c) => LayerColorScreen.show(c, lookId)) : null,
-        ),
-        SheetMenuItem(
-          key: const Key('layer_menu_erase'),
-          icon: Icons.colorize_outlined,
-          color: SheetMenuColors.edit,
-          label: 'Удалить цвет',
-          onTap: lookEditable ? () => openOverMap((c) => EraseColorScreen.show(c, lookId)) : null,
-        ),
-        SheetMenuItem(
-          key: const Key('layer_menu_blending'),
-          icon: Icons.opacity,
-          color: SheetMenuColors.edit,
-          label: 'Режим смешивания слоёв',
-          onTap: lookEditable ? () => openSheet((c) => LayerBlendingSheet.show(c, lookId)) : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_invert'),

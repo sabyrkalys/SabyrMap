@@ -1,15 +1,12 @@
 import 'package:app/map/screens/compare/compare_mode_screen.dart';
 import 'package:app/map/screens/compare/compare_select_dialog.dart';
 import 'package:app/map/screens/layer_details/layer_details_screen.dart';
-import 'package:app/map/screens/layer_look/erase_color_screen.dart';
 import 'package:app/map/screens/layer_look/layer_color_screen.dart';
 import 'package:app/map/screens/layers_panel.dart';
-import 'package:app/map/screens/on_screen/layer_blending_sheet.dart';
 import 'package:app/map/screens/on_screen/layer_context_menu.dart';
 import 'package:app/map/screens/on_screen/layer_opacity_sheet.dart';
 import 'package:app/map/services/layer_manager.dart';
 import 'package:app/map/state/map_layers_controller.dart';
-import 'package:app/maps/layer_stack/layer_blending.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,8 +42,6 @@ void main() {
       'Для сохранения изменений создайте/обновите избранную карту или набор карт.',
       'Непрозрачность',
       'Изменить цвет',
-      'Удалить цвет',
-      'Режим смешивания слоёв',
       'Инверсия цветов',
       'ОТМЕНА',
     ]) {
@@ -211,9 +206,11 @@ void main() {
     );
   });
 
-  testWidgets('«Изменить цвет» and «Удалить цвет» open their screens and hide the panel until ✓', (tester) async {
+  testWidgets('«Изменить цвет» opens its screen and hides the panel until ✓; no erase or blending items', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'yandex-hybrid');
+    expect(find.byKey(const Key('layer_menu_erase')), findsNothing);
+    expect(find.byKey(const Key('layer_menu_blending')), findsNothing);
     await tester.tap(find.byKey(const Key('layer_menu_color')));
     await tester.pumpAndSettle();
     expect(find.byType(LayerColorScreen), findsOneWidget);
@@ -222,25 +219,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(LayerColorScreen), findsNothing);
     expect(find.byType(LayersPanel), findsOneWidget);
-
-    await openMenu(tester, 'yandex-hybrid');
-    await tester.tap(find.byKey(const Key('layer_menu_erase')));
-    await tester.pumpAndSettle();
-    expect(find.byType(EraseColorScreen), findsOneWidget);
-    expect(find.byType(LayersPanel), findsNothing);
-  });
-
-  testWidgets('«Режим смешивания слоёв»: one mode is picked, the sheet closes, the mode is told', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer]));
-    await openMenu(tester, 'yandex-hybrid');
-    await tester.tap(find.byKey(const Key('layer_menu_blending')));
-    await tester.pumpAndSettle();
-    expect(find.byType(LayerBlendingSheet), findsOneWidget);
-    await tester.tap(find.byKey(const Key('blending_multiply')));
-    await tester.pumpAndSettle();
-    expect(find.byType(LayerBlendingSheet), findsNothing);
-    expect(h.container.read(layerLooksProvider)['yandex-hybrid']!.blending, LayerBlending.multiply);
-    expect(find.text('Режим: Умножение'), findsOneWidget);
   });
 
   testWidgets('the chosen map has its own opacity and colour, reset when another map is chosen', (tester) async {

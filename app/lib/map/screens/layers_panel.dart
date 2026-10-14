@@ -87,7 +87,6 @@ class LayersPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final providers = ref.watch(catalogProvider).value ?? const <MapProvider>[];
     final state = ref.watch(mapLayersProvider);
-    final looks = ref.watch(layerLooksProvider);
     final notifier = ref.read(mapLayersProvider.notifier);
     final index = catalogIndex(providers);
     final baseId = state.baseSourceId ?? defaultBaseId;
@@ -157,7 +156,6 @@ class LayersPanel extends ConsumerWidget {
                                 layer: layer,
                                 name: index[layer.sourceId]?.source.name ?? layer.sourceId,
                                 source: index[layer.sourceId]?.source,
-                                erasing: looks[layer.sourceId]?.erase.enabled ?? false,
                                 onVisible: (v) =>
                                     runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
                                 onOpacity: () => _openOpacity(context, layer.sourceId),
