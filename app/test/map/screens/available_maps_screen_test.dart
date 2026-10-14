@@ -718,6 +718,7 @@ void main() {
     await pump(tester);
     await tester.tap(find.byKey(const Key('maps_menu_button')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('drawer_folder_Медиафайлы')), findsOneWidget);
     expect(find.byKey(const Key('drawer_folder_Ортофото')), findsOneWidget);
     expect(find.byKey(const Key('drawer_folder_Мои загрузки')), findsOneWidget);
 

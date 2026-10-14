@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'mediafile_folder_service.dart';
+import '../format_bytes.dart';
 import '../widgets/app_icon.dart';
 import '../app_icons.dart';
 
@@ -17,6 +18,7 @@ class MediaFileFolderScreen extends StatefulWidget {
 
   final String title;
   final String subfolder;
+  /// Empty — any file.
   final List<String> allowedExtensions;
   final MediaFileFolderService? service;
 
@@ -43,7 +45,7 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
     final path = result?.files.firstOrNull?.path;
     if (path == null) return;
     final extension = path.split('.').last.toLowerCase();
-    if (!widget.allowedExtensions.contains(extension)) {
+    if (widget.allowedExtensions.isNotEmpty && !widget.allowedExtensions.contains(extension)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Подходят файлы: ${widget.allowedExtensions.join(', ')}')),
@@ -122,7 +124,7 @@ class _MediaFileFolderScreenState extends State<MediaFileFolderScreen> {
               return ListTile(
                 key: Key('mediafile_entry_${entry.fileName}'),
                 title: Text(entry.fileName),
-                subtitle: Text('${(entry.sizeBytes / 1024).ceil()} КБ'),
+                subtitle: Text(formatBytes(entry.sizeBytes)),
                 trailing: IconButton(
                   key: Key('mediafile_delete_${entry.fileName}'),
                   icon: const AppIcon(AppIcons.trash),

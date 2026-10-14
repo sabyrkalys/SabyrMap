@@ -62,8 +62,9 @@ class DeviceFolder {
   final String name;
   final String path;
 
-  /// Subfolder under mediafile; null — not a folder of the app, a file is
-  /// picked through the system picker instead.
+  /// Subfolder under mediafile; '' — mediafile itself, its subfolders
+  /// listed; null — not a folder of the app, a file is picked through the
+  /// system picker instead.
   final String? subfolder;
 }
 
@@ -113,6 +114,7 @@ class MapsFilter {
 /// Folders in the side panel under «Карты на устройстве».
 
 const deviceFolders = [
+  DeviceFolder(name: 'Медиафайлы', path: 'mediafile/', subfolder: ''),
   DeviceFolder(name: 'Карты', path: 'mediafile/$kMapsSubfolder/', subfolder: kMapsSubfolder),
   DeviceFolder(name: 'Ортофото', path: 'mediafile/$kOrthophotoSubfolder/', subfolder: kOrthophotoSubfolder),
   DeviceFolder(name: 'Мои загрузки', path: 'Download/ — выбрать файл .mbtiles'),

@@ -11,6 +11,7 @@ import '../../format_bytes.dart';
 import '../../landmarks/settings/settings_keys.dart';
 import '../../mediafile/mediafile_folder_screen.dart';
 import '../../mediafile/mediafile_folder_service.dart';
+import '../../mediafile/mediafile_root_screen.dart';
 import '../../mediafile/mediafile_subfolders.dart';
 import '../../widgets/app_icon.dart';
 import '../catalog/catalog_repository.dart';
@@ -253,13 +254,15 @@ class _AvailableMapsScreenState extends ConsumerState<AvailableMapsScreen> {
   Future<void> _openFolder(DeviceFolder folder) async {
     setState(() => _isDrawerOpen = false);
     final subfolder = folder.subfolder;
-    if (subfolder != null) {
+    if (subfolder == '') {
+      await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const MediaFileRootScreen()));
+    } else if (subfolder != null) {
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => MediaFileFolderScreen(
             title: folder.name,
             subfolder: subfolder,
-            allowedExtensions: const ['mbtiles'],
+            allowedExtensions: kMediaFileSubfolders[subfolder]?.allowedExtensions ?? const [],
           ),
         ),
       );
