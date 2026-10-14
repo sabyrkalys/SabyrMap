@@ -3,6 +3,7 @@ import 'package:app/map/screens/on_screen/favorite_set_save_dialog.dart';
 import 'package:app/map/screens/on_screen/layer_context_menu.dart';
 import 'package:app/map/models/map_models.dart';
 import 'package:app/map/services/layer_manager.dart';
+import 'package:app/map/state/map_layers_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -81,6 +82,24 @@ void main() {
     await tester.tap(find.byKey(const Key('compare_save')));
     await tester.pumpAndSettle();
     expect(find.byType(FavoriteSetNameDialog), findsOneWidget);
+  });
+
+  testWidgets('the base map hides the chosen map too; leaving shows it again', (tester) async {
+    await start(tester, ['yandex-hybrid', MapStateNotifier.worldKey]);
+    // У тестовой карты появляются свои слои.
+    h.host.styleLayers = ['background', 'map-fill'];
+    await h.container.read(mapLayersProvider.notifier).setBase(liberty);
+    await tester.pumpAndSettle();
+    expect(h.host.hidden, isEmpty);
+    tester.widget<Slider>(find.byKey(const Key('compare_slider'))).onChanged!(1);
+    await tester.pumpAndSettle();
+    expect(tester.widget<Text>(find.byKey(const Key('compare_current'))).data, 'Базовая карта');
+    expect(opacity('yandex-hybrid'), 0);
+    expect(h.host.hidden, isNotEmpty, reason: 'the map style layers are hidden');
+    expect(h.state.mapVisible, isTrue, reason: 'not stored');
+    await tester.tap(find.byKey(const Key('compare_close')));
+    await tester.pumpAndSettle();
+    expect(h.host.hidden, isEmpty);
   });
 }
 

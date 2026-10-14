@@ -55,7 +55,12 @@ class LayerContextMenu extends ConsumerWidget {
     final name = layerName(providers, realId);
     final ids = state.overlays.map((l) => l.sourceId).toList(); // снизу вверх
     final onMap = ids.contains(sourceId);
-    final isTop = onMap && ids.last == sourceId;
+    // Перемещаются слои и выбранная карта (общий список сверху вниз);
+    // ортофотопланы и базовая карта стоят на местах.
+    final stack = notifier.stack;
+    final stackId = _isBase ? MapStateNotifier.mapKey : sourceId;
+    final movable = stack.contains(stackId) && stack.length > 1;
+    final isTop = movable && stack.first == stackId;
     // Ортофотопланы: только вид (непрозрачность, цвет); убираются кнопкой.
     final isOrthophotos = sourceId == MapStateNotifier.orthophotosKey;
     // Встроенная карта мира: только непрозрачность.
@@ -110,8 +115,8 @@ class LayerContextMenu extends ConsumerWidget {
     Future<void> toggleForceRefresh() async {
       final on = !look.forceRefresh;
       if (on && !await ForceRefreshDialog.show(context)) return;
-      debugPrint('Force refresh toggled: $realId → $on');
-      await notifier.setLook(sourceId, look.copyWith(forceRefresh: on));
+      await notifier.setLook(lookId, look.copyWith(forceRefresh: on));
+      if (on) await notifier.refreshTiles();
     }
 
     return SheetMenu(
@@ -129,18 +134,19 @@ class LayerContextMenu extends ConsumerWidget {
           icon: Icons.compare,
           color: SheetMenuColors.accent,
           label: 'Сравнить...',
-          // Сравнивать: выбранная карта и слои, хотя бы двое.
-          onTap: !isOrthophotos && !isWorld && !noMap && ids.length + (hasMap ? 1 : 0) >= 2 ? startCompare : null,
+          // Всегда есть с чем сравнить: хотя бы с «Базовой картой».
+          onTap: !isOrthophotos && !isWorld && !noMap ? startCompare : null,
         ),
         SheetMenuItem(
           key: const Key('layer_menu_force_refresh'),
           icon: Icons.refresh,
           color: SheetMenuColors.accent,
           label: 'Принудительное обновление сохранённых фрагментов карты (только эта сессия)',
-          onTap: editable ? toggleForceRefresh : null,
+          // Файлы на телефоне (ортофотопланы, базовая карта) обновлять неоткуда.
+          onTap: editable || (_isBase && hasMap) ? toggleForceRefresh : null,
           trailing: Icon(
             look.forceRefresh ? Icons.check_box : Icons.check_box_outline_blank,
-            color: editable ? SheetMenuColors.accent : SheetMenuColors.disabled,
+            color: editable || (_isBase && hasMap) ? SheetMenuColors.accent : SheetMenuColors.disabled,
           ),
         ),
         const SheetMenuSection('Упорядочить'),
@@ -172,14 +178,14 @@ class LayerContextMenu extends ConsumerWidget {
           icon: isTop ? Icons.arrow_downward : Icons.arrow_upward,
           color: SheetMenuColors.accent,
           label: isTop ? 'Переместить вниз' : 'Переместить вверх',
-          onTap: editable && ids.length > 1
+          onTap: movable
               ? () {
-                  final order = List.of(ids);
-                  final i = order.indexOf(sourceId);
+                  final order = List.of(stack);
+                  final i = order.indexOf(stackId);
                   order
                     ..removeAt(i)
-                    ..insert(isTop ? i - 1 : i + 1, sourceId);
-                  runLayerChange(context, () => notifier.reorderOverlays(order));
+                    ..insert(isTop ? i + 1 : i - 1, stackId);
+                  runLayerChange(context, () => notifier.reorderStack(order));
                 }
               : null,
         ),

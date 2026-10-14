@@ -31,10 +31,8 @@ String layerName(List<MapProvider> providers, String id) => switch (id) {
 
 /// Имя для заголовков экранов вида: у выбранной карты ([MapStateNotifier.mapKey]) —
 /// её название.
-String layerTitle(MapState state, List<MapProvider> providers, String id) => layerName(
-      providers,
-      id == MapStateNotifier.mapKey ? state.baseSourceId ?? LayersPanel.defaultBaseId : id,
-    );
+String layerTitle(MapState state, List<MapProvider> providers, String id) =>
+    layerName(providers, id == MapStateNotifier.mapKey ? state.baseSourceId ?? LayersPanel.defaultBaseId : id);
 
 /// Выполняет изменение слоёв; отказ карты ([LayerException]) — SnackBar.
 Future<void> runLayerChange(BuildContext context, Future<void> Function() action) async {
@@ -95,8 +93,9 @@ class LayersPanel extends ConsumerWidget {
       for (final p in providers)
         if (p.id == CatalogRepository.orthophotoProviderId) ...p.sources,
     ];
-    // Сверху вниз, т. е. с наибольшего zIndex.
-    final shown = state.overlays.reversed.toList();
+    // Слои и карта сверху вниз; карта может стоять между слоями.
+    final stack = notifier.stack;
+    final overlaysById = {for (final l in state.overlays) l.sourceId: l};
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.6),
@@ -136,50 +135,54 @@ class LayersPanel extends ConsumerWidget {
                             source: orthophotos.first,
                             onVisible: (v) => runLayerChange(context, () => notifier.setOrthophotosOn(v)),
                             onOpacity: () => _openOpacity(context, MapStateNotifier.orthophotosKey),
-                            onMenu: () => LayerContextMenu.show(context, MapStateNotifier.orthophotosKey, fromPanel: true),
+                            onMenu: () =>
+                                LayerContextMenu.show(context, MapStateNotifier.orthophotosKey, fromPanel: true),
                           ),
                         // Порядок — ручкой ≡ (долгий тап по строке открывает меню).
+                        // Слои и выбранная карта — один перетаскиваемый список (сверху
+                        // вниз); «Ортофотопланы» и «Базовая карта» стоят на местах.
                         ReorderableListView(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           buildDefaultDragHandles: false,
                           onReorderItem: (oldIndex, newIndex) {
-                            final order = shown.map((l) => l.sourceId).toList();
+                            final order = List.of(stack);
                             order.insert(newIndex, order.removeAt(oldIndex));
-                            runLayerChange(context, () => notifier.reorderOverlays(order.reversed.toList()));
+                            runLayerChange(context, () => notifier.reorderStack(order));
                           },
                           children: [
-                            for (final (i, layer) in shown.indexed)
-                              OnScreenLayerRow(
-                                key: ValueKey(layer.sourceId),
-                                index: i,
-                                layer: layer,
-                                name: index[layer.sourceId]?.source.name ?? layer.sourceId,
-                                source: index[layer.sourceId]?.source,
-                                onVisible: (v) =>
-                                    runLayerChange(context, () => notifier.setVisibility(layer.sourceId, v)),
-                                onOpacity: () => _openOpacity(context, layer.sourceId),
-                                onMenu: () => LayerContextMenu.show(context, layer.sourceId, fromPanel: true),
-                              ),
+                            for (final (i, id) in stack.indexed)
+                              if (id == MapStateNotifier.mapKey)
+                                OnScreenLayerBaseRow(
+                                  key: const ValueKey(MapStateNotifier.mapKey),
+                                  rowKey: const Key('layer_base_row'),
+                                  menuKey: const Key('layer_menu_base'),
+                                  dragIndex: i,
+                                  title: layerName(providers, baseId),
+                                  subtitle: 'Карта · ${opacityLabel(state.mapOpacity)}',
+                                  source: index[baseId]?.source,
+                                  visible: state.mapVisible,
+                                  visibleKey: const Key('layer_base_visible'),
+                                  onVisible: (v) => runLayerChange(context, () => notifier.setMapVisible(v)),
+                                  onTap: () => Navigator.of(
+                                    context,
+                                  ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
+                                  onMenu: () =>
+                                      LayerContextMenu.show(context, LayerContextMenu.baseId, fromPanel: true),
+                                )
+                              else if (overlaysById[id] case final layer?)
+                                OnScreenLayerRow(
+                                  key: ValueKey(id),
+                                  index: i,
+                                  layer: layer,
+                                  name: index[id]?.source.name ?? id,
+                                  source: index[id]?.source,
+                                  onVisible: (v) => runLayerChange(context, () => notifier.setVisibility(id, v)),
+                                  onOpacity: () => _openOpacity(context, id),
+                                  onMenu: () => LayerContextMenu.show(context, id, fromPanel: true),
+                                ),
                           ],
                         ),
-                        // Выбранная карта: под слоями, тап — сменить; убрана — строки нет,
-                        // карта выбирается в «Доступных картах».
-                        if (baseId != LayerManager.noMapId)
-                          OnScreenLayerBaseRow(
-                            rowKey: const Key('layer_base_row'),
-                            menuKey: const Key('layer_menu_base'),
-                            title: layerName(providers, baseId),
-                            subtitle: 'Карта · ${opacityLabel(state.mapOpacity)}',
-                            source: index[baseId]?.source,
-                            visible: state.mapVisible,
-                            visibleKey: const Key('layer_base_visible'),
-                            onVisible: (v) => runLayerChange(context, () => notifier.setMapVisible(v)),
-                            onTap: () => Navigator.of(
-                              context,
-                            ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
-                            onMenu: () => LayerContextMenu.show(context, LayerContextMenu.baseId, fromPanel: true),
-                          ),
                         // Встроенная карта мира под всеми: видна, где у карты нет тайлов.
                         OnScreenLayerBaseRow(
                           rowKey: const Key('layer_world_row'),

@@ -100,7 +100,10 @@ class MapStateNotifier extends Notifier<MapState> {
     unawaited(ref.read(mapStateStoreProvider).save(next).catchError((_) {}));
   }
 
-  void _syncOverlays() => _publish(state.copyWith(overlays: _requireManager().getActiveLayers()));
+  void _syncOverlays() => _publish(state.copyWith(
+        overlays: _requireManager().getActiveLayers(),
+        overlaysUnderMap: _requireManager().overlaysUnderMap,
+      ));
 
   /// Called by the map screen when the map (and a new [manager]) exists.
   Future<LayerChangeResult> attach(LayerManager manager) async {
@@ -113,6 +116,7 @@ class MapStateNotifier extends Notifier<MapState> {
     // Встроенная карта мира ложится под каждую карту при смене стиля; её
     // копирование из APK не задерживает показ карты.
     unawaited(_attachWorld(manager));
+    manager.setOverlaysUnderMap(state.overlaysUnderMap);
     await manager.setMapVisible(state.mapVisible);
     try {
       MapSource base;
@@ -221,6 +225,7 @@ class MapStateNotifier extends Notifier<MapState> {
     _publish(state.copyWith(
       baseSourceId: source.id,
       overlays: _requireManager().getActiveLayers(),
+      overlaysUnderMap: _requireManager().overlaysUnderMap,
       mapOpacity: changed ? 1.0 : state.mapOpacity,
     ));
     return result;
@@ -257,6 +262,14 @@ class MapStateNotifier extends Notifier<MapState> {
   /// stores the final value.
   Future<void> previewOpacity(String sourceId, double opacity) => _requireManager().setOpacity(sourceId, opacity);
 
+  /// Saved tiles of every map are fetched again from their servers as they
+  /// are shown («Принудительное обновление»).
+  Future<void> refreshTiles() async => _manager?.refreshTiles();
+
+  /// Shows or hides the chosen map on the map only, without storing it (the
+  /// compare mode puts the stored visibility back on exit).
+  Future<void> previewMapVisible(bool visible) async => _manager?.setMapVisible(visible);
+
   /// Shows or hides an overlay on the map only, without storing it (the
   /// compare mode puts the stored visibility back on exit).
   Future<void> previewVisibility(String sourceId, bool visible) => _requireManager().setVisibility(sourceId, visible);
@@ -279,6 +292,24 @@ class MapStateNotifier extends Notifier<MapState> {
 
   Future<void> setVisibility(String sourceId, bool visible) async {
     await _requireManager().setVisibility(sourceId, visible);
+    _syncOverlays();
+  }
+
+  /// The whole movable stack top → bottom: overlay ids and [mapKey] for the
+  /// chosen map, which may sit between them.
+  List<String> get stack {
+    final bottomUp = state.overlays.map((l) => l.sourceId).toList();
+    final under = state.overlaysUnderMap.clamp(0, bottomUp.length);
+    final hasMap = (state.baseSourceId ?? CatalogRepository.defaultBaseSourceId) != LayerManager.noMapId;
+    return [...bottomUp.take(under), if (hasMap) mapKey, ...bottomUp.skip(under)].reversed.toList();
+  }
+
+  /// Applies a new [stack] order (top → bottom, see [stack]).
+  Future<void> reorderStack(List<String> topToBottom) async {
+    final bottomUp = topToBottom.reversed.toList();
+    final mapAt = bottomUp.indexOf(mapKey);
+    final overlays = [for (final id in bottomUp) if (id != mapKey) id];
+    await _requireManager().reorderOverlays(overlays, underMap: mapAt < 0 ? 0 : mapAt);
     _syncOverlays();
   }
 
@@ -310,7 +341,12 @@ class MapStateNotifier extends Notifier<MapState> {
     }
     final result = await manager.restoreOverlays(preset.overlays);
     ref.read(layerLooksProvider.notifier).replaceAll(preset.looks);
-    _publish(state.copyWith(baseSourceId: base.id, overlays: manager.getActiveLayers(), mapOpacity: 1.0));
+    _publish(state.copyWith(
+      baseSourceId: base.id,
+      overlays: manager.getActiveLayers(),
+      overlaysUnderMap: manager.overlaysUnderMap,
+      mapOpacity: 1.0,
+    ));
     return result;
   }
 

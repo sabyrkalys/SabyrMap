@@ -9,13 +9,15 @@ import '../../state/map_layers_controller.dart';
 import '../layers_panel.dart';
 import '../on_screen/layer_context_menu.dart';
 
-/// Слои, которые можно сравнить: наложенные сверху вниз и базовая карта
-/// ([LayerContextMenu.baseId]); ортофотопланы не сравниваются.
+/// Что можно сравнить: наложенные слои сверху вниз, выбранную карту
+/// ([LayerContextMenu.baseId]) и встроенную «Базовую карту»; ортофотопланы не
+/// сравниваются.
 List<({String id, String name})> compareCandidates(MapState state, List<MapProvider> providers) {
   final baseId = state.baseSourceId ?? LayersPanel.defaultBaseId;
   return [
     for (final layer in state.overlays.reversed) (id: layer.sourceId, name: layerName(providers, layer.sourceId)),
     if (baseId != LayerManager.noMapId) (id: LayerContextMenu.baseId, name: '${layerName(providers, baseId)} (карта)'),
+    (id: MapStateNotifier.worldKey, name: 'Базовая карта'),
   ];
 }
 

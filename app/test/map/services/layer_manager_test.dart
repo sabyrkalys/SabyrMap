@@ -88,6 +88,9 @@ class FakeHost implements MapLayerHost {
   /// Hidden layers (any, also the style's own).
   final hidden = <String>{};
 
+  @override
+  Future<void> invalidateTileCache() async => calls.add('invalidateCache');
+
   /// Style-JSON layers added or re-set, by id.
   final styleLayers_ = <String, Map<String, dynamic>>{};
 
@@ -654,6 +657,34 @@ void main() {
       await m.setWorld(null);
       await m.setBaseSource(liberty);
       expect(host.sources.keys, isNot(contains(LayerManager.worldSourceId)));
+    });
+  });
+
+  group('overlays under the map', () {
+    test('the lowest ones go under the map\'s own layers, the rest above it; kept on a base change', () async {
+      final m = manager();
+      host.styleLayers = ['background', 'map-fill', 'road-main'];
+      await m.setBaseSource(liberty);
+      await m.addOverlay(osm);
+      await m.addOverlay(yHybrid);
+      await m.reorderOverlays([osm.id, yHybrid.id], underMap: 1);
+      expect(m.overlaysUnderMap, 1);
+      expect(host.calls, contains('addLayer ${LayerManager.layerIdOf(osm.id)} below map-fill'));
+      expect(host.calls, contains('addLayer ${LayerManager.layerIdOf(yHybrid.id)} below lines_0'));
+
+      host.calls.clear();
+      await m.setBaseSource(liberty);
+      expect(host.calls, contains('addLayer ${LayerManager.layerIdOf(osm.id)} below map-fill'));
+
+      await m.removeOverlay(osm.id);
+      expect(m.overlaysUnderMap, 0);
+    });
+
+    test('force refresh marks the saved tiles stale', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      await m.refreshTiles();
+      expect(host.calls.last, 'invalidateCache');
     });
   });
 

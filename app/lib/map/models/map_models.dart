@@ -302,6 +302,7 @@ class MapState {
     this.worldOpacity = 1.0,
     this.mapVisible = true,
     this.mapOpacity = 1.0,
+    this.overlaysUnderMap = 0,
   });
 
   const MapState.initial()
@@ -313,7 +314,8 @@ class MapState {
         orthophotoOpacity = 1.0,
         worldOpacity = 1.0,
         mapVisible = true,
-        mapOpacity = 1.0;
+        mapOpacity = 1.0,
+        overlaysUnderMap = 0;
 
   final String? baseSourceId;
   final List<ActiveLayer> overlays;
@@ -336,6 +338,9 @@ class MapState {
   /// Opacity of the chosen map; back to 1 when another map is chosen.
   final double mapOpacity;
 
+  /// How many overlays (the lowest ones) lie under the chosen map.
+  final int overlaysUnderMap;
+
   MapState copyWith({
     String? baseSourceId,
     List<ActiveLayer>? overlays,
@@ -346,6 +351,7 @@ class MapState {
     double? worldOpacity,
     bool? mapVisible,
     double? mapOpacity,
+    int? overlaysUnderMap,
   }) =>
       MapState(
         baseSourceId: baseSourceId ?? this.baseSourceId,
@@ -357,6 +363,7 @@ class MapState {
         worldOpacity: worldOpacity ?? this.worldOpacity,
         mapVisible: mapVisible ?? this.mapVisible,
         mapOpacity: mapOpacity ?? this.mapOpacity,
+        overlaysUnderMap: overlaysUnderMap ?? this.overlaysUnderMap,
       );
 
   factory MapState.fromJson(Map<String, dynamic> json) => MapState(
@@ -373,6 +380,7 @@ class MapState {
         worldOpacity: (json['worldOpacity'] as num?)?.toDouble() ?? 1.0,
         mapVisible: json['mapVisible'] as bool? ?? true,
         mapOpacity: (json['mapOpacity'] as num?)?.toDouble() ?? 1.0,
+        overlaysUnderMap: (json['overlaysUnderMap'] as num?)?.toInt() ?? 0,
       );
 
   Map<String, dynamic> toJson() => {
@@ -385,6 +393,7 @@ class MapState {
         if (worldOpacity != 1.0) 'worldOpacity': worldOpacity,
         if (!mapVisible) 'mapVisible': false,
         if (mapOpacity != 1.0) 'mapOpacity': mapOpacity,
+        if (overlaysUnderMap != 0) 'overlaysUnderMap': overlaysUnderMap,
       };
 
   @override
@@ -398,7 +407,8 @@ class MapState {
       other.orthophotoOpacity == orthophotoOpacity &&
       other.worldOpacity == worldOpacity &&
       other.mapVisible == mapVisible &&
-      other.mapOpacity == mapOpacity;
+      other.mapOpacity == mapOpacity &&
+      other.overlaysUnderMap == overlaysUnderMap;
 
   @override
   int get hashCode =>
@@ -412,5 +422,6 @@ class MapState {
         worldOpacity,
         mapVisible,
         mapOpacity,
+        overlaysUnderMap,
       );
 }

@@ -53,6 +53,10 @@ abstract class MapLayerHost {
   /// resets what is not given).
   Future<void> setStyleLayerProperties(Map<String, dynamic> layer);
 
+  /// Marks the tiles MapLibre keeps on the device as stale: each is fetched
+  /// again from its server the next time it is shown.
+  Future<void> invalidateTileCache();
+
   /// Shows or hides any layer (also one that came with the style).
   Future<void> setLayerVisibility(String layerId, bool visible);
 
@@ -293,6 +297,29 @@ class LayerManager {
 
   bool get mapVisible => _mapVisible;
 
+  /// How many overlays (the lowest ones) lie under the chosen map: they are
+  /// drawn right above the world map, the rest above the map.
+  int _overlaysUnderMap = 0;
+
+  int get overlaysUnderMap => _overlaysUnderMap.clamp(0, _overlays.length);
+
+  /// Where an overlay under the map goes: under the map's lowest own layer.
+  /// Null without a map of its own (then everything is over the map).
+  String? get _mapFloor {
+    for (final id in _styleLayerIds) {
+      if (!id.contains('background')) return id;
+    }
+    return null;
+  }
+
+  /// Ceiling for the overlay at stack position [position] (bottom = 0);
+  /// the stored count, not [overlaysUnderMap]: the list may still be filling.
+  String? _ceilingAt(int position) =>
+      position < _overlaysUnderMap ? (_mapFloor ?? _overlayCeiling) : _overlayCeiling;
+
+  /// For the first layers put on the map: how many overlays will be under it.
+  void setOverlaysUnderMap(int count) => _overlaysUnderMap = count < 0 ? 0 : count;
+
   /// Opacity and colour of the chosen map; reset when another map is chosen.
   double _mapOpacity = 1;
   LayerColorSettings _mapColor = const LayerColorSettings();
@@ -366,6 +393,9 @@ class LayerManager {
     }
     return {...layer, 'paint': paint};
   }
+
+  /// Fetches the map's saved tiles again from their servers as they are shown.
+  Future<void> refreshTiles() => _serial(() => _host.invalidateTileCache());
 
   /// Shows or hides the chosen map: its style layers, except the background.
   /// Overlays, orthophotos and the world map stay. Kept across base changes.
@@ -615,6 +645,7 @@ class LayerManager {
         _overlays.removeAt(index);
         _colors.remove(sourceId);
         _vectors.remove(sourceId);
+        if (index < _overlaysUnderMap) _overlaysUnderMap--;
       });
 
   Future<void> setOpacity(String sourceId, double opacity) => _serial(() async {
@@ -648,7 +679,9 @@ class LayerManager {
       });
 
   /// [orderedIds] bottom → top; must name exactly the current overlays.
-  Future<void> reorderOverlays(List<String> orderedIds) => _serial(() async {
+  /// [underMap]: how many of them (from the bottom) lie under the chosen map;
+  /// unchanged when not given.
+  Future<void> reorderOverlays(List<String> orderedIds, {int? underMap}) => _serial(() async {
         final current = {for (final l in _overlays) l.sourceId: l};
         if (orderedIds.length != current.length || !orderedIds.every(current.containsKey)) {
           throw ArgumentError.value(orderedIds, 'orderedIds', 'must list exactly the current overlays');
@@ -657,11 +690,12 @@ class LayerManager {
           await _removeLayersOf(layer.sourceId);
         }
         _overlays.clear();
+        if (underMap != null) _overlaysUnderMap = underMap.clamp(0, orderedIds.length);
         for (var i = 0; i < orderedIds.length; i++) {
           final layer = current[orderedIds[i]]!.copyWith(zIndex: (i + 1) * zStep);
-          // Added bottom → top, each right under the annotations, so each
-          // new one sits above the previous.
-          await _addLayersOf(layer, _overlayCeiling);
+          // Added bottom → top, each right under its ceiling (the map or the
+          // annotations), so each new one sits above the previous.
+          await _addLayersOf(layer, _ceilingAt(i));
           _overlays.add(layer);
         }
       });
@@ -709,7 +743,7 @@ class LayerManager {
 
     final z = zIndex ?? (_overlays.isEmpty ? zStep : _overlays.last.zIndex + zStep);
     final above = _overlays.where((l) => l.zIndex > z).toList();
-    final below = above.isEmpty ? _overlayCeiling : _bottomLayerOf(above.first.sourceId);
+    final below = above.isEmpty ? _ceilingAt(_overlays.length) : _bottomLayerOf(above.first.sourceId);
     final clamped = opacity.clamp(0.0, 1.0);
     final layer = ActiveLayer(sourceId: source.id, type: MapLayerType.overlay, opacity: clamped, visible: visible, zIndex: z);
 

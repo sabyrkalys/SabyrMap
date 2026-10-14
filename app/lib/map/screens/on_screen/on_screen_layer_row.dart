@@ -157,6 +157,7 @@ class OnScreenLayerBaseRow extends StatelessWidget {
     this.visible,
     this.visibleKey,
     this.onVisible,
+    this.dragIndex,
     required this.onTap,
     required this.onMenu,
   });
@@ -167,6 +168,9 @@ class OnScreenLayerBaseRow extends StatelessWidget {
   /// Глазик: null — без него.
   final bool? visible;
   final Key? visibleKey;
+
+  /// Место в [ReorderableListView] для ручки ≡; null — строку не перетащить.
+  final int? dragIndex;
   final ValueChanged<bool>? onVisible;
 
   final Key rowKey;
@@ -189,7 +193,18 @@ class OnScreenLayerBaseRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
           children: [
-            const SizedBox(width: _handleWidth),
+            if (dragIndex case final index?)
+              ReorderableDragStartListener(
+                key: Key('${(rowKey as ValueKey<String>).value}_drag'),
+                index: index,
+                child: const SizedBox(
+                  width: _handleWidth,
+                  height: 48,
+                  child: Icon(Icons.drag_handle, size: 22, color: _ink),
+                ),
+              )
+            else
+              const SizedBox(width: _handleWidth),
             if (visible case final visible?)
               IconButton(
                 key: visibleKey,

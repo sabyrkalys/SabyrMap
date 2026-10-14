@@ -42,6 +42,9 @@ class _CompareModeScreenState extends ConsumerState<CompareModeScreen> {
     for (final l in ref.read(mapLayersProvider).overlays) l.sourceId: l.visible,
   };
 
+  /// Видимость выбранной карты при входе.
+  late final bool _mapVisible = ref.read(mapLayersProvider).mapVisible;
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +61,8 @@ class _CompareModeScreenState extends ConsumerState<CompareModeScreen> {
         // Слой убран или карта ещё не готова — пропускаем.
       }
     }
+    // «Базовая карта»: прячется и выбранная карта, видна только базовая.
+    await _layers.previewMapVisible(current == MapStateNotifier.worldKey ? false : _mapVisible);
   }
 
   @override
@@ -67,6 +72,7 @@ class _CompareModeScreenState extends ConsumerState<CompareModeScreen> {
     for (final entry in _snapshot.entries) {
       _layers.previewVisibility(entry.key, entry.value).catchError((Object _) {});
     }
+    _layers.previewMapVisible(_mapVisible).catchError((Object _) {});
     super.dispose();
   }
 

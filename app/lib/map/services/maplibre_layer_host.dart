@@ -132,6 +132,9 @@ class MapLibreLayerHost implements MapLayerHost {
   }
 
   @override
+  Future<void> invalidateTileCache() async => _controller.invalidateAmbientCache();
+
+  @override
   Future<void> setLayerVisibility(String layerId, bool visible) => _controller.setLayerVisibility(layerId, visible);
 
   /// Every property not given here is reset to MapLibre's default, so the

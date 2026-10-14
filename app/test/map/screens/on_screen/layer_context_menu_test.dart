@@ -96,13 +96,13 @@ void main() {
     expect(find.text('Яндекс Гибрид'), findsOneWidget);
   });
 
-  testWidgets('without a map: remembered on the next start; a layer has nothing to compare with', (tester) async {
+  testWidgets('without a map: remembered on the next start; a layer compares with the base map', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer], base: LayerManager.noMapId));
     expect(h.state.baseSourceId, LayerManager.noMapId);
     expect(h.host.style, contains('"background"'));
     expect(find.byKey(const Key('layer_base_row')), findsNothing);
     await openMenu(tester, 'yandex-hybrid');
-    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+    expect(enabled(tester, 'layer_menu_compare'), isTrue);
   });
 
   testWidgets('picking a map in «Доступные карты» brings its row back', (tester) async {
@@ -128,9 +128,33 @@ void main() {
     expect(h.state.overlays.map((l) => l.sourceId), ['yandex-hybrid', 'osm-standard']);
   });
 
-  testWidgets('a single layer cannot move', (tester) async {
+  testWidgets('a single layer can go under the map and back; the map moves too', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, 'yandex-hybrid');
+    expect(find.text('Переместить вниз'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('layer_menu_move_up')));
+    await tester.pumpAndSettle();
+    expect(h.state.overlaysUnderMap, 1);
+    expect(h.container.read(mapLayersProvider.notifier).stack, [MapStateNotifier.mapKey, 'yandex-hybrid']);
+
+    await tester.tap(find.byKey(const Key('layer_menu_cancel')));
+    await tester.pumpAndSettle();
+    await openMenu(tester, 'base');
+    expect(find.text('Переместить вниз'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('layer_menu_move_up')));
+    await tester.pumpAndSettle();
+    expect(h.state.overlaysUnderMap, 0);
+    expect(h.store.saved!.overlaysUnderMap, 0);
+  });
+
+  testWidgets('the orthophotos and the base map do not move', (tester) async {
+    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await openMenu(tester, MapStateNotifier.orthophotosKey);
+    expect(enabled(tester, 'layer_menu_move_up'), isFalse);
+    await tester.tap(find.byKey(const Key('layer_menu_cancel')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('layer_menu_world')));
+    await tester.pumpAndSettle();
     expect(enabled(tester, 'layer_menu_move_up'), isFalse);
   });
 
@@ -148,10 +172,10 @@ void main() {
     expect(h.container.read(compareRequestProvider), ['osm-standard', 'yandex-hybrid']);
   });
 
-  testWidgets('nothing to compare without layers or for the orthophotos', (tester) async {
+  testWidgets('the map compares with the base map even without layers; not for the orthophotos', (tester) async {
     await h.pump(tester);
     await openMenu(tester, 'base');
-    expect(enabled(tester, 'layer_menu_compare'), isFalse);
+    expect(enabled(tester, 'layer_menu_compare'), isTrue);
     await tester.tap(find.byKey(const Key('layer_menu_cancel')));
     await tester.pumpAndSettle();
     await openMenu(tester, MapStateNotifier.orthophotosKey);

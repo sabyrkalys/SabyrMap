@@ -128,7 +128,7 @@ void main() {
 
   testWidgets('dragging a layer by its ≡ handle reorders the map (top of the list = top of the map)', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
-    expect(find.byIcon(Icons.drag_handle), findsNWidgets(2));
+    expect(find.byIcon(Icons.drag_handle), findsNWidgets(3), reason: 'two layers and the map');
     // Сверху вниз: OSM, затем Гибрид. Тянем Гибрид за ручку наверх.
     final handle = find.byKey(const Key('layer_drag_yandex-hybrid'));
     final gesture = await tester.startGesture(tester.getCenter(handle));
