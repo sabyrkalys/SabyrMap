@@ -46,6 +46,12 @@ class LandmarkItem {
   /// Объект внутри файла меток (только для показа: правится файл целиком).
   bool get isNested => path.contains(_nestedMark);
 
+  /// Номер объекта внутри файла меток; null — не вложенный.
+  int? get nestedIndex {
+    final at = path.lastIndexOf(_nestedMark);
+    return at == -1 ? null : int.tryParse(path.substring(at + _nestedMark.length));
+  }
+
   /// Файл, в котором лежит объект ([fileOf]).
   String get filePath => fileOf(path);
 

@@ -32,6 +32,7 @@ import 'package:app/landmarks/drafts/metadata_patch.dart';
 import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:app/landmarks/index/landmark_index.dart';
 import 'package:app/landmarks/index/landmark_index_watcher.dart';
+import 'package:app/landmarks/map_data/landmark_geometry_cache.dart';
 import 'package:app/landmarks/on_screen/on_screen_registry.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
 import 'package:app/maps/calibration/calibration_controller.dart';
@@ -116,6 +117,7 @@ class LandmarkServices {
     required this.displayRegistry,
     required this.onScreen,
     required this.index,
+    required this.geometry,
     required this.backupService,
     required this.restoreService,
     required this.intentDispatcher,
@@ -192,6 +194,9 @@ class LandmarkServices {
 
   /// Все метки в памяти — источник для карты и списков.
   final LandmarkIndex index;
+
+  /// Геометрия меток для карты (GeoJSON).
+  final LandmarkGeometryCache geometry;
   final BackupService backupService;
   final RestoreService restoreService;
   final IntentDispatcher intentDispatcher;
@@ -374,6 +379,7 @@ class LandmarkServices {
       displayRegistry: display,
       onScreen: onScreen,
       index: index,
+      geometry: LandmarkGeometryCache(repository),
       backupService: BackupService(storagePaths, storage, settings, clock: clock),
       restoreService: RestoreService(storagePaths, storage, settings),
       intentDispatcher: IntentDispatcher(creation, target, folders, trackerService),
