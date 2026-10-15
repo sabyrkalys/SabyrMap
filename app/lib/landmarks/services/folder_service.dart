@@ -15,6 +15,10 @@ class FolderService {
   final StoragePaths _paths;
   final AppSettings _settings;
 
+  /// Кому сообщать о переименованных и удалённых папках и файлах
+  /// ([LandmarkIndex.refresh]).
+  Future<void> Function(Iterable<String> paths)? onChanged;
+
   /// Папка по умолчанию из настроек или «Несортированные метки». Если
   /// сохранённой папки больше нет, настройка сбрасывается.
   Future<String> getDefaultFolder() async =>
@@ -115,6 +119,7 @@ class FolderService {
     } on FileSystemException catch (e) {
       throw StorageException('Cannot rename folder', path: oldPath, cause: e);
     }
+    await onChanged?.call([oldPath, newPath]);
   }
 
   /// Удаляет папку со всем содержимым, без возврата. Защищённая папка —
@@ -127,6 +132,7 @@ class FolderService {
     } on FileSystemException catch (e) {
       throw StorageException('Cannot delete folder', path: path, cause: e);
     }
+    await onChanged?.call([path]);
   }
 
   /// Подпапки, файлы, размер и время последнего изменения папки (с
@@ -171,6 +177,7 @@ class FolderService {
     } on FileSystemException catch (e) {
       throw StorageException('Cannot rename file', path: oldPath, cause: e);
     }
+    await onChanged?.call([oldPath, target]);
     return target;
   }
 

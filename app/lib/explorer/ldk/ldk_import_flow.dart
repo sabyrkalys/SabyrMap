@@ -95,6 +95,7 @@ abstract final class LdkImportFlow {
         p.basename(source),
       );
       await services.storage.atomicWriteBytes(target, bytes);
+      await services.repository.changed([target]);
       return ImportResult(
         success: true,
         createdPaths: [target],

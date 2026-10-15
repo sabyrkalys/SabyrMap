@@ -1,9 +1,6 @@
-import 'dart:io';
 import 'dart:math';
 
 import 'package:app/landmarks/explorer/listing/landmark_item.dart';
-import 'package:app/landmarks/explorer/listing/landmark_item_reader.dart';
-import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:app/landmarks/on_screen/on_screen_registry.dart';
 import 'package:app/landmarks/on_screen/on_screen_saver.dart';
 import 'package:app/landmarks/on_screen/on_screen_sort.dart';
@@ -11,7 +8,6 @@ import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:app/landmarks/settings/settings_keys.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path/path.dart' as p;
 
 import '../app/landmark_services_provider.dart';
 import '../dialogs/confirm_dialog.dart';
@@ -27,7 +23,6 @@ import 'item_menu/item_hooks.dart';
 import 'item_menu/item_menu_entries.dart' show MenuColors;
 import 'item_row.dart';
 import 'ldk/ldk_create_dialog.dart';
-import '../waypoints/waypoints_controller.dart';
 
 /// «Метки на экране»: все метки, что сейчас на экране — новые и
 /// загруженные попадают сюда сами. Глаз прячет метку на карте, оставляя её
@@ -43,21 +38,11 @@ class OnScreenLandmarksPanel extends ConsumerStatefulWidget {
     builder: (_) => const OnScreenLandmarksPanel(),
   );
 
-  /// Все файлы меток папки меток (с подпапками), что на экране.
-  static Future<List<LandmarkItem>> loadItems(LandmarkServices services, OnScreenRegistry onScreen) async {
-    final root = Directory(services.paths.landmarks);
-    if (!await root.exists()) return const [];
-    final paths = <String>[];
-    await for (final entity in root.list(recursive: true, followLinks: false)) {
-      if (entity is File &&
-          LandmarkType.fromExtension(p.extension(entity.path)) != null &&
-          onScreen.isOnScreen(entity.path)) {
-        paths.add(entity.path);
-      }
-    }
-    final reader = LandmarkItemReader(services.storage);
-    return (await Future.wait(paths.map(reader.read))).whereType<LandmarkItem>().toList();
-  }
+  /// Файлы меток (с подпапками, без объектов внутри `.ldk`), что на экране.
+  static List<LandmarkItem> itemsOf(LandmarkServices services, OnScreenRegistry onScreen) => [
+    for (final item in services.index.inFolder(services.paths.landmarks, recursive: true))
+      if (onScreen.isOnScreen(item.path)) item,
+  ];
 
   @override
   ConsumerState<OnScreenLandmarksPanel> createState() => _OnScreenLandmarksPanelState();
@@ -79,23 +64,22 @@ class _OnScreenLandmarksPanelState extends ConsumerState<OnScreenLandmarksPanel>
   @override
   void initState() {
     super.initState();
-    _onScreen.addListener(_onRegistry);
+    _onScreen.addListener(_reload);
+    _services.index.addListener(_reload);
     _reload();
   }
 
   @override
   void dispose() {
-    _onScreen.removeListener(_onRegistry);
+    _onScreen.removeListener(_reload);
+    _services.index.removeListener(_reload);
     super.dispose();
   }
 
-  void _onRegistry() {
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _reload() async {
-    final items = await OnScreenLandmarksPanel.loadItems(_services, _onScreen);
-    if (mounted) setState(() => _items = items);
+  /// Метки на экране — из индекса меток; индекс и «Метки на экране»
+  /// сами сообщают об изменениях, перечитывать после действий не нужно.
+  void _reload() {
+    if (mounted) setState(() => _items = OnScreenLandmarksPanel.itemsOf(_services, _onScreen));
   }
 
   ({double latitude, double longitude})? get _center {
@@ -105,12 +89,10 @@ class _OnScreenLandmarksPanelState extends ConsumerState<OnScreenLandmarksPanel>
 
   Future<void> _openDetails(String path) async {
     await LandmarkDetailsScreen.open(context, path);
-    await _reload();
   }
 
   Future<void> _openMenu(LandmarkItem item) async {
     await ItemContextMenu.show(_hooksContext ?? context, item);
-    await _reload();
   }
 
   Future<void> _removeAll() async {
@@ -125,7 +107,6 @@ class _OnScreenLandmarksPanelState extends ConsumerState<OnScreenLandmarksPanel>
     );
     if (!ok) return;
     _onScreen.removeAll(items.map((i) => i.path));
-    await _reload();
   }
 
   /// «Сохранить все»: метки на экране — в один файл меток (.ldk).
@@ -143,13 +124,9 @@ class _OnScreenLandmarksPanelState extends ConsumerState<OnScreenLandmarksPanel>
         comment: props.comment,
         description: props.description,
       );
-      await _services.explorerController.refresh();
-      // Точки нового файла — на карту.
-      await ref.read(waypointsControllerProvider.notifier).loadWaypoints();
       messenger.showSnackBar(
         SnackBar(content: Text('Сохранено в ${ref.read(markerGroupFoldersProvider).display(path)}')),
       );
-      await _reload();
     } on Exception catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Не удалось сохранить: $e')));
     }
@@ -270,8 +247,6 @@ class _OnScreenLandmarksPanelState extends ConsumerState<OnScreenLandmarksPanel>
           top: false,
           child: ItemHooks(
             onOpen: _openDetails,
-            onDeleted: _reload,
-            onRenamed: (_) => _reload(),
             child: Builder(
               builder: (hooksContext) {
                 _hooksContext = hooksContext;
@@ -370,7 +345,7 @@ class _OnScreenLandmarksPanelState extends ConsumerState<OnScreenLandmarksPanel>
     final visible = _onScreen.isVisible(item.path);
     final distance = OnScreenSort.distanceFrom(center, item);
     final bearing = OnScreenSort.bearingFrom(center, item);
-    final color = visible ? Color(item.colorValue | 0xFF000000) : _faded;
+    final color = visible ? Color(item.displayColor | 0xFF000000) : _faded;
     return InkWell(
       key: ValueKey(item.path),
       onTap: () => _openDetails(item.path),

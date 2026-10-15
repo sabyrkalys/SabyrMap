@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:app/landmarks/index/landmark_index.dart';
 import 'package:app/landmarks/services/folder_service.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
 import 'package:app/landmarks/settings/settings_keys.dart';
@@ -35,7 +36,9 @@ class ExplorerController extends ChangeNotifier {
     required SelectionController selection,
     required LandmarksClipboard clipboard,
     required AppSettings settings,
+    LandmarkIndex? index,
   }) : _folders = folders,
+       _index = index,
        _places = places,
        _reader = reader,
        _display = displayRegistry,
@@ -51,6 +54,9 @@ class ExplorerController extends ChangeNotifier {
   final FolderService _folders;
   final PlacesProvider _places;
   final LandmarkItemReader _reader;
+
+  /// Метки папки меток — из индекса; папки вне неё читаются с диска.
+  final LandmarkIndex? _index;
   final DisplayRegistry _display;
   final SelectionController _selection;
   final LandmarksClipboard _clipboard;
@@ -164,7 +170,8 @@ class ExplorerController extends ChangeNotifier {
     try {
       if (!await _folders.folderExists(folder)) throw StateError('Folder does not exist: $folder');
       final contents = await _folders.listContents(folder);
-      final items = await _reader.readAll(folder);
+      final index = _index;
+      final items = index != null && index.covers(folder) ? index.inFolder(folder) : await _reader.readAll(folder);
       if (token != _loadToken) return;
       _allFolders = [for (final f in contents.folders) ExplorerFolderNode(path: f, name: p.basename(f))];
       _allItems = items;

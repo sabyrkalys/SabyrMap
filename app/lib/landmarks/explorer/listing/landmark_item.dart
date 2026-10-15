@@ -7,12 +7,15 @@ class LandmarkItem {
     required this.path,
     required this.name,
     required this.type,
-    required this.colorValue,
+    this.colorValue,
     required this.createdAt,
     required this.updatedAt,
     required this.fileSizeBytes,
     required this.fileModifiedAt,
     this.iconId,
+    this.userIcon,
+    this.kind,
+    this.description,
     this.latitude,
     this.longitude,
     this.lengthMeters,
@@ -28,13 +31,41 @@ class LandmarkItem {
   /// Цвет, если в метаданных его нет.
   static const int defaultColor = 0xFFEE1111;
 
+  /// Путь объекта внутри файла меток: `<путь .ldk>#ldk:<номер>`.
+  static const String _nestedMark = '#ldk:';
+
+  static String nestedPath(String ldkPath, int index) => '$ldkPath$_nestedMark$index';
+
+  /// Файл, в котором лежит объект [path]: у вложенного в `.ldk` — сам
+  /// `.ldk`, у остальных — [path].
+  static String fileOf(String path) {
+    final at = path.lastIndexOf(_nestedMark);
+    return at == -1 ? path : path.substring(0, at);
+  }
+
+  /// Объект внутри файла меток (только для показа: правится файл целиком).
+  bool get isNested => path.contains(_nestedMark);
+
+  /// Файл, в котором лежит объект ([fileOf]).
+  String get filePath => fileOf(path);
+
   final String path;
   final String name;
   final LandmarkType type;
 
-  /// Цвет ARGB.
-  final int colorValue;
+  /// Свой цвет ARGB; null — не задан (у точки — цвет её вида).
+  final int? colorValue;
+
+  /// Цвет для показа в списках: свой или [defaultColor].
+  int get displayColor => colorValue ?? defaultColor;
   final String? iconId;
+
+  /// Файл значка из библиотеки ([LandmarkMetadata.userIcon]).
+  final String? userIcon;
+
+  /// Вид метки в приложении ([LandmarkMetadata.kind]).
+  final String? kind;
+  final String? description;
 
   /// Время создания и правки, Unix ms.
   final int createdAt;
@@ -69,8 +100,11 @@ class LandmarkItem {
     String? path,
     String? name,
     LandmarkType? type,
-    int? colorValue,
+    Object? colorValue = _keep,
     Object? iconId = _keep,
+    Object? userIcon = _keep,
+    Object? kind = _keep,
+    Object? description = _keep,
     int? createdAt,
     int? updatedAt,
     int? fileSizeBytes,
@@ -89,8 +123,11 @@ class LandmarkItem {
     path: path ?? this.path,
     name: name ?? this.name,
     type: type ?? this.type,
-    colorValue: colorValue ?? this.colorValue,
+    colorValue: identical(colorValue, _keep) ? this.colorValue : colorValue as int?,
     iconId: identical(iconId, _keep) ? this.iconId : iconId as String?,
+    userIcon: identical(userIcon, _keep) ? this.userIcon : userIcon as String?,
+    kind: identical(kind, _keep) ? this.kind : kind as String?,
+    description: identical(description, _keep) ? this.description : description as String?,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
@@ -115,6 +152,9 @@ class LandmarkItem {
       other.type == type &&
       other.colorValue == colorValue &&
       other.iconId == iconId &&
+      other.userIcon == userIcon &&
+      other.kind == kind &&
+      other.description == description &&
       other.createdAt == createdAt &&
       other.updatedAt == updatedAt &&
       other.fileSizeBytes == fileSizeBytes &&
@@ -137,6 +177,9 @@ class LandmarkItem {
     type,
     colorValue,
     iconId,
+    userIcon,
+    kind,
+    description,
     createdAt,
     updatedAt,
     fileSizeBytes,

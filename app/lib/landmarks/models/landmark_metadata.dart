@@ -37,6 +37,13 @@ class LandmarkMetadata {
   static const String descriptionKey = 'description';
   static const String colorKey = 'color';
   static const String iconKey = 'icon';
+
+  /// Файл значка из библиотеки пользователя (папка icons); [iconKey] —
+  /// значок из каталога. Могут быть оба.
+  static const String userIconKey = 'user_icon';
+
+  /// Вид метки в приложении (тип путевой точки: «Пост», «Опасность»...).
+  static const String kindKey = 'type';
   static const String styleKey = 'style';
   static const String createdAtKey = 'created_at';
   static const String updatedAtKey = 'updated_at';
@@ -70,6 +77,8 @@ class LandmarkMetadata {
   String? get description => _typed<String>(descriptionKey);
   int? get colorValue => _typed<int>(colorKey);
   String? get iconId => _typed<String>(iconKey);
+  String? get userIcon => _typed<String>(userIconKey);
+  String? get kind => _typed<String>(kindKey);
   int? get createdAtMs => _typed<int>(createdAtKey);
   int? get updatedAtMs => _typed<int>(updatedAtKey);
 

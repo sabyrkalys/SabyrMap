@@ -1,12 +1,12 @@
-import 'dart:io';
 
 import 'package:app/landmarks/drafts/marker_draft.dart';
 import 'package:app/landmarks/drafts/waypoint_patch.dart';
 import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:app/landmarks/validation/validation_result.dart';
+import 'package:app/landmarks/explorer/listing/landmark_item.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
-import 'package:path/path.dart' as p;
 
 import 'waypoint_color.dart';
 import 'waypoint_models.dart';
@@ -27,44 +27,36 @@ class FileWaypointsRepository implements WaypointsRepository {
   /// Ключ типа метки приложения в метаданных.
   static const String typeKey = 'type';
 
-  /// Разделитель id точки внутри файла меток: `<путь .ldk>#ldk:<номер>`.
-  static const String _nestedMark = '#ldk:';
-
   /// Файл, которому принадлежит точка [id]: у точки из файла меток — сам
-  /// `.ldk`, у отдельной точки — её `.wpt`.
-  static String fileOf(String id) {
-    final at = id.lastIndexOf(_nestedMark);
-    return at == -1 ? id : id.substring(0, at);
-  }
+  /// `.ldk`, у отдельной точки — её `.wpt` ([LandmarkItem.fileOf]).
+  static String fileOf(String id) => LandmarkItem.fileOf(id);
 
-  /// Все точки папки меток с подпапками, по времени создания; точки внутри
-  /// файлов меток (`.ldk`) — тоже, только для показа ([Waypoint.canEdit]
-  /// false: это копии внутри файла).
+  /// Индекс меток: точки для карты берутся из него, без обхода диска.
+  Listenable get changes => _services.index;
+
+  /// Все точки из индекса меток (и внутри файлов меток — только для
+  /// показа, [Waypoint.canEdit] false), по времени создания.
   @override
   Future<List<Waypoint>> list() async {
-    final root = Directory(_services.repository.storage.paths.landmarks);
-    if (!await root.exists()) return const [];
-    final out = <Waypoint>[];
-    await for (final entity in root.list(recursive: true, followLinks: false)) {
-      if (entity is! File) continue;
-      final ext = p.extension(entity.path).toLowerCase();
-      try {
-        if (ext == '.wpt') {
-          out.add(_toModel(entity.path, await _services.waypoints.load(entity.path)));
-        } else if (ext == '.ldk') {
-          final content = (await _services.repository.load(entity.path)).content;
-          if (content is! LdkFileObject) continue;
-          for (final (i, object) in content.objects.indexed) {
-            if (object is WaypointObject) out.add(_toModel('${entity.path}$_nestedMark$i', object, canEdit: false));
-          }
-        }
-      } on Exception {
-        // Чужой или повреждённый файл — в список не попадает.
-      }
-    }
+    final out = [for (final item in _services.index.byType(LandmarkType.waypoint)) fromItem(item)];
     out.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     return out;
   }
+
+  /// Точка карты из записи индекса.
+  static Waypoint fromItem(LandmarkItem item) => Waypoint(
+    id: item.path,
+    orgId: '',
+    ownerId: '',
+    name: item.name,
+    type: item.kind ?? defaultWaypointType,
+    note: item.description,
+    color: item.colorValue == null ? null : colorToHex(Color(item.colorValue!)),
+    lat: item.latitude ?? 0,
+    lng: item.longitude ?? 0,
+    canEdit: !item.isNested,
+    createdAt: DateTime.fromMillisecondsSinceEpoch(item.createdAt),
+  );
 
   @override
   Future<Waypoint> create({
@@ -90,7 +82,7 @@ class FileWaypointsRepository implements WaypointsRepository {
           extraMetadata: {typeKey: type, ...extra},
         ),
       );
-      return _toModel(path, await _services.waypoints.load(path));
+      return _fromIndex(path);
     } on ValidationException catch (e) {
       throw WaypointException(e.errors.join('; '));
     } on Exception catch (e) {
@@ -107,7 +99,7 @@ class FileWaypointsRepository implements WaypointsRepository {
     required String? color,
   }) async {
     try {
-      final updated = await _services.waypoints.update(
+      await _services.waypoints.update(
         id,
         WaypointPatch(
           name: name,
@@ -115,7 +107,7 @@ class FileWaypointsRepository implements WaypointsRepository {
           extra: {typeKey: type, LandmarkMetadata.colorKey: _argb(color)},
         ),
       );
-      return _toModel(id, updated);
+      return _fromIndex(id);
     } on ValidationException catch (e) {
       throw WaypointException(e.errors.join('; '));
     } on Exception catch (e) {
@@ -132,23 +124,11 @@ class FileWaypointsRepository implements WaypointsRepository {
     }
   }
 
-  static Waypoint _toModel(String path, WaypointObject w, {bool canEdit = true}) {
-    final m = w.userMetadata;
-    final type = m.entries[typeKey];
-    final created = m.createdAtMs;
-    return Waypoint(
-      id: path,
-      orgId: '',
-      ownerId: '',
-      name: m.name ?? p.basenameWithoutExtension(fileOf(path)),
-      type: type is String && type.isNotEmpty ? type : defaultWaypointType,
-      note: m.description,
-      color: m.colorValue == null ? null : colorToHex(Color(m.colorValue!)),
-      lat: w.location.latitude,
-      lng: w.location.longitude,
-      canEdit: canEdit,
-      createdAt: created == null ? DateTime.fromMillisecondsSinceEpoch(0) : DateTime.fromMillisecondsSinceEpoch(created),
-    );
+  /// Точка [path] из индекса: запись в файл его уже обновила.
+  Waypoint _fromIndex(String path) {
+    final item = _services.index.byPath(path);
+    if (item == null) throw WaypointException('Waypoint is not in the index: $path');
+    return fromItem(item);
   }
 
   /// `#RRGGBB` → непрозрачный ARGB; null — без своего цвета.

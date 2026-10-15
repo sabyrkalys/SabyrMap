@@ -28,6 +28,7 @@ import 'package:app/landmarks/import_export/import/import_service.dart';
 import 'package:app/landmarks/import_export/registry/format_registry.dart';
 import 'package:app/landmarks/icons/icon_resolver.dart';
 import 'package:app/landmarks/repository/landmark_repository.dart';
+import 'package:app/landmarks/index/landmark_index.dart';
 import 'package:app/landmarks/on_screen/on_screen_registry.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
 import 'package:app/maps/calibration/calibration_controller.dart';
@@ -109,6 +110,7 @@ class LandmarkServices {
     required this.workspaceController,
     required this.displayRegistry,
     required this.onScreen,
+    required this.index,
     required this.backupService,
     required this.restoreService,
     required this.intentDispatcher,
@@ -179,6 +181,9 @@ class LandmarkServices {
 
   /// «Метки на экране»: что из меток видно на карте.
   final OnScreenRegistry onScreen;
+
+  /// Все метки в памяти — источник для карты и списков.
+  final LandmarkIndex index;
   final BackupService backupService;
   final RestoreService restoreService;
   final IntentDispatcher intentDispatcher;
@@ -231,6 +236,11 @@ class LandmarkServices {
     final icons = IconRegistry(IconResolver(storagePaths));
     await icons.refresh();
     final folders = FolderService(storagePaths, settings);
+    // Индекс меток: один обход диска при старте, дальше — от записей
+    // репозитория и папок.
+    final index = LandmarkIndex(storagePaths.landmarks, LandmarkItemReader(storage));
+    repository.onChanged = index.refresh;
+    folders.onChanged = index.refresh;
     final editor = MetadataEditor(clock: clock);
     const calculator = CompositeCalculator();
     final setService = SetService(repository, editor: editor, calculator: calculator);
@@ -287,6 +297,7 @@ class LandmarkServices {
     final bookmarks = BookmarkController(BookmarkStore(settings), clock: clock);
     await bookmarks.load();
     final reader = LandmarkItemReader(storage);
+    await index.rebuild();
     final places = placesProvider ?? PlacesProvider(storagePaths);
     final clipboard = LandmarksClipboard();
     return LandmarkServices(
@@ -338,6 +349,7 @@ class LandmarkServices {
       workspaceController: workspaces,
       displayRegistry: display,
       onScreen: onScreen,
+      index: index,
       backupService: BackupService(storagePaths, storage, settings, clock: clock),
       restoreService: RestoreService(storagePaths, storage, settings),
       intentDispatcher: IntentDispatcher(creation, target, folders, trackerService),
@@ -356,6 +368,7 @@ class LandmarkServices {
         places: places,
         reader: reader,
         displayRegistry: display,
+        index: index,
         selection: SelectionController(),
         clipboard: clipboard,
         settings: settings,

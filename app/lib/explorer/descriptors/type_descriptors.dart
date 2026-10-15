@@ -279,7 +279,7 @@ abstract final class TypeDescriptors {
     ),
     buildDetailsHeader: (context, data) => GeometryPreview(
       points: LandmarkGeometry.pointsOf(data.object),
-      color: Color(data.item.colorValue | 0xFF000000),
+      color: Color(data.item.displayColor | 0xFF000000),
     ),
     buildDetailsSections: (context, data) {
       final points = switch (data.object) {
@@ -463,7 +463,7 @@ abstract final class TypeDescriptors {
     ),
     buildDetailsHeader: (context, data) => GeometryPreview(
       points: LandmarkGeometry.pointsOf(data.object),
-      color: Color(data.item.colorValue | 0xFF000000),
+      color: Color(data.item.displayColor | 0xFF000000),
       closed: switch (data.object) {
         final AreaObject o => CompositeCalculator.isClosed(o),
         _ => true,

@@ -36,7 +36,8 @@ void main() {
     );
     final item = (await f.reader.read(path))!;
     expect(item.name, 'untitled_1760000000000');
-    expect(item.colorValue, LandmarkItem.defaultColor);
+    expect(item.colorValue, isNull);
+    expect(item.displayColor, LandmarkItem.defaultColor);
   });
 
   test('composite files: no coordinates, statistics from metadata', () async {

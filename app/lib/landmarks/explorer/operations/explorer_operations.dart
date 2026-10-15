@@ -142,6 +142,7 @@ class ExplorerOperations {
       if (!p.equals(p.dirname(source), targetFolder)) {
         final target = await FileNaming.resolveCollision(targetFolder, p.basename(source));
         await _storage.moveFile(source, target);
+        await _repository.changed([source, target]);
         _onScreen?.moved(source, target);
         if (_display.isDisplayed(source)) {
           _display.undisplay(source);
@@ -152,6 +153,7 @@ class ExplorerOperations {
     } else {
       final target = await FileNaming.resolveCollision(targetFolder, p.basename(source));
       await _storage.atomicWriteBytes(target, await _storage.readBytes(source));
+      await _repository.changed([target]);
     }
   }
 
@@ -167,11 +169,15 @@ class ExplorerOperations {
     await Directory(targetFolder).create(recursive: true);
     if (_clipboard.isCut) {
       if (!p.equals(p.dirname(source), targetFolder)) {
-        await Directory(source).rename(await FileNaming.resolveCollision(targetFolder, p.basename(source)));
+        final target = await FileNaming.resolveCollision(targetFolder, p.basename(source));
+        await Directory(source).rename(target);
+        await _repository.changed([source, target]);
       }
       _clipboard.removeOne(source);
     } else {
-      await _copyDirectory(Directory(source), await FileNaming.resolveCollision(targetFolder, p.basename(source)));
+      final target = await FileNaming.resolveCollision(targetFolder, p.basename(source));
+      await _copyDirectory(Directory(source), target);
+      await _repository.changed([target]);
     }
   }
 

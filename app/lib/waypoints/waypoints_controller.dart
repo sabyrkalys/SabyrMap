@@ -15,7 +15,17 @@ final waypointsControllerProvider = NotifierProvider<WaypointsController, List<W
 
 class WaypointsController extends Notifier<List<Waypoint>> {
   @override
-  List<Waypoint> build() => const [];
+  List<Waypoint> build() {
+    // Точки из файлов — из индекса меток: любая запись меток (с карты, из
+    // «Всех меток», импорт, Syncthing) сразу доходит сюда.
+    final repository = ref.watch(waypointsRepositoryProvider);
+    if (repository is FileWaypointsRepository) {
+      final changes = repository.changes;
+      changes.addListener(loadWaypoints);
+      ref.onDispose(() => changes.removeListener(loadWaypoints));
+    }
+    return const [];
+  }
 
   WaypointsRepository get _repository => ref.read(waypointsRepositoryProvider);
 

@@ -90,7 +90,7 @@ class LandmarkTypeSection extends StatelessWidget {
               icon: ItemRow.iconFor(item.type),
               iconColor: item.type == LandmarkType.ldkFile
                   ? Color(descriptor.iconColor)
-                  : Color(item.colorValue | 0xFF000000),
+                  : Color(item.displayColor | 0xFF000000),
               displayName: item.name,
               subtitle: _cardSubtitle(item),
               selecting: selecting,

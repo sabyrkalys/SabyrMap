@@ -25,6 +25,14 @@ class LandmarkRepository {
   /// файлов не-меток, например экспорта).
   StorageService get storage => _service;
 
+  /// Кому сообщать о путях, записанных репозиторием ([LandmarkIndex.refresh]).
+  /// Ждётся: когда запись вернулась, индекс уже знает о ней.
+  Future<void> Function(Iterable<String> paths)? onChanged;
+
+  /// Сообщает об изменённых путях (файлах или папках). Для записей мимо
+  /// репозитория — копирования, импорта своих файлов.
+  Future<void> changed(Iterable<String> paths) async => onChanged?.call(paths);
+
   /// Сохраняет новый объект и возвращает абсолютный путь файла.
   /// Все типы сохраняются сразу; режим правки — забота UI.
   /// [directory] по умолчанию — [StoragePaths.landmarks]. Ставит
@@ -44,6 +52,7 @@ class LandmarkRepository {
     final name = FileNaming.filename(file.content.userMetadata.name ?? '', file.type, at: now);
     final path = await FileNaming.resolveCollision(dir, name);
     await _service.atomicWriteBytes(path, bytes);
+    await changed([path]);
     return path;
   }
 
@@ -64,10 +73,14 @@ class LandmarkRepository {
         .copyWith(version: previous.version + 1);
     final bytes = LandmarkCodec.encode(file.withContent(file.content.withTechnicalMetadata(technical)));
     await _service.atomicWriteBytes(absolutePath, bytes);
+    await changed([absolutePath]);
   }
 
   /// Удаляет файл. Необратимо; отсутствующий файл — не ошибка.
-  Future<void> delete(String absolutePath) => _service.deleteFile(absolutePath);
+  Future<void> delete(String absolutePath) async {
+    await _service.deleteFile(absolutePath);
+    await changed([absolutePath]);
+  }
 
   /// Переносит файл в папку [to] и возвращает новый путь. [newName] —
   /// новое имя файла; без расширения типа оно добавляется. Занятое имя
@@ -83,6 +96,7 @@ class LandmarkRepository {
     await _ensureDirectory(to);
     final path = await FileNaming.resolveCollision(to, name);
     await _service.moveFile(from, path);
+    await changed([from, path]);
     return path;
   }
 

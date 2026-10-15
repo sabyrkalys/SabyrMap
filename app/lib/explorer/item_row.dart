@@ -68,7 +68,7 @@ class ItemRow extends StatelessWidget {
     dense: dense,
     leading: selecting
         ? Checkbox(value: selected, onChanged: (_) => onTap())
-        : Icon(iconFor(item.type), color: Color(item.colorValue | 0xFF000000)),
+        : Icon(iconFor(item.type), color: Color(item.displayColor | 0xFF000000)),
     title: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis),
     subtitle: Text(subtitleFor(item), maxLines: 1),
     selected: selected,

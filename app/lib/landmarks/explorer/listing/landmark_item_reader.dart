@@ -4,8 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:app/exceptions/serialization_exception.dart';
-import 'package:app/landmarks/models/landmark_metadata.dart';
-import 'package:app/landmarks/models/landmark_type.dart';
+import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/landmarks/repository/file_naming.dart';
 import 'package:app/landmarks/serialization/binary_reader.dart';
 import 'package:app/landmarks/serialization/landmark_codec.dart';
@@ -99,21 +98,79 @@ class LandmarkItemReader {
       latitude = r.readInt() / 1e7;
     }
 
-    final modifiedMs = stat.modified.millisecondsSinceEpoch;
+    return itemOf(
+      path,
+      header.type,
+      technical: technical,
+      user: user,
+      latitude: latitude,
+      longitude: longitude,
+      fileSizeBytes: stat.size,
+      fileModifiedAt: stat.modified,
+    );
+  }
+
+  /// Объекты внутри файла меток [ldkPath] — записи с путями
+  /// [LandmarkItem.nestedPath]; размер и время файла — у самого `.ldk`.
+  /// Файл меток читается целиком. Не файл меток или повреждён — пусто.
+  Future<List<LandmarkItem>> readNested(String ldkPath) async {
+    try {
+      final file = File(ldkPath);
+      final stat = await file.stat();
+      final content = LandmarkCodec.decode(await file.readAsBytes()).content;
+      if (content is! LdkFileObject) return const [];
+      return [
+        for (final (i, object) in content.objects.indexed)
+          itemOf(
+            LandmarkItem.nestedPath(ldkPath, i),
+            object.type,
+            technical: object.technicalMetadata,
+            user: object.userMetadata,
+            latitude: object is WaypointObject ? object.location.latitude : null,
+            longitude: object is WaypointObject ? object.location.longitude : null,
+            fileSizeBytes: stat.size,
+            fileModifiedAt: stat.modified,
+          ),
+      ];
+    } on SerializationException catch (e) {
+      developer.log('Skipping unreadable landmark file $ldkPath: $e', name: 'sabyrmap.explorer');
+      return const [];
+    } on FileSystemException catch (e) {
+      developer.log('Cannot read landmark file $ldkPath: $e', name: 'sabyrmap.explorer');
+      return const [];
+    }
+  }
+
+  /// Запись списка по метаданным объекта; [latitude]/[longitude] — у
+  /// объекта с одной точкой.
+  static LandmarkItem itemOf(
+    String path,
+    LandmarkType type, {
+    required LandmarkMetadata technical,
+    required LandmarkMetadata user,
+    double? latitude,
+    double? longitude,
+    required int fileSizeBytes,
+    required DateTime fileModifiedAt,
+  }) {
+    final modifiedMs = fileModifiedAt.millisecondsSinceEpoch;
     final createdAt = user.createdAtMs ?? technical.createdAtMs ?? modifiedMs;
     final name = user.name;
     return LandmarkItem(
       path: path,
       name: name != null && name.trim().isNotEmpty
           ? name
-          : FileNaming.baseFromName(p.basenameWithoutExtension(path)),
-      type: header.type,
-      colorValue: user.colorValue ?? LandmarkItem.defaultColor,
+          : FileNaming.baseFromName(p.basenameWithoutExtension(LandmarkItem.fileOf(path))),
+      type: type,
+      colorValue: user.colorValue,
       iconId: user.iconId,
+      userIcon: _string(user, LandmarkMetadata.userIconKey),
+      kind: _string(user, LandmarkMetadata.kindKey),
+      description: _string(user, LandmarkMetadata.descriptionKey),
       createdAt: createdAt,
       updatedAt: user.updatedAtMs ?? technical.updatedAtMs ?? createdAt,
-      fileSizeBytes: stat.size,
-      fileModifiedAt: stat.modified,
+      fileSizeBytes: fileSizeBytes,
+      fileModifiedAt: fileModifiedAt,
       latitude: latitude,
       longitude: longitude,
       lengthMeters: _number(user, LandmarkMetadata.lengthKey),
