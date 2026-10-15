@@ -28,7 +28,10 @@ import 'package:app/landmarks/import_export/import/import_service.dart';
 import 'package:app/landmarks/import_export/registry/format_registry.dart';
 import 'package:app/landmarks/icons/icon_resolver.dart';
 import 'package:app/landmarks/repository/landmark_repository.dart';
+import 'package:app/landmarks/drafts/metadata_patch.dart';
+import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:app/landmarks/index/landmark_index.dart';
+import 'package:app/landmarks/index/landmark_index_watcher.dart';
 import 'package:app/landmarks/on_screen/on_screen_registry.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
 import 'package:app/maps/calibration/calibration_controller.dart';
@@ -210,11 +213,23 @@ class LandmarkServices {
   final ExplorerController explorerController;
   final ExplorerOperations explorerOperations;
 
+  /// Правка пользовательских метаданных файла метки любого типа (имя,
+  /// цвет, значок, описание...): версия растёт, индекс обновляется.
+  /// Объект внутри файла меток так не правится — [StateError].
+  Future<void> patchMetadata(String path, MetadataPatch patch) async {
+    if (LandmarkItem.fileOf(path) != path) throw StateError('Nested object is read-only: $path');
+    final file = await repository.load(path);
+    final user = editor.apply(file.content.userMetadata, patch);
+    await repository.update(path, file.withContent(file.content.withUserMetadata(user)));
+  }
+
   /// Собирает сервисы: пути, базовые папки, репозиторий, настройки,
   /// реестр иконок (сразу просканированный), сервисы составных объектов
   /// и режим правки. [paths], [prefs] и [clock]
-  /// подменяются в тестах.
+  /// подменяются в тестах; [watchLandmarks] — следить за правками папки
+  /// меток извне (в тестах выключен: временные папки).
   static Future<LandmarkServices> bootstrap({
+    bool watchLandmarks = true,
     StoragePaths? paths,
     SharedPreferences? prefs,
     DateTime Function()? clock,
@@ -298,6 +313,7 @@ class LandmarkServices {
     await bookmarks.load();
     final reader = LandmarkItemReader(storage);
     await index.rebuild();
+    if (watchLandmarks) LandmarkIndexWatcher(index).start();
     final places = placesProvider ?? PlacesProvider(storagePaths);
     final clipboard = LandmarksClipboard();
     return LandmarkServices(

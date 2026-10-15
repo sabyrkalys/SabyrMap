@@ -40,11 +40,7 @@ abstract final class ItemActions {
   }
 
   /// Правка пользовательских метаданных файла (версия растёт).
-  static Future<void> _patch(LandmarkServices s, String path, MetadataPatch patch) async {
-    final file = await s.repository.load(path);
-    final user = s.editor.apply(file.content.userMetadata, patch);
-    await s.repository.update(path, file.withContent(file.content.withUserMetadata(user)));
-  }
+  static Future<void> _patch(LandmarkServices s, String path, MetadataPatch patch) => s.patchMetadata(path, patch);
 
   /// Переименование: новое имя пишется в метаданные, файл получает имя из
   /// него (занятое — с `_1`, `_2`). Показ на карте и буфер следуют за

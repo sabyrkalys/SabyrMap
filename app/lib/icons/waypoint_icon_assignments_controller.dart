@@ -9,7 +9,17 @@ final waypointIconAssignmentsControllerProvider =
 
 class WaypointIconAssignmentsController extends Notifier<Map<String, String>> {
   @override
-  Map<String, String> build() => const {};
+  Map<String, String> build() {
+    // Значки в файлах: меняются вместе с индексом меток (переименование,
+    // перенос, правка извне).
+    final store = ref.watch(waypointIconStoreProvider);
+    if (store is FileWaypointIconStore) {
+      final changes = store.changes;
+      changes.addListener(load);
+      ref.onDispose(() => changes.removeListener(load));
+    }
+    return const {};
+  }
 
   WaypointIconStore get _store => ref.read(waypointIconStoreProvider);
 

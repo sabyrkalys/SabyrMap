@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/landmark_services_provider.dart';
 import 'explorer/local_landmarks_screen.dart';
+import 'icons/icon_metadata_migration.dart';
+import 'icons/waypoint_icon_store.dart';
 import 'home/home_shell.dart';
 import 'landmarks/services/landmark_services.dart';
 import 'licenses.dart';
@@ -18,11 +20,14 @@ Future<void> main() async {
   registerThirdPartyLicenses();
   await installSeedFiles();
   final services = await LandmarkServices.bootstrap();
+  // Значки из библиотеки — из защищённого хранилища в файлы точек (один раз).
+  await IconMetadataMigration.run(services, SecureWaypointIconStore());
   runApp(
     ProviderScope(
       overrides: [
         landmarkServicesProvider.overrideWithValue(services),
         onScreenRegistryProvider.overrideWithValue(services.onScreen),
+        waypointIconStoreProvider.overrideWithValue(FileWaypointIconStore(services)),
         allMarkersOpenerProvider.overrideWithValue(
           (context) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LocalLandmarksScreen())),
         ),

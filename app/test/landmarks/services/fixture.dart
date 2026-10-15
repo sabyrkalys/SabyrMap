@@ -29,6 +29,7 @@ class ServicesFixture {
     final paths = StoragePaths.forRoot(root.path);
     final now = [DateTime.fromMillisecondsSinceEpoch(1760000000000)];
     final services = await LandmarkServices.bootstrap(
+      watchLandmarks: false,
       paths: paths,
       prefs: await SharedPreferences.getInstance(),
       clock: () => now.single,
