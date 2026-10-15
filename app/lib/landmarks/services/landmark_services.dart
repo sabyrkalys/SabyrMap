@@ -321,6 +321,7 @@ class LandmarkServices {
     if (watchLandmarks) LandmarkIndexWatcher(index).start();
     final places = placesProvider ?? PlacesProvider(storagePaths);
     final clipboard = LandmarksClipboard();
+    final compositeCreation = CompositeCreationService(repository, folders, editor, calculator: calculator, clock: clock);
     return LandmarkServices(
       creation: creation,
       waypoints: waypoints,
@@ -329,7 +330,7 @@ class LandmarkServices {
       folders: folders,
       icons: icons,
       repository: repository,
-      compositeCreation: CompositeCreationService(repository, folders, editor, calculator: calculator, clock: clock),
+      compositeCreation: compositeCreation,
       setService: setService,
       routeService: routeService,
       trackService: trackService,
@@ -339,6 +340,7 @@ class LandmarkServices {
         routeService: routeService,
         trackService: trackService,
         areaService: areaService,
+        creation: compositeCreation,
       ),
       calculator: calculator,
       formatRegistry: formats,

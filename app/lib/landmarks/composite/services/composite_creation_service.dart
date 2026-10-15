@@ -101,6 +101,25 @@ class CompositeCreationService {
     return parts;
   }
 
+  /// Сохраняет объект, нарисованный в режиме правки ([EditModeController.startNew]),
+  /// новым файлом в [targetFolder] (по умолчанию — папка новых меток);
+  /// пустые сегменты и контуры отбрасываются.
+  Future<String> createObject(LandmarkObject object, {String? targetFolder}) {
+    final cleaned = switch (object) {
+      TrackObject o => TrackObject(
+        waypoints: o.waypoints,
+        segments: [for (final s in o.segments) if (s.locations.isNotEmpty) s],
+        userMetadata: o.userMetadata,
+      ),
+      AreaObject o => AreaObject(
+        polygons: [for (final p in o.polygons) if (p.outline.isNotEmpty) p],
+        userMetadata: o.userMetadata,
+      ),
+      _ => object,
+    };
+    return _save(cleaned, {...cleaned.userMetadata.entries.cast<String, Object>()}, targetFolder);
+  }
+
   static Map<String, Object> _base(String? name, String? comment, String? description, int? color, String? icon) => {
     if (name?.trim().isNotEmpty ?? false) LandmarkMetadata.nameKey: name!.trim(),
     if (comment?.trim().isNotEmpty ?? false) LandmarkMetadata.commentKey: comment!,

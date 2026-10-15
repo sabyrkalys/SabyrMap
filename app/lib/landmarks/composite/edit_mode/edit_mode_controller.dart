@@ -2,6 +2,7 @@ import 'package:app/landmarks/composite/operations/polygon_ops.dart';
 import 'package:app/landmarks/composite/operations/segment_ops.dart';
 import 'package:app/landmarks/composite/operations/waypoint_ops.dart';
 import 'package:app/landmarks/composite/services/area_service.dart';
+import 'package:app/landmarks/composite/services/composite_creation_service.dart';
 import 'package:app/landmarks/composite/services/composite_service.dart';
 import 'package:app/landmarks/composite/services/route_service.dart';
 import 'package:app/landmarks/composite/services/set_service.dart';
@@ -24,7 +25,9 @@ class EditModeController extends ChangeNotifier {
     required RouteService routeService,
     required TrackService trackService,
     required AreaService areaService,
-  }) : _set = setService,
+    CompositeCreationService? creation,
+  }) : _creation = creation,
+       _set = setService,
        _route = routeService,
        _track = trackService,
        _area = areaService;
@@ -33,6 +36,15 @@ class EditModeController extends ChangeNotifier {
   final RouteService _route;
   final TrackService _track;
   final AreaService _area;
+  final CompositeCreationService? _creation;
+
+  /// Сколько точек нужно, чтобы нарисованный объект можно было сохранить.
+  static const Map<LandmarkType, int> minPoints = {
+    LandmarkType.set: 1,
+    LandmarkType.route: 2,
+    LandmarkType.track: 2,
+    LandmarkType.area: 3,
+  };
 
   /// Сколько шагов отмены хранится.
   static const int maxHistory = 50;
@@ -57,6 +69,57 @@ class EditModeController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Начинает рисование нового набора, маршрута, трека или области: пустой
+  /// объект (у трека — один пустой сегмент, у области — один пустой
+  /// контур) с [metadata] (имя, цвет...); файл появится в [saveAndClose]
+  /// в [folder] (по умолчанию — папка новых меток).
+  void startNew(LandmarkType type, {String? folder, LandmarkMetadata metadata = const LandmarkMetadata()}) {
+    final LandmarkObject object = switch (type) {
+      LandmarkType.set => SetObject(userMetadata: metadata),
+      LandmarkType.route => RouteObject(userMetadata: metadata),
+      LandmarkType.track => TrackObject(segments: const [TrackSegment()], userMetadata: metadata),
+      LandmarkType.area => AreaObject(polygons: const [AreaPolygon()], userMetadata: metadata),
+      _ => throw ArgumentError.value(type, 'type', 'drawing is for sets, routes, tracks and areas'),
+    };
+    _original = object;
+    _undo.clear();
+    _redo.clear();
+    _state = EditModeState(target: EditModeTarget(folder: folder, type: type, object: object));
+    notifyListeners();
+  }
+
+  /// Добавляет точку [location] в конец по правилу типа: точка набора или
+  /// маршрута, точка последнего сегмента трека, точка контура первой
+  /// области. Отмена — [undo].
+  bool addPoint(LandmarkLocation location) {
+    final object = _state.target?.object;
+    return execute(switch (object) {
+      TrackObject(:final segments) => AddTrackLocationCommand(
+        segmentIndex: segments.isEmpty ? 0 : segments.length - 1,
+        location: location,
+      ),
+      AreaObject() => AddAreaOutlinePointCommand(polygonIndex: 0, location: location),
+      _ => AddWaypointCommand(waypoint: WaypointObject(location: location)),
+    });
+  }
+
+  /// Сколько точек в объекте (у трека — во всех сегментах, у области — в
+  /// контурах).
+  int get pointCount => switch (_state.target?.object) {
+    SetObject(:final waypoints) || RouteObject(:final waypoints) => waypoints.length,
+    TrackObject(:final segments) => segments.fold(0, (n, s) => n + s.locations.length),
+    AreaObject(:final polygons) => polygons.fold(0, (n, p) => n + p.outline.length),
+    _ => 0,
+  };
+
+  /// Можно ли сохранить: у существующего — всегда, у нового — набрано
+  /// [minPoints].
+  bool get canFinish {
+    final target = _state.target;
+    if (target == null) return false;
+    return !target.isNew || pointCount >= (minPoints[target.type] ?? 1);
+  }
+
   /// Закрывает без записи.
   void close() {
     _original = null;
@@ -66,13 +129,24 @@ class EditModeController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Записывает правки (если они есть) через сервис типа и закрывает.
-  /// Ошибка записи оставляет режим открытым.
-  Future<void> saveAndClose() async {
+  /// Записывает правки (если они есть) через сервис типа и закрывает;
+  /// новый объект сохраняется новым файлом. Возвращает путь файла (null —
+  /// режим не открыт). Ошибка записи оставляет режим открытым; новый
+  /// объект без [minPoints] — [StateError].
+  Future<String?> saveAndClose() async {
     final target = _state.target;
-    if (target == null) return;
-    if (target.isDirty) await _write(target);
+    if (target == null) return null;
+    String? path = target.filePath;
+    if (target.isNew) {
+      if (!canFinish) throw StateError('Not enough points to save a ${target.type.name}');
+      final creation = _creation;
+      if (creation == null) throw StateError('Drawing needs CompositeCreationService');
+      path = await creation.createObject(target.object, targetFolder: target.folder);
+    } else if (target.isDirty) {
+      await _write(target);
+    }
     close();
+    return path;
   }
 
   /// Применяет команду. Неприменимая команда (не тот тип, неверный
@@ -134,10 +208,10 @@ class EditModeController extends ChangeNotifier {
   };
 
   Future<void> _write(EditModeTarget target) => switch (target.object) {
-    final SetObject o => _set.save(target.filePath, o),
-    final RouteObject o => _route.save(target.filePath, o),
-    final TrackObject o => _track.save(target.filePath, o),
-    final AreaObject o => _area.save(target.filePath, o),
+    final SetObject o => _set.save(target.filePath!, o),
+    final RouteObject o => _route.save(target.filePath!, o),
+    final TrackObject o => _track.save(target.filePath!, o),
+    final AreaObject o => _area.save(target.filePath!, o),
     _ => throw StateError('Unsupported object ${target.object.runtimeType}'),
   };
 
