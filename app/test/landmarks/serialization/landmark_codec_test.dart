@@ -76,6 +76,10 @@ void main() {
       ),
     ),
     LandmarkFile.of(
+      CircleObject(center: loc(30.5, 50.5), radiusMeters: 1250, userMetadata: const LandmarkMetadata(entries: {'name': 'Зона'})),
+    ),
+    LandmarkFile.of(TextObject(location: loc(30.6, 50.6), text: 'Брод', technicalMetadata: technical)),
+    LandmarkFile.of(
       LdkFileObject(
         userMetadata: const LandmarkMetadata(entries: {'name': 'Поход', 'comment': 'Весна'}),
         technicalMetadata: technical,
@@ -196,7 +200,7 @@ void main() {
     );
 
     test('round-trips every object type', () {
-      expect((ldk.content as LdkFileObject).objects, hasLength(5));
+      expect((ldk.content as LdkFileObject).objects, hasLength(samples.length - 1));
       expect(roundTrip(ldk), ldk);
     });
 

@@ -70,6 +70,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'folder_service.dart';
 import 'marker_creation_service.dart';
 import 'metadata_editor.dart';
+import 'shape_service.dart';
 import 'waypoint_service.dart';
 
 /// Сервисы меток для UI, собранные вручную, без DI-пакетов.
@@ -77,6 +78,7 @@ class LandmarkServices {
   const LandmarkServices({
     required this.creation,
     required this.waypoints,
+    required this.shapes,
     required this.editor,
     required this.folders,
     required this.icons,
@@ -133,6 +135,9 @@ class LandmarkServices {
 
   final MarkerCreationService creation;
   final WaypointService waypoints;
+
+  /// Геометрия круга и текста.
+  final ShapeService shapes;
   final MetadataEditor editor;
   final FolderService folders;
   final IconRegistry icons;
@@ -319,6 +324,7 @@ class LandmarkServices {
     return LandmarkServices(
       creation: creation,
       waypoints: waypoints,
+      shapes: ShapeService(repository),
       editor: editor,
       folders: folders,
       icons: icons,

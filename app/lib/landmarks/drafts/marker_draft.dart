@@ -1,7 +1,8 @@
 import 'package:app/landmarks/models/landmark_type.dart';
 
 /// Черновик нового объекта: всё, что UI собрал в диалоге «Новая метка»,
-/// до сохранения. В этом спринте сохраняется только [LandmarkType.waypoint].
+/// до сохранения: путевая точка, круг ([radiusMeters]), текст ([text]) или
+/// файл меток. Составные объекты — свои черновики (SetDraft...).
 class MarkerDraft {
   const MarkerDraft({
     required this.type,
@@ -14,6 +15,8 @@ class MarkerDraft {
     this.iconId,
     this.targetFolder,
     this.extraMetadata = const {},
+    this.radiusMeters,
+    this.text,
   });
 
   final LandmarkType type;
@@ -40,6 +43,12 @@ class MarkerDraft {
   /// приложения); значения — допустимые типы [LandmarkMetadata].
   final Map<String, Object> extraMetadata;
 
+  /// Радиус круга, м ([LandmarkType.circle]); центр — [latitude]/[longitude].
+  final double? radiusMeters;
+
+  /// Надпись ([LandmarkType.text]) в точке [latitude]/[longitude].
+  final String? text;
+
   MarkerDraft copyWith({
     LandmarkType? type,
     String? name,
@@ -51,6 +60,8 @@ class MarkerDraft {
     double? latitude,
     String? targetFolder,
     Map<String, Object>? extraMetadata,
+    double? radiusMeters,
+    String? text,
   }) => MarkerDraft(
     type: type ?? this.type,
     name: name ?? this.name,
@@ -62,6 +73,8 @@ class MarkerDraft {
     latitude: latitude ?? this.latitude,
     targetFolder: targetFolder ?? this.targetFolder,
     extraMetadata: extraMetadata ?? this.extraMetadata,
+    radiusMeters: radiusMeters ?? this.radiusMeters,
+    text: text ?? this.text,
   );
 
   @override
@@ -75,9 +88,11 @@ class MarkerDraft {
       other.iconId == iconId &&
       other.longitude == longitude &&
       other.latitude == latitude &&
-      other.targetFolder == targetFolder;
+      other.targetFolder == targetFolder &&
+      other.radiusMeters == radiusMeters &&
+      other.text == text;
 
   @override
   int get hashCode =>
-      Object.hash(type, name, comment, description, colorValue, iconId, longitude, latitude, targetFolder);
+      Object.hash(type, name, comment, description, colorValue, iconId, longitude, latitude, targetFolder, radiusMeters, text);
 }

@@ -4,17 +4,34 @@ import 'package:app/landmarks/models/landmark_type.dart';
 
 import 'validation_result.dart';
 
-/// Проверка путевой точки перед сохранением.
+/// Проверка путевой точки, круга и текста перед сохранением (у всех одна
+/// точка и общие поля).
 abstract final class WaypointValidator {
   static const int maxNameLength = 200;
   static const int maxCommentLength = 5000;
   static const int maxDescriptionLength = 20000;
 
+  /// Самый большой радиус круга, м (половина окружности Земли).
+  static const double maxRadiusMeters = 20000000;
+  static const int maxTextLength = 1000;
+
   /// Проверяет черновик новой путевой точки.
   static ValidationResult validate(MarkerDraft draft) {
     final errors = <String>[];
-    if (draft.type != LandmarkType.waypoint) {
-      errors.add('WaypointValidator supports only waypoint type');
+    switch (draft.type) {
+      case LandmarkType.waypoint:
+        break;
+      case LandmarkType.circle:
+        final radius = draft.radiusMeters;
+        if (radius == null || !radius.isFinite || radius <= 0 || radius > maxRadiusMeters) {
+          errors.add('radiusMeters must be within (0, $maxRadiusMeters]');
+        }
+      case LandmarkType.text:
+        final text = draft.text?.trim() ?? '';
+        if (text.isEmpty) errors.add('text must not be empty');
+        if (text.length > maxTextLength) errors.add('text must not exceed $maxTextLength characters');
+      default:
+        errors.add('WaypointValidator supports waypoints, circles and texts');
     }
     _checkCoordinates(errors, draft.longitude, draft.latitude);
     _checkFields(errors, draft.name, draft.comment, draft.description, draft.colorValue);

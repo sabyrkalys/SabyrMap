@@ -8,7 +8,13 @@ enum LandmarkType {
 
   /// Файл меток: контейнер для объектов разных типов. Единственный
   /// формат, который создаётся из UI; прочие форматы — импорт и экспорт.
-  ldkFile(extension: 'ldk', magic: 0x50500F);
+  ldkFile(extension: 'ldk', magic: 0x50500F),
+
+  /// Круг: центр и радиус.
+  circle(extension: 'cir', magic: 0x505010),
+
+  /// Текст на карте: точка и надпись.
+  text(extension: 'lbl', magic: 0x505011);
 
   const LandmarkType({required this.extension, required this.magic});
 

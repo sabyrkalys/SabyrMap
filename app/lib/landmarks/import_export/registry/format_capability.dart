@@ -19,14 +19,15 @@ enum FormatCapability {
   multiObjectPerFile;
 
   /// Возможность импортировать объекты типа [type]. null — у типа нет
-  /// своей возможности: файл меток — контейнер, переносятся его объекты.
+  /// своей возможности: файл меток — контейнер, переносятся его объекты;
+  /// у круга и текста соответствия в GPX/KML/CSV нет — форматы их пропускают.
   static FormatCapability? importOf(LandmarkType type) => switch (type) {
     LandmarkType.waypoint => importWaypoint,
     LandmarkType.set => importSet,
     LandmarkType.route => importRoute,
     LandmarkType.track => importTrack,
     LandmarkType.area => importArea,
-    LandmarkType.ldkFile => null,
+    LandmarkType.ldkFile || LandmarkType.circle || LandmarkType.text => null,
   };
 
   /// Возможность экспортировать объекты типа [type]; null — см. [importOf].
@@ -36,6 +37,6 @@ enum FormatCapability {
     LandmarkType.route => exportRoute,
     LandmarkType.track => exportTrack,
     LandmarkType.area => exportArea,
-    LandmarkType.ldkFile => null,
+    LandmarkType.ldkFile || LandmarkType.circle || LandmarkType.text => null,
   };
 }

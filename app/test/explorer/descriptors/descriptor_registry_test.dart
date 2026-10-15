@@ -7,9 +7,9 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final registry = DescriptorRegistry.buildDefault();
 
-  test('buildDefault registers all six types', () {
+  test('buildDefault registers every type', () {
     expect(registry.all.map((d) => d.type).toSet(), LandmarkType.values.toSet());
-    expect(registry.all, hasLength(6));
+    expect(registry.all, hasLength(LandmarkType.values.length));
   });
 
   test('byType returns the matching descriptor', () {
@@ -64,6 +64,6 @@ void main() {
       ),
     );
     expect(r.of(LandmarkType.track).sectionTitle, 'ТРЕКИ 2');
-    expect(r.all, hasLength(6));
+    expect(r.all, hasLength(LandmarkType.values.length));
   });
 }

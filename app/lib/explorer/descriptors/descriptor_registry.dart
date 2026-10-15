@@ -20,7 +20,7 @@ class DescriptorRegistry {
   /// Все дескрипторы в порядке регистрации.
   List<LandmarkTypeDescriptor> get all => List.unmodifiable(_byType.values);
 
-  /// Все шесть типов, в порядке секций списка.
+  /// Все типы, в порядке секций списка.
   static DescriptorRegistry buildDefault() {
     final registry = DescriptorRegistry();
     for (final d in TypeDescriptors.all()) {

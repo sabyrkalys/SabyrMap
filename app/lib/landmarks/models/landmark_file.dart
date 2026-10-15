@@ -2,12 +2,14 @@ import 'landmark_object.dart';
 import 'landmark_type.dart';
 
 export 'landmark_area.dart';
+export 'landmark_circle.dart';
 export 'landmark_ldk.dart';
 export 'landmark_location.dart';
 export 'landmark_metadata.dart';
 export 'landmark_object.dart';
 export 'landmark_route.dart';
 export 'landmark_set.dart';
+export 'landmark_text.dart';
 export 'landmark_track.dart';
 export 'landmark_type.dart';
 export 'landmark_waypoint.dart';

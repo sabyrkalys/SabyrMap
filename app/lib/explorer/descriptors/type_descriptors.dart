@@ -34,7 +34,7 @@ abstract final class TypeDescriptors {
   static const int _accent = 0xFF00A38E;
 
   /// В порядке секций списка.
-  static List<LandmarkTypeDescriptor> all() => [waypoint, set, route, track, area, ldkFile];
+  static List<LandmarkTypeDescriptor> all() => [waypoint, set, route, track, area, circle, text, ldkFile];
 
   // ── Общие части ──────────────────────────────────────────────────────
 
@@ -479,6 +479,77 @@ abstract final class TypeDescriptors {
         ],
       ),
     ],
+  );
+
+  // ── Круг и текст ─────────────────────────────────────────────────────
+  // Decision: пока без своего оформления — меню и координаты как у точки;
+  // экран круга и текста придёт вместе с интерфейсом их создания.
+
+  static final LandmarkTypeDescriptor circle = _pointLike(
+    LandmarkType.circle,
+    displayName: 'Круг',
+    sectionTitle: 'КРУГИ',
+    icon: Icons.circle_outlined,
+    exportName: 'круги',
+    locationOf: (o) => o is CircleObject ? o.center : null,
+    extra: (o) => [
+      DetailField(
+        label: 'Радиус',
+        valueResolver: (_) => o is CircleObject ? DetailsFormat.distance(o.radiusMeters) : '—',
+      ),
+    ],
+  );
+
+  static final LandmarkTypeDescriptor text = _pointLike(
+    LandmarkType.text,
+    displayName: 'Текст',
+    sectionTitle: 'ТЕКСТЫ',
+    icon: Icons.text_fields,
+    exportName: 'тексты',
+    locationOf: (o) => o is TextObject ? o.location : null,
+    extra: (o) => [DetailField(label: 'Текст', valueResolver: (_) => o is TextObject ? o.text : '—')],
+  );
+
+  static LandmarkTypeDescriptor _pointLike(
+    LandmarkType type, {
+    required String displayName,
+    required String sectionTitle,
+    required IconData icon,
+    required String exportName,
+    required LandmarkLocation? Function(LandmarkObject? object) locationOf,
+    required List<DetailField> Function(LandmarkObject? object) extra,
+  }) => LandmarkTypeDescriptor(
+    type: type,
+    displayName: displayName,
+    sectionTitle: sectionTitle,
+    icon: icon,
+    iconColor: _accent,
+    buildItemMenu: (context, item) => _itemMenu(
+      item,
+      base: [ItemMenuEntries.details(item), ItemMenuEntries.display(item), ItemMenuEntries.share(item)],
+      edit: [ItemMenuEntries.color(item), ItemMenuEntries.properties(item), ItemMenuEntries.delete(item)],
+    ),
+    buildSectionMenu: (context) => SectionMenuEntries.build(
+      type,
+      exportName: exportName,
+      sorts: [...SectionMenuEntries.byName, ...SectionMenuEntries.byDate, ...SectionMenuEntries.byDistance],
+    ),
+    buildDetailsSections: (context, data) {
+      final location = locationOf(data.object);
+      final lat = location?.latitude ?? data.item.latitude;
+      final lon = location?.longitude ?? data.item.longitude;
+      return [
+        _fileSection(),
+        DetailSection(
+          title: 'КООРДИНАТЫ',
+          fields: [
+            DetailField(label: 'Широта', valueResolver: (_) => lat == null ? '—' : formatLatitude(lat)),
+            DetailField(label: 'Долгота', valueResolver: (_) => lon == null ? '—' : formatLongitude(lon)),
+            ...extra(data.object),
+          ],
+        ),
+      ];
+    },
   );
 
   // ── Файл меток ───────────────────────────────────────────────────────

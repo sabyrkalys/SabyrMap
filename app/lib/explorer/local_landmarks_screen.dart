@@ -395,6 +395,8 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
         LandmarkType.route: 'Маршруты',
         LandmarkType.track: 'Треки',
         LandmarkType.area: 'Области',
+        LandmarkType.circle: 'Круги',
+        LandmarkType.text: 'Тексты',
         LandmarkType.ldkFile: 'Файлы меток',
       };
       return SafeArea(

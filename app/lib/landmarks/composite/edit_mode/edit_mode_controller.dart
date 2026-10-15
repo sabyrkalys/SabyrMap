@@ -126,7 +126,11 @@ class EditModeController extends ChangeNotifier {
     LandmarkType.route => _route,
     LandmarkType.track => _track,
     LandmarkType.area => _area,
-    LandmarkType.waypoint || LandmarkType.ldkFile => throw ArgumentError.value(type, 'type', 'edit mode is for sets, routes, tracks and areas'),
+    LandmarkType.waypoint || LandmarkType.ldkFile || LandmarkType.circle || LandmarkType.text => throw ArgumentError.value(
+      type,
+      'type',
+      'edit mode is for sets, routes, tracks and areas',
+    ),
   };
 
   Future<void> _write(EditModeTarget target) => switch (target.object) {

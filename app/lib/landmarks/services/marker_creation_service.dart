@@ -40,12 +40,13 @@ class MarkerCreationService {
         LandmarkMetadata.updatedAtKey: now,
       },
     );
-    final LandmarkObject object = isFile
-        ? LdkFileObject(userMetadata: user)
-        : WaypointObject(
-            location: LandmarkLocation(longitude: draft.longitude, latitude: draft.latitude),
-            userMetadata: user,
-          );
+    final at = LandmarkLocation(longitude: draft.longitude, latitude: draft.latitude);
+    final LandmarkObject object = switch (draft.type) {
+      LandmarkType.ldkFile => LdkFileObject(userMetadata: user),
+      LandmarkType.circle => CircleObject(center: at, radiusMeters: draft.radiusMeters!, userMetadata: user),
+      LandmarkType.text => TextObject(location: at, text: draft.text!.trim(), userMetadata: user),
+      _ => WaypointObject(location: at, userMetadata: user),
+    };
     final directory = draft.targetFolder ?? await _folders.getDefaultFolder();
     return _repository.save(LandmarkFile.of(object), directory: directory);
   }

@@ -89,7 +89,7 @@ class LandmarkItemReader {
 
     double? latitude;
     double? longitude;
-    if (header.type == LandmarkType.waypoint) {
+    if (pointTypes.contains(header.type)) {
       // Location: int size, int lon·1e7, int lat·1e7 — остальное не нужно.
       final sizeAt = r.position;
       final size = r.readInt();
@@ -126,8 +126,8 @@ class LandmarkItemReader {
             object.type,
             technical: object.technicalMetadata,
             user: object.userMetadata,
-            latitude: object is WaypointObject ? object.location.latitude : null,
-            longitude: object is WaypointObject ? object.location.longitude : null,
+            latitude: pointOf(object)?.latitude,
+            longitude: pointOf(object)?.longitude,
             fileSizeBytes: stat.size,
             fileModifiedAt: stat.modified,
           ),
@@ -140,6 +140,17 @@ class LandmarkItemReader {
       return const [];
     }
   }
+
+  /// Типы с одной точкой, которая лежит в файле первой после метаданных:
+  /// её координата попадает в запись (расстояние, карта).
+  static const Set<LandmarkType> pointTypes = {LandmarkType.waypoint, LandmarkType.circle, LandmarkType.text};
+
+  /// Точка объекта с одной точкой (точка, центр круга, привязка текста).
+  static LandmarkLocation? pointOf(LandmarkObject object) => switch (object) {
+    WaypointObject(:final location) || TextObject(:final location) => location,
+    CircleObject(:final center) => center,
+    _ => null,
+  };
 
   /// Запись списка по метаданным объекта; [latitude]/[longitude] — у
   /// объекта с одной точкой.

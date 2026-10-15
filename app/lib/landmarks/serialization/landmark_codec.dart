@@ -25,6 +25,8 @@ import 'metadata_codec.dart';
 ///     area     → AreaPolygons
 ///     track    → Waypoints, TrackSegments
 ///     ldkFile  → пусто или Objects
+///     circle   → Location center + double radiusMeters
+///     text     → Location + String text
 ///
 /// Waypoints     = int count + Waypoint * count
 /// Waypoint      = Metadata user + Location
@@ -81,6 +83,12 @@ abstract final class LandmarkCodec {
           MetadataCodec.write(w, segment.userMetadata);
           LocationCodec.writeList(w, segment.locations);
         }
+      case CircleObject o:
+        LocationCodec.write(w, o.center);
+        w.writeDouble(o.radiusMeters);
+      case TextObject o:
+        LocationCodec.write(w, o.location);
+        w.writeString(o.text);
       case LdkFileObject o:
         if (o.objects.isNotEmpty) _writeObjects(w, o.objects);
       default:
@@ -108,6 +116,18 @@ abstract final class LandmarkCodec {
       LandmarkType.track => TrackObject(
         waypoints: _readWaypoints(r),
         segments: _readSegments(r),
+        userMetadata: user,
+        technicalMetadata: technical,
+      ),
+      LandmarkType.circle => CircleObject(
+        center: LocationCodec.read(r),
+        radiusMeters: _readRadius(r),
+        userMetadata: user,
+        technicalMetadata: technical,
+      ),
+      LandmarkType.text => TextObject(
+        location: LocationCodec.read(r),
+        text: r.readString(),
         userMetadata: user,
         technicalMetadata: technical,
       ),
@@ -142,6 +162,13 @@ abstract final class LandmarkCodec {
     }
     r.skip(headerSize - LandmarkHeader.byteSize);
     return LandmarkHeader(type: type, version: version, headerSize: headerSize);
+  }
+
+  static double _readRadius(BinaryReader r) {
+    final at = r.position;
+    final radius = r.readDouble();
+    if (!radius.isFinite || radius <= 0) throw SerializationException('Invalid circle radius $radius', position: at);
+    return radius;
   }
 
   static void _writeObjects(BinaryWriter w, List<LandmarkObject> objects) {
