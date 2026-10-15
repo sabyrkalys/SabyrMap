@@ -20,11 +20,11 @@ import '../item_menu/item_actions.dart';
 abstract final class LandmarkExportFlow {
   static const String unsupported = 'Формат не поддерживает содержимое файла';
 
-  /// Объекты файла для экспорта. Файл меток пока не хранит вложенных
-  /// объектов — у него пусто; у файла другого типа — он сам.
+  /// Объекты файла для экспорта: у файла меток — вложенные, у файла
+  /// другого типа — он сам.
   static List<LandmarkObject> objectsOf(LandmarkFile file) =>
       switch (file.content) {
-        LdkFileObject() => const [],
+        LdkFileObject(:final objects) => objects,
         final object => [object],
       };
 

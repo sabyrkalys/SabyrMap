@@ -182,4 +182,50 @@ void main() {
     expect(LandmarkType.fromExtension('gpx'), isNull);
     expect(LandmarkType.fromMagic(0x123456), isNull);
   });
+
+  group('landmark file with objects', () {
+    final ldk = LandmarkFile.of(
+      LdkFileObject(
+        userMetadata: const LandmarkMetadata(entries: {'name': 'Метки на экране'}),
+        technicalMetadata: technical,
+        objects: [
+          for (final s in samples)
+            if (s.type != LandmarkType.ldkFile) s.content,
+        ],
+      ),
+    );
+
+    test('round-trips every object type', () {
+      expect((ldk.content as LdkFileObject).objects, hasLength(5));
+      expect(roundTrip(ldk), ldk);
+    });
+
+    test('a file written before objects (empty payload) reads as empty', () {
+      final empty = LandmarkFile.of(const LdkFileObject(userMetadata: LandmarkMetadata(entries: {'name': 'Старый'})));
+      expect((roundTrip(empty).content as LdkFileObject).objects, isEmpty);
+    });
+
+    test('cut inside the objects is rejected', () {
+      final bytes = LandmarkCodec.encode(ldk);
+      final metadataEnd = LandmarkCodec.encode(
+        LandmarkFile.of(
+          LdkFileObject(userMetadata: (ldk.content as LdkFileObject).userMetadata, technicalMetadata: technical),
+        ),
+      ).length;
+      for (var cut = metadataEnd + 1; cut < bytes.length; cut++) {
+        expect(
+          () => LandmarkCodec.decode(Uint8List.sublistView(bytes, 0, cut)),
+          throwsA(isA<SerializationException>()),
+          reason: 'cut at $cut',
+        );
+      }
+    });
+
+    test('a landmark file inside a landmark file is rejected', () {
+      expect(
+        () => LandmarkCodec.encode(LandmarkFile.of(const LdkFileObject(objects: [LdkFileObject()]))),
+        throwsA(isA<SerializationException>()),
+      );
+    });
+  });
 }

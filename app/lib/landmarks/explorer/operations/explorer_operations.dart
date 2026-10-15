@@ -5,6 +5,7 @@ import 'package:app/landmarks/drafts/metadata_patch.dart';
 import 'package:app/landmarks/explorer/clipboard/clipboard_entry.dart';
 import 'package:app/landmarks/explorer/clipboard/landmarks_clipboard.dart';
 import 'package:app/landmarks/explorer/display/display_registry.dart';
+import 'package:app/landmarks/on_screen/on_screen_registry.dart';
 import 'package:app/landmarks/explorer/listing/landmark_item_reader.dart';
 import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/landmarks/repository/file_naming.dart';
@@ -26,12 +27,14 @@ class ExplorerOperations {
     required StorageService storage,
     required LandmarksClipboard clipboard,
     required DisplayRegistry display,
+    OnScreenRegistry? onScreen,
     MetadataEditor editor = const MetadataEditor(),
   }) : _repository = repository,
        _reader = reader,
        _storage = storage,
        _clipboard = clipboard,
        _display = display,
+       _onScreen = onScreen,
        _editor = editor;
 
   final LandmarkRepository _repository;
@@ -39,6 +42,7 @@ class ExplorerOperations {
   final StorageService _storage;
   final LandmarksClipboard _clipboard;
   final DisplayRegistry _display;
+  final OnScreenRegistry? _onScreen;
   final MetadataEditor _editor;
 
   /// Ключи, которые меняет [editDetailsSelected] в этом спринте.
@@ -62,12 +66,14 @@ class ExplorerOperations {
   /// Показывает файлы на карте; файлы не трогает.
   Future<OperationResult> displaySelected(Set<String> paths) async {
     _display.displayAll(paths);
+    _onScreen?.showAll(paths);
     return OperationResult.ok(paths.length);
   }
 
   /// Убирает файлы с карты; файлы не трогает.
   Future<OperationResult> undisplaySelected(Set<String> paths) async {
     _display.undisplayAll(paths);
+    _onScreen?.hideAll(paths);
     return OperationResult.ok(paths.length);
   }
 
@@ -136,6 +142,7 @@ class ExplorerOperations {
       if (!p.equals(p.dirname(source), targetFolder)) {
         final target = await FileNaming.resolveCollision(targetFolder, p.basename(source));
         await _storage.moveFile(source, target);
+        _onScreen?.moved(source, target);
         if (_display.isDisplayed(source)) {
           _display.undisplay(source);
           _display.display(target);

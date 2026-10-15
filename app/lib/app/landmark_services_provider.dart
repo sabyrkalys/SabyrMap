@@ -1,4 +1,5 @@
 import 'package:app/config/storage_paths.dart' as mock;
+import 'package:app/landmarks/on_screen/on_screen_registry.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,3 +43,7 @@ final markerGroupFoldersProvider = Provider<MarkerGroupFolders>(
 /// Открывает «Локальные метки» поверх [BuildContext]. Задаётся в `main`;
 /// по умолчанию ничего не делает (тесты подставляют свою запись вызова).
 final allMarkersOpenerProvider = Provider<void Function(BuildContext context)>((ref) => (_) {});
+
+/// «Метки на экране»: что из меток видно на карте. `main` подставляет
+/// реестр из [LandmarkServices]; по умолчанию (тесты) — пустой, всё видно.
+final onScreenRegistryProvider = Provider<OnScreenRegistry>((ref) => OnScreenRegistry());

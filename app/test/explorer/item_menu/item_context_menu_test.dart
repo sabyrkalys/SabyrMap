@@ -73,7 +73,7 @@ void main() {
     expectLabels([
       'Перевал',
       'Детали',
-      'Показать',
+      'Скрыть',
       'Задать целью',
       'Поделиться',
       'Экспортировать как...',
@@ -127,7 +127,7 @@ void main() {
   testWidgets('landmark file: open and rename', (tester) async {
     await start(tester);
     await openMenu(tester, LandmarkType.ldkFile);
-    expectLabels(['Поход', 'Открыть', 'Показать', 'Поделиться', 'Экспортировать как...', 'Переименовать', 'Удалить']);
+    expectLabels(['Поход', 'Открыть', 'Скрыть', 'Поделиться', 'Экспортировать как...', 'Переименовать', 'Удалить']);
     expect(inMenu('Детали'), findsNothing);
     expect(inMenu('Изменить цвет'), findsNothing);
     await h.dispose(tester);

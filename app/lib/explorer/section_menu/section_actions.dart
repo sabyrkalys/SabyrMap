@@ -45,12 +45,14 @@ abstract final class SectionActions {
   static String showAll(LandmarkServices s, LandmarkType type) {
     final paths = pathsOf(s, type);
     s.displayRegistry.displayAll(paths);
+    s.onScreen.showAll(paths);
     return 'Показано на карте: ${paths.length}';
   }
 
   static String hideAll(LandmarkServices s, LandmarkType type) {
     final paths = pathsOf(s, type);
     s.displayRegistry.undisplayAll(paths);
+    s.onScreen.hideAll(paths);
     return 'Убрано с карты: ${paths.length}';
   }
 

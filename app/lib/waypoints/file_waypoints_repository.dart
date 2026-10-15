@@ -27,16 +27,37 @@ class FileWaypointsRepository implements WaypointsRepository {
   /// Ключ типа метки приложения в метаданных.
   static const String typeKey = 'type';
 
-  /// Все точки папки меток с подпапками, по времени создания.
+  /// Разделитель id точки внутри файла меток: `<путь .ldk>#ldk:<номер>`.
+  static const String _nestedMark = '#ldk:';
+
+  /// Файл, которому принадлежит точка [id]: у точки из файла меток — сам
+  /// `.ldk`, у отдельной точки — её `.wpt`.
+  static String fileOf(String id) {
+    final at = id.lastIndexOf(_nestedMark);
+    return at == -1 ? id : id.substring(0, at);
+  }
+
+  /// Все точки папки меток с подпапками, по времени создания; точки внутри
+  /// файлов меток (`.ldk`) — тоже, только для показа ([Waypoint.canEdit]
+  /// false: это копии внутри файла).
   @override
   Future<List<Waypoint>> list() async {
     final root = Directory(_services.repository.storage.paths.landmarks);
     if (!await root.exists()) return const [];
     final out = <Waypoint>[];
     await for (final entity in root.list(recursive: true, followLinks: false)) {
-      if (entity is! File || p.extension(entity.path).toLowerCase() != '.wpt') continue;
+      if (entity is! File) continue;
+      final ext = p.extension(entity.path).toLowerCase();
       try {
-        out.add(_toModel(entity.path, await _services.waypoints.load(entity.path)));
+        if (ext == '.wpt') {
+          out.add(_toModel(entity.path, await _services.waypoints.load(entity.path)));
+        } else if (ext == '.ldk') {
+          final content = (await _services.repository.load(entity.path)).content;
+          if (content is! LdkFileObject) continue;
+          for (final (i, object) in content.objects.indexed) {
+            if (object is WaypointObject) out.add(_toModel('${entity.path}$_nestedMark$i', object, canEdit: false));
+          }
+        }
       } on Exception {
         // Чужой или повреждённый файл — в список не попадает.
       }
@@ -111,7 +132,7 @@ class FileWaypointsRepository implements WaypointsRepository {
     }
   }
 
-  static Waypoint _toModel(String path, WaypointObject w) {
+  static Waypoint _toModel(String path, WaypointObject w, {bool canEdit = true}) {
     final m = w.userMetadata;
     final type = m.entries[typeKey];
     final created = m.createdAtMs;
@@ -119,13 +140,13 @@ class FileWaypointsRepository implements WaypointsRepository {
       id: path,
       orgId: '',
       ownerId: '',
-      name: m.name ?? p.basenameWithoutExtension(path),
+      name: m.name ?? p.basenameWithoutExtension(fileOf(path)),
       type: type is String && type.isNotEmpty ? type : defaultWaypointType,
       note: m.description,
       color: m.colorValue == null ? null : colorToHex(Color(m.colorValue!)),
       lat: w.location.latitude,
       lng: w.location.longitude,
-      canEdit: true,
+      canEdit: canEdit,
       createdAt: created == null ? DateTime.fromMillisecondsSinceEpoch(0) : DateTime.fromMillisecondsSinceEpoch(created),
     );
   }

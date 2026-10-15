@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:app/app/landmark_services_provider.dart';
+import 'package:app/landmarks/on_screen/on_screen_saver.dart';
 import 'package:app/waypoints/file_waypoints_repository.dart';
 import 'package:app/waypoints/waypoint_models.dart';
 import 'package:app/waypoints/waypoint_types.dart';
@@ -103,5 +104,16 @@ void main() {
     expect(folders.display(folders.unsorted), 'landmarks/imported');
     expect(folders.display('/elsewhere/x'), '/elsewhere/x');
     expect(const MarkerGroupFolders(unsorted: '/a', myMarkers: '/b').display('/a'), '/a');
+  });
+
+  test('waypoints inside a landmark file are listed read-only and belong to the file', () async {
+    final wpt = await repo.create(name: 'Отдельная', type: defaultWaypointType, note: '', color: null, lat: 48.5, lng: 37.0);
+    final ldk = await OnScreenSaver.saveAll(f.services, [wpt.id], name: 'Набор');
+    final all = await repo.list();
+    final nested = all.where((w) => w.id != wpt.id).single;
+    expect(nested.name, 'Отдельная');
+    expect(nested.canEdit, isFalse);
+    expect(FileWaypointsRepository.fileOf(nested.id), ldk);
+    expect(FileWaypointsRepository.fileOf(wpt.id), wpt.id);
   });
 }

@@ -16,6 +16,7 @@ import '../details/landmark_details_format.dart';
 import '../details/landmark_geometry.dart';
 import '../details/landmark_previews.dart';
 import '../item_menu/item_menu_entries.dart';
+import '../item_row.dart';
 import '../section_menu/section_context_menu.dart';
 import '../sheet_menu.dart';
 import 'context_menu_action.dart';
@@ -77,6 +78,25 @@ abstract final class TypeDescriptors {
                 dense: true,
                 title: Text(title, style: const TextStyle(fontSize: 14, color: SheetMenuColors.text)),
                 subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: SheetMenuColors.secondary)),
+              ),
+          ],
+        );
+
+  /// Объекты файла меток: значок типа в цвете объекта, имя, вид.
+  static Widget _contentsBody(List<LandmarkObject> objects) => objects.isEmpty
+      ? _rows(const [], empty: 'В файле нет объектов')
+      : Column(
+          children: [
+            for (final (i, o) in objects.indexed)
+              ListTile(
+                key: Key('details_object_$i'),
+                dense: true,
+                leading: Icon(
+                  ItemRow.iconFor(o.type),
+                  color: Color((o.userMetadata.colorValue ?? LandmarkItem.defaultColor) | 0xFF000000),
+                ),
+                title: Text(o.userMetadata.name ?? ItemRow.kindOf(o.type)),
+                subtitle: Text(ItemRow.kindOf(o.type), style: const TextStyle(fontSize: 12)),
               ),
           ],
         );
@@ -491,7 +511,10 @@ abstract final class TypeDescriptors {
       _fileSection(),
       DetailSection(
         title: 'СОДЕРЖИМОЕ',
-        customBody: (_, _) => _rows(const [], empty: 'Файл пока не содержит объектов'),
+        customBody: (_, data) => _contentsBody(switch (data.object) {
+          LdkFileObject(:final objects) => objects,
+          _ => const [],
+        }),
       ),
     ],
   );

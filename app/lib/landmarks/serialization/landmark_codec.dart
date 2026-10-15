@@ -24,7 +24,7 @@ import 'metadata_codec.dart';
 ///     route    → Waypoints
 ///     area     → AreaPolygons
 ///     track    → Waypoints, TrackSegments
-///     ldkFile  → пусто (вложенные объекты — отдельный слой)
+///     ldkFile  → пусто или Objects
 ///
 /// Waypoints     = int count + Waypoint * count
 /// Waypoint      = Metadata user + Location
@@ -33,13 +33,17 @@ import 'metadata_codec.dart';
 /// TrackSegments = int count + TrackSegment * count
 /// TrackSegment  = Metadata user + Locations
 /// Locations     = int count + Location * count
+/// Objects       = int count + (int byteLength + файл метки целиком) * count
 /// ```
 ///
 /// Decision: `headerSize` включает оба поля заголовка. Если он больше 8,
 /// лишние байты пропускаются: так новые версии смогут дописать поля в
 /// заголовок, не ломая чтение. Устройство AreaPolygon и TrackSegment
 /// (метаданные + списки точек) выбрано по аналогии с Waypoint.
-/// Байты после payload считаются повреждением файла.
+/// Байты после payload считаются повреждением файла. Вложенный объект
+/// файла меток — обычный файл метки со своим заголовком (так его тип и
+/// версия читаются тем же кодом); пустой payload — файл без объектов
+/// (файлы, записанные до вложенных объектов).
 abstract final class LandmarkCodec {
   /// Файл в байты.
   static Uint8List encode(LandmarkFile file) {
@@ -77,8 +81,8 @@ abstract final class LandmarkCodec {
           MetadataCodec.write(w, segment.userMetadata);
           LocationCodec.writeList(w, segment.locations);
         }
-      case LdkFileObject():
-        break;
+      case LdkFileObject o:
+        if (o.objects.isNotEmpty) _writeObjects(w, o.objects);
       default:
         throw SerializationException('Unsupported landmark object ${file.content.runtimeType}');
     }
@@ -107,7 +111,11 @@ abstract final class LandmarkCodec {
         userMetadata: user,
         technicalMetadata: technical,
       ),
-      LandmarkType.ldkFile => LdkFileObject(userMetadata: user, technicalMetadata: technical),
+      LandmarkType.ldkFile => LdkFileObject(
+        userMetadata: user,
+        technicalMetadata: technical,
+        objects: r.remaining == 0 ? const [] : _readObjects(r),
+      ),
     };
     if (r.remaining != 0) {
       throw SerializationException('${r.remaining} unexpected trailing byte(s)', position: r.position);
@@ -134,6 +142,32 @@ abstract final class LandmarkCodec {
     }
     r.skip(headerSize - LandmarkHeader.byteSize);
     return LandmarkHeader(type: type, version: version, headerSize: headerSize);
+  }
+
+  static void _writeObjects(BinaryWriter w, List<LandmarkObject> objects) {
+    w.writeInt(objects.length);
+    for (final object in objects) {
+      if (object is LdkFileObject) {
+        throw const SerializationException('A landmark file cannot contain another landmark file');
+      }
+      final bytes = encode(LandmarkFile(type: object.type, content: object));
+      w.writeInt(bytes.length);
+      w.writeBytes(bytes);
+    }
+  }
+
+  static List<LandmarkObject> _readObjects(BinaryReader r) {
+    final count = LocationCodec.readCount(r, 'object');
+    final objects = <LandmarkObject>[];
+    for (var i = 0; i < count; i++) {
+      final at = r.position;
+      final file = decode(r.readBytes(LocationCodec.readCount(r, 'object byte')));
+      if (file.type == LandmarkType.ldkFile) {
+        throw SerializationException('Nested landmark file', position: at);
+      }
+      objects.add(file.content);
+    }
+    return objects;
   }
 
   static void _writeWaypoints(BinaryWriter w, List<WaypointObject> waypoints) {

@@ -74,7 +74,7 @@ abstract final class ItemMenuEntries {
     label: 'Показать',
     icon: Icons.visibility_outlined,
     iconColor: MenuColors.base,
-    labelResolver: (env) => (env as MenuEnv).services.displayRegistry.isDisplayed(item.path) ? 'Скрыть' : 'Показать',
+    labelResolver: (env) => (env as MenuEnv).services.onScreen.isVisible(item.path) ? 'Скрыть' : 'Показать',
     onTap: (c) async =>
         say(c, ItemActions.toggleDisplay(services(c), item.path) ? 'Показано на карте' : 'Скрыто с карты'),
   );

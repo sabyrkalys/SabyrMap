@@ -105,7 +105,8 @@ abstract final class ItemActions {
   }
 
   /// Показать или скрыть на карте; true — теперь показан.
-  static bool toggleDisplay(LandmarkServices s, String path) => s.displayRegistry.toggle(path);
+  /// «Показать» / «Скрыть» в меню метки — видимость в «Метках на экране».
+  static bool toggleDisplay(LandmarkServices s, String path) => s.onScreen.toggle(path);
 
   static String copy(LandmarkServices s, LandmarkItem item) {
     s.explorerController.clipboard.copy([ClipboardEntry(sourcePath: item.path, type: item.type, originalName: item.name)]);
@@ -180,6 +181,7 @@ abstract final class ItemActions {
 
   static void _follow(LandmarkServices s, String from, String to) {
     if (from == to) return;
+    s.onScreen.moved(from, to);
     final display = s.displayRegistry;
     if (display.isDisplayed(from)) {
       display

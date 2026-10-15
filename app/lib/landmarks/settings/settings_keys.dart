@@ -18,6 +18,12 @@ abstract final class SettingsKeys {
   /// Объекты на карте; дальше — id рабочего пространства. JSON-список путей.
   static const String displayedPrefix = 'explorer.displayed.';
 
+  /// «Метки на экране»: скрытые и убранные пути (JSON).
+  static const String onScreenLandmarks = 'landmarks.on_screen';
+
+  /// Сортировка «Меток на экране» ([OnScreenSort.encode]).
+  static const String onScreenSort = 'landmarks.on_screen.sort';
+
   /// Линия к цели.
   static const String targetDisplayLine = 'navigation.target.display_line';
 

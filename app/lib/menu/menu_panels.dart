@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app_icons.dart';
 import '../compass/compass_screen.dart';
+import '../explorer/on_screen_landmarks_panel.dart';
 import '../map/screens/available_maps_screen.dart';
 import '../map/screens/layers_panel.dart';
 import '../map/screens/on_screen/favorite_sets_section.dart';
@@ -21,7 +22,7 @@ Widget menuPanelFor(MenuTab tab, {required double arrowCenterX, VoidCallback? on
   return switch (tab) {
     MenuTab.settings => _SettingsPanel(arrowCenterX: arrowCenterX),
     MenuTab.maps => _MapsPanel(arrowCenterX: arrowCenterX, onClose: onClose),
-    MenuTab.waypoints => _WaypointsPanel(arrowCenterX: arrowCenterX),
+    MenuTab.waypoints => _WaypointsPanel(arrowCenterX: arrowCenterX, onClose: onClose),
     MenuTab.positioning => _PositioningPanel(arrowCenterX: arrowCenterX),
     MenuTab.orientation => _OrientationPanel(arrowCenterX: arrowCenterX),
   };
@@ -122,9 +123,10 @@ class _MapsPanel extends StatelessWidget {
 }
 
 class _WaypointsPanel extends ConsumerWidget {
-  const _WaypointsPanel({required this.arrowCenterX});
+  const _WaypointsPanel({required this.arrowCenterX, this.onClose});
 
   final double arrowCenterX;
+  final VoidCallback? onClose;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -138,7 +140,15 @@ class _WaypointsPanel extends ConsumerWidget {
           label: 'Все метки',
           onTap: () => ref.read(allMarkersOpenerProvider)(context),
         ),
-        const MenuListItem(icon: AppIcons.list, label: 'Метки на экране'),
+        MenuListItem(
+          icon: AppIcons.list,
+          label: 'Метки на экране',
+          // Панель — шторка над картой: меню закрывается, глаз виден сразу.
+          onTap: () {
+            onClose?.call();
+            OnScreenLandmarksPanel.show(context);
+          },
+        ),
         MenuListItem(
           icon: AppIcons.flagPlus,
           label: 'Новая метка',

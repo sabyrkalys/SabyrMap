@@ -106,7 +106,7 @@ void main() {
     await pumpDetails(tester, LandmarkType.ldkFile);
     expect(find.byKey(const Key('details_center')), findsNothing);
     expect(section('СОДЕРЖИМОЕ'), findsOneWidget);
-    expect(find.text('Файл пока не содержит объектов'), findsOneWidget);
+    expect(find.text('В файле нет объектов'), findsOneWidget);
     await dispose(tester);
   });
 

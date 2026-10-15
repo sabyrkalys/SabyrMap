@@ -22,6 +22,7 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         landmarkServicesProvider.overrideWithValue(services),
+        onScreenRegistryProvider.overrideWithValue(services.onScreen),
         allMarkersOpenerProvider.overrideWithValue(
           (context) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LocalLandmarksScreen())),
         ),

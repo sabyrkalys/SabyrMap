@@ -28,6 +28,7 @@ import 'package:app/landmarks/import_export/import/import_service.dart';
 import 'package:app/landmarks/import_export/registry/format_registry.dart';
 import 'package:app/landmarks/icons/icon_resolver.dart';
 import 'package:app/landmarks/repository/landmark_repository.dart';
+import 'package:app/landmarks/on_screen/on_screen_registry.dart';
 import 'package:app/landmarks/settings/app_settings.dart';
 import 'package:app/maps/calibration/calibration_controller.dart';
 import 'package:app/maps/color/erase_color_controller.dart';
@@ -107,6 +108,7 @@ class LandmarkServices {
     required this.appSettingsController,
     required this.workspaceController,
     required this.displayRegistry,
+    required this.onScreen,
     required this.backupService,
     required this.restoreService,
     required this.intentDispatcher,
@@ -174,6 +176,9 @@ class LandmarkServices {
 
   /// Метки на карте (общий для проводника и пространств).
   final DisplayRegistry displayRegistry;
+
+  /// «Метки на экране»: что из меток видно на карте.
+  final OnScreenRegistry onScreen;
   final BackupService backupService;
   final RestoreService restoreService;
   final IntentDispatcher intentDispatcher;
@@ -266,6 +271,7 @@ class LandmarkServices {
     final appSettings = AppSettingsController(settings);
     await appSettings.load();
     final display = DisplayRegistry();
+    final onScreen = OnScreenRegistry(settings)..restore();
     final workspaces = WorkspaceController(
       WorkspaceStore(settings),
       layers,
@@ -331,6 +337,7 @@ class LandmarkServices {
       appSettingsController: appSettings,
       workspaceController: workspaces,
       displayRegistry: display,
+      onScreen: onScreen,
       backupService: BackupService(storagePaths, storage, settings, clock: clock),
       restoreService: RestoreService(storagePaths, storage, settings),
       intentDispatcher: IntentDispatcher(creation, target, folders, trackerService),
@@ -359,6 +366,7 @@ class LandmarkServices {
         storage: storage,
         clipboard: clipboard,
         display: display,
+        onScreen: onScreen,
         editor: editor,
       ),
     );

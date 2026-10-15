@@ -7,6 +7,8 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import '../app/landmark_services_provider.dart';
+import '../landmarks/on_screen/on_screen_registry.dart';
 import '../config.dart';
 import '../icons/icon_image_cache.dart';
 import '../icons/icon_library_scanner.dart';
@@ -40,6 +42,7 @@ import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
 import '../tracks/tracks_visibility_controller.dart';
+import '../waypoints/file_waypoints_repository.dart';
 import '../waypoints/waypoint_actions.dart';
 import '../waypoints/new_marker/marker_type.dart';
 import '../waypoints/new_marker/new_marker_sheet.dart';
@@ -190,10 +193,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // it once up front and calling stop() on it later is safe.
   late final TrackRecordingController _recordingController;
 
+  // «Метки на экране»: скрытая глазом или убранная метка не рисуется.
+  late final OnScreenRegistry _onScreen;
+
   @override
   void initState() {
     super.initState();
     _recordingController = ref.read(trackRecordingControllerProvider.notifier);
+    _onScreen = ref.read(onScreenRegistryProvider)..addListener(_requestSync);
     Future.microtask(() {
       if (!mounted) return;
       ref.read(waypointsControllerProvider.notifier).loadWaypoints();
@@ -260,6 +267,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   void dispose() {
+    _onScreen.removeListener(_requestSync);
     // trackRecordingControllerProvider is a root-scope, non-autoDispose
     // provider: it survives MapScreen being swapped out (e.g. on logout),
     // so without this the geolocator stream would keep appending points in
@@ -563,7 +571,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       // waypoint can't be classified as circle-mode by one and symbol-mode
       // by the other within a single sync pass (which would render it twice).
       final iconAssignments = ref.read(waypointIconAssignmentsControllerProvider);
-      final waypoints = ref.read(waypointsControllerProvider);
+      final waypoints = [
+        for (final w in ref.read(waypointsControllerProvider))
+          if (_onScreen.isVisible(FileWaypointsRepository.fileOf(w.id))) w,
+      ];
       await _syncCircles(waypoints, iconAssignments);
       await _syncSymbols(waypoints, iconAssignments);
       await _syncLines();

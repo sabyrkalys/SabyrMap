@@ -60,8 +60,10 @@ void main() {
 
   test('delete removes the file; toggle display flips it', () async {
     final path = await createLdk(f.services, 'Поход');
-    expect(ItemActions.toggleDisplay(f.services, path), isTrue);
+    // Новая метка сразу на экране: первое нажатие её скрывает.
     expect(ItemActions.toggleDisplay(f.services, path), isFalse);
+    expect(f.services.onScreen.isVisible(path), isFalse);
+    expect(ItemActions.toggleDisplay(f.services, path), isTrue);
     expect(await ItemActions.delete(f.services, path), 'Файл удалён');
     expect(File(path).existsSync(), isFalse);
   });
