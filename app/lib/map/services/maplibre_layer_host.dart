@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import 'hybrid_road_style.dart';
@@ -88,11 +89,26 @@ class MapLibreLayerHost implements MapLayerHost {
       );
 
   @override
-  Future<void> addStyleSource(String sourceId, Map<String, dynamic> source) =>
-      _controller.addSource(
-        sourceId,
-        source['type'] == 'raster' ? RasterSourceProperties.fromJson(source) : VectorSourceProperties.fromJson(source),
-      );
+  Future<void> addStyleSource(String sourceId, Map<String, dynamic> source) {
+    final json = typedSourceJson(source);
+    return _controller.addSource(
+      sourceId,
+      json['type'] == 'raster' ? RasterSourceProperties.fromJson(json) : VectorSourceProperties.fromJson(json),
+    );
+  }
+
+  /// [source] from a decoded style JSON with its lists typed as maplibre_gl's
+  /// fromJson casts them (`tiles` → `List<String>`, `bounds` → `List<double>`,
+  /// zooms → double): jsonDecode gives `List<dynamic>` and int, and the cast
+  /// throws.
+  @visibleForTesting
+  static Map<String, dynamic> typedSourceJson(Map<String, dynamic> source) => {
+        ...source,
+        if (source['tiles'] is List) 'tiles': [for (final t in source['tiles'] as List) t as String],
+        if (source['bounds'] is List) 'bounds': [for (final b in source['bounds'] as List) (b as num).toDouble()],
+        for (final key in const ['minzoom', 'maxzoom'])
+          if (source[key] is num) key: (source[key] as num).toDouble(),
+      };
 
   /// The style JSON's layout and paint, flattened as maplibre_gl wants them.
   static LayerProperties? _properties(Map<String, dynamic> layer) {
