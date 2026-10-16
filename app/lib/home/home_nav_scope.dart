@@ -5,6 +5,12 @@ import 'package:flutter/material.dart';
 /// [HomeShell] оказалось бы под ней. Шторка ставит копию меню над собой
 /// ([aboveSheet]); нажатие на вкладку закрывает шторку и открывает эту
 /// вкладку, как обычно.
+/// Кнопки карты справа (ортофото, «+», «−») для шторок: их ставит
+/// [MapScreen], пока он на экране; null — карты нет.
+abstract final class MapSideButtons {
+  static WidgetBuilder? builder;
+}
+
 class HomeNavScope extends InheritedWidget {
   const HomeNavScope({super.key, required this.buildNav, required this.select, required super.child});
 
@@ -38,13 +44,23 @@ class HomeNavScope extends InheritedWidget {
       children: [
         // Меню само отступает от системной панели; над шторкой этот
         // отступ не нужен.
-        MediaQuery.removePadding(
-          context: sheetContext,
-          removeBottom: true,
-          child: scope.buildNav((index) {
-            Navigator.of(sheetContext).pop();
-            scope.select(index);
-          }),
+        // Меню слева, кнопки карты справа — как над шторкой набора точек.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: MediaQuery.removePadding(
+                context: sheetContext,
+                removeBottom: true,
+                child: scope.buildNav((index) {
+                  Navigator.of(sheetContext).pop();
+                  scope.select(index);
+                }),
+              ),
+            ),
+            if (MapSideButtons.builder case final buttons?)
+              Padding(padding: const EdgeInsets.only(right: 16), child: buttons(sheetContext)),
+          ],
         ),
         const SizedBox(height: 8),
         Flexible(child: body(sheetContext)),

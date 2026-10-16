@@ -235,6 +235,10 @@ void main() {
     expect(sheetNav, findsNWidgets(2));
     final panelTop = tester.getTopLeft(find.byType(OnScreenLandmarksPanel)).dy;
     expect(tester.getBottomLeft(sheetNav.last).dy, lessThanOrEqualTo(panelTop));
+    // Кнопки «+» и «−» — тоже над шторкой.
+    final zoomIn = find.byKey(const Key('zoom_in_button'));
+    expect(zoomIn, findsNWidgets(2));
+    expect(tester.getBottomLeft(zoomIn.last).dy, lessThanOrEqualTo(panelTop));
 
     await tester.tap(find.descendant(of: sheetNav.last, matching: find.byKey(const Key('nav_map'))));
     await tester.pumpAndSettle();

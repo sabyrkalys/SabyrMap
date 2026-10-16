@@ -22,6 +22,7 @@ import 'attribution_bar.dart';
 import 'models/map_models.dart';
 import 'catalog/catalog_repository.dart';
 import 'crosshair_menu.dart';
+import '../home/home_nav_scope.dart';
 import 'drawing/drawing_actions.dart';
 import 'drawing/drawing_bar.dart';
 import 'drawing/set_panel.dart';
@@ -165,6 +166,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _onScreen = ref.read(onScreenRegistryProvider)..addListener(_onLandmarksChanged);
     _landmarkIndex = ref.read(landmarkServicesProvider).index..addListener(_onLandmarksChanged);
     _editMode = ref.read(landmarkServicesProvider).editMode..addListener(_onEditModeChanged);
+    // Кнопки карты над шторками (HomeNavScope.aboveSheet).
+    MapSideButtons.builder = (_) => Consumer(
+      builder: (context, ref, _) => _mapButtons(ref.watch(mapLayersProvider.select((state) => state.orthophotosOn))),
+    );
     _loadSavedCamera();
     _loadMyLocation();
   }
@@ -218,6 +223,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _onScreen.removeListener(_onLandmarksChanged);
     _landmarkIndex.removeListener(_onLandmarksChanged);
     _editMode.removeListener(_onEditModeChanged);
+    MapSideButtons.builder = null;
     // trackRecordingControllerProvider is a root-scope, non-autoDispose
     // provider: it survives MapScreen being swapped out (e.g. on logout),
     // so without this the geolocator stream would keep appending points in
