@@ -57,6 +57,30 @@ import '../waypoints/waypoint_create_action.dart';
 
 const String _recordingLineKey = '__recording__';
 
+/// Как укоротить линию [points] с конца на [meters]: оставить первые
+/// [keep] точек и последней из них поставить [end] (null — не сдвигать).
+/// Короче [meters] — остаётся одна первая точка.
+({int keep, LandmarkLocation? end}) trimTrackEnd(List<LandmarkLocation> points, double meters) {
+  var left = meters;
+  for (var i = points.length - 1; i > 0; i--) {
+    final a = points[i - 1];
+    final b = points[i];
+    final length = Haversine.distance(a, b);
+    if (length > left) {
+      final t = (length - left) / length;
+      return (
+        keep: i + 1,
+        end: LandmarkLocation(
+          latitude: a.latitude + (b.latitude - a.latitude) * t,
+          longitude: a.longitude + (b.longitude - a.longitude) * t,
+        ),
+      );
+    }
+    left -= length;
+  }
+  return (keep: 1, end: null);
+}
+
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
@@ -89,9 +113,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _autoDraw = false;
   static const double _drawStepDp = 8;
 
-  /// «Удалить» у пути снимает с конца отрезок такой длины на экране —
-  /// небольшой в любом масштабе.
-  static const double _trackDeleteDp = 48;
+  /// «Удалить» у пути укорачивает его с конца на столько dp на экране —
+  /// немного в любом масштабе.
+  static const double _trackDeleteDp = 12;
 
   /// Метров в одном dp карты на широте [latitude] при масштабе [zoom].
   static double _metersPerDp(double latitude, double zoom) =>
@@ -588,8 +612,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _editMode.execute(AddWaypointCommand(waypoint: WaypointObject(location: at)));
   }
 
-  /// «Удалить» у пути: последний небольшой отрезок — точки с конца, пока
-  /// снятая длина меньше [_trackDeleteDp] на экране (хотя бы одна точка).
+  /// «Удалить» у пути: путь укорачивается с конца ровно на
+  /// [_trackDeleteDp] на экране — последний отрезок обрезается (его конец
+  /// сдвигается назад по линии), а не снимается целыми точками.
   void _removeTrackTail() {
     final object = _editMode.state.target?.object;
     if (object is! TrackObject || object.segments.isEmpty) return;
@@ -597,14 +622,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final points = object.segments[segment].locations;
     if (points.isEmpty) return;
     final zoom = _controller?.cameraPosition?.zoom ?? _cameraZoom;
-    final limit = _trackDeleteDp * _metersPerDp(points.last.latitude, zoom);
-    var removed = 0.0;
-    var i = points.length - 1;
-    do {
+    final cut = trimTrackEnd(points, _trackDeleteDp * _metersPerDp(points.last.latitude, zoom));
+    for (var i = points.length - 1; i >= cut.keep; i--) {
       _editMode.execute(RemoveTrackLocationCommand(segmentIndex: segment, index: i));
-      if (i > 0) removed += Haversine.distance(points[i - 1], points[i]);
-      i--;
-    } while (i >= 0 && removed < limit);
+    }
+    if (cut.end case final end?) {
+      _editMode.execute(MoveTrackLocationCommand(segmentIndex: segment, index: cut.keep - 1, newLocation: end));
+    }
   }
 
   void _onEditModeChanged() {

@@ -7,6 +7,7 @@ import 'package:app/map/drawing/shape_dialogs.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:app/map/landmark_layer.dart';
 import 'package:app/map/map_crosshair.dart';
+import 'package:app/landmarks/composite/distance/haversine.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/menu/menu_toggles.dart';
 import 'package:app/theme/app_theme.dart';
@@ -89,6 +90,27 @@ void main() {
     expect(parseRadius('0'), isNull);
     expect(parseRadius('-3'), isNull);
     expect(parseRadius('abc'), isNull);
+  });
+
+  group('trimTrackEnd', () {
+    final line = [_loc(48.5, 37.0), _loc(48.501, 37.0), _loc(48.502, 37.0)];
+    final step = Haversine.distance(line[0], line[1]);
+
+    test('cuts into the last stretch: the end moves back along the line', () {
+      final cut = trimTrackEnd(line, step / 4);
+      expect(cut.keep, 3);
+      expect(cut.end!.latitude, closeTo(48.50175, 1e-6));
+    });
+
+    test('a cut longer than the last stretch drops it and cuts into the one before', () {
+      final cut = trimTrackEnd(line, step * 1.5);
+      expect(cut.keep, 2);
+      expect(cut.end!.latitude, closeTo(48.5005, 1e-6));
+    });
+
+    test('longer than the whole line leaves the first point', () {
+      expect(trimTrackEnd(line, step * 5), (keep: 1, end: null));
+    });
   });
 
   test('route length next to the point count', () {
@@ -513,7 +535,12 @@ void main() {
       await tester.pump();
       await tester.tap(find.byKey(const Key('set_panel_delete')));
       await tester.pump();
-      expect(f.services.editMode.pointCount, inExclusiveRange(0, 15));
+      // 12 dp при масштабе 15 на широте 48.5° — около 19 м (путь ~156 м):
+      // путь укоротился ровно на столько, точки не снимались целиком.
+      final after = LandmarkLayer.drawnPoints(f.services.editMode.state.target!.object);
+      final cut = 14 * 0.0001 * 111195 - Haversine.totalDistance(after);
+      expect(cut, closeTo(19, 1));
+      expect(after, hasLength(14));
     });
 
     testWidgets('«Набор точек» opens the waypoint dialog without coordinates, then drawing with what was entered', (
