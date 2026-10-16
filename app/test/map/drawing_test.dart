@@ -519,6 +519,11 @@ void main() {
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
       expect(find.text('СТАТИСТИКА'), findsOneWidget);
       expect(tester.widget<Text>(find.byKey(const Key('set_panel_climb'))).data, 'нет данных о высотах');
+      f.services.editMode.addPoint(_loc(48.5, 37.0));
+      await tester.pump();
+      expect(find.byKey(const Key('drawing_leg_label')), findsNothing);
+      f.services.editMode.undo();
+      await tester.pump();
 
       // «Путевая точка» — точка на путь, а не точка линии.
       await tester.tap(find.byKey(const Key('set_panel_add')));

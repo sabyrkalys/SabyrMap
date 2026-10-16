@@ -991,7 +991,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           // Отрезок от последней точки до прицела: расстояние и азимут — в
           // постоянном месте слева сверху от прицела, меняется только текст.
-          if (_legStart case final from?)
+          // У пути — без цифр: он чертится за прицелом.
+          if (_legStart case final from? when !_drawingTrack)
             IgnorePointer(
               child: Center(
                 child: Transform.translate(
