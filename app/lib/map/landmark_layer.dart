@@ -22,6 +22,11 @@ class LandmarkLayer {
 
   final MapLibreMapController _controller;
   bool _attached = false;
+  Future<void>? _attaching;
+
+  /// Растёт с каждой новой загрузкой стиля ([detach]): подключение,
+  /// начатое на прежнем стиле, не считается подключением к новому.
+  int _style = 0;
 
   /// Пути меток по id объектов из последнего [update].
   List<String> _paths = const [];
@@ -49,10 +54,39 @@ class LandmarkLayer {
 
   bool get isAttached => _attached;
 
+  /// Все слои снизу вверх.
+  static const List<String> layerIds = [
+    fillLayerId,
+    outlineLayerId,
+    lineLayerId,
+    haloLayerId,
+    dotLayerId,
+    iconLayerId,
+    labelLayerId,
+  ];
+
   /// Источник и слои — после загрузки стиля. Повторный вызов на том же
   /// стиле ничего не делает; [detach] — стиль сменился.
-  Future<void> attach() async {
-    if (_attached) return;
+  ///
+  /// Decision: прежние слои и источник сначала снимаются. Стиль может
+  /// сообщить о загрузке дважды, а уже добавленный слой MapLibre второй
+  /// раз не принимает — без этого метки пропадали до перезапуска.
+  Future<void> attach() {
+    if (_attached) return Future.value();
+    final previous = _attaching ?? Future.value();
+    final next = previous.catchError((Object _) {}).then((_) => _attached ? null : _attach(_style));
+    _attaching = next;
+    return next.whenComplete(() {
+      if (identical(_attaching, next)) _attaching = null;
+    });
+  }
+
+  Future<void> _attach(int style) async {
+    final existing = await _controller.getLayerIds();
+    for (final id in layerIds.reversed) {
+      if (existing.contains(id)) await _controller.removeLayer(id);
+    }
+    if ((await _controller.getSourceIds()).contains(sourceId)) await _controller.removeSource(sourceId);
     await _controller.addGeoJsonSource(sourceId, LandmarkFeatures.collection(const []));
     List<Object> role(FeatureRole r) => ['==', ['get', 'role'], r.name];
     const hasIcon = ['has', 'icon_image'];
@@ -128,11 +162,12 @@ class LandmarkLayer {
       ),
       filter: role(FeatureRole.label),
     );
-    _attached = true;
+    _attached = style == _style;
   }
 
   /// Стиль загружен заново: прежних источника и слоёв в нём больше нет.
   void detach() {
+    _style++;
     _attached = false;
     _paths = const [];
   }
