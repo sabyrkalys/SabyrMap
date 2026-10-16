@@ -38,34 +38,58 @@ class HomeNavScope extends InheritedWidget {
             child: panel(sheetContext),
           );
     if (scope == null) return body;
-    return (sheetContext) => Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // Меню само отступает от системной панели; над шторкой этот
-        // отступ не нужен.
-        // Меню слева, кнопки карты справа — как над шторкой набора точек.
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: MediaQuery.removePadding(
-                context: sheetContext,
-                removeBottom: true,
-                child: scope.buildNav((index) {
-                  Navigator.of(sheetContext).pop();
-                  scope.select(index);
-                }),
-              ),
+    // Шторка во всю высоту (вызывать с isScrollControlled): над панелью —
+    // своё поле, и любое касание карты там — тап или начало сдвига —
+    // закрывает шторку (барьер шторки ловит только тап).
+    return (sheetContext) {
+      void close() => Navigator.of(sheetContext).maybePop();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: Listener(
+                    key: const Key('sheet_map_area'),
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: (_) => close(),
+                  ),
+                ),
+                // Меню слева, кнопки карты справа — как над шторкой набора точек.
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: MediaQuery.removePadding(
+                            context: sheetContext,
+                            removeBottom: true,
+                            child: scope.buildNav((index) {
+                              Navigator.of(sheetContext).pop();
+                              scope.select(index);
+                            }),
+                          ),
+                        ),
+                        if (MapSideButtons.builder case final buttons?)
+                          Padding(padding: const EdgeInsets.only(right: 16), child: buttons(sheetContext)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            if (MapSideButtons.builder case final buttons?)
-              Padding(padding: const EdgeInsets.only(right: 16), child: buttons(sheetContext)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Flexible(child: body(sheetContext)),
-      ],
-    );
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.85),
+            child: body(sheetContext),
+          ),
+        ],
+      );
+    };
   }
 
   @override

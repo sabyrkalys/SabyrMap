@@ -16,6 +16,7 @@ Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, LandmarkIt
   final note = item.description;
   final action = await showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: HomeNavScope.aboveSheet(
       context,

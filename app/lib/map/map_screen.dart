@@ -366,7 +366,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   final Map<int, (Offset, Duration)> _crosshairPointers = {};
   bool _crosshairMultiTouch = false;
 
+  // Карточка была открыта, когда палец коснулся прицела: это касание её
+  // закрывает (барьер ловит его первым), а не открывает снова.
+  bool _menuOpenAtDown = false;
+
   void _onCrosshairPointerDown(PointerDownEvent event) {
+    if (_crosshairPointers.isEmpty) _menuOpenAtDown = ref.read(crosshairMenuOpenProvider);
     _crosshairPointers[event.pointer] = (event.position, event.timeStamp);
     if (_crosshairPointers.length > 1) _crosshairMultiTouch = true;
   }
@@ -386,7 +391,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _addDrawingPoint();
       return;
     }
-    ref.read(crosshairMenuOpenProvider.notifier).toggle();
+    if (_menuOpenAtDown) {
+      ref.read(crosshairMenuOpenProvider.notifier).close();
+    } else {
+      ref.read(crosshairMenuOpenProvider.notifier).toggle();
+    }
   }
 
   void _onCrosshairPointerCancel(PointerCancelEvent event) {
@@ -1007,10 +1016,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           if (menuOpen && (!_drawing || SetPanel.isActive(_editMode))) ...[
             Positioned.fill(
-              child: GestureDetector(
+              // Любое касание карты — тап или начало сдвига.
+              child: Listener(
                 key: const Key('crosshair_menu_barrier'),
                 behavior: HitTestBehavior.opaque,
-                onTap: () => ref.read(crosshairMenuOpenProvider.notifier).close(),
+                onPointerDown: (_) => ref.read(crosshairMenuOpenProvider.notifier).close(),
               ),
             ),
             // The card's bottom (its triangle tip) sits just above the

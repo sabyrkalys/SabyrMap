@@ -104,6 +104,7 @@ Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
   final focus = ref.read(mapFocusProvider.notifier);
   await showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     backgroundColor: Colors.transparent,
     builder: HomeNavScope.aboveSheet(
       context,

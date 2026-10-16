@@ -85,10 +85,11 @@ class _HomeShellState extends State<HomeShell> {
                       // Catches the tap that closes the panel so it never
                       // reaches the map underneath.
                       Positioned.fill(
-                        child: GestureDetector(
+                        // Любое касание карты — тап или начало сдвига.
+                        child: Listener(
                           key: const Key('menu_panel_barrier'),
                           behavior: HitTestBehavior.opaque,
-                          onTap: () => setState(() => _openTab = null),
+                          onPointerDown: (_) => setState(() => _openTab = null),
                         ),
                       ),
                       Positioned(

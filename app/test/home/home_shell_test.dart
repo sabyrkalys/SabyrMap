@@ -213,7 +213,10 @@ void main() {
     expect(panel, findsOneWidget);
     expect(tester.getBottomLeft(panel).dy, screen.height);
     expect(find.byKey(const Key('nav_map')), findsOneWidget);
-    expect(tester.getBottomLeft(find.byKey(const Key('bottom_nav'))).dy, lessThanOrEqualTo(tester.getTopLeft(panel).dy));
+    expect(
+      tester.getBottomLeft(find.byKey(const Key('bottom_nav'))).dy,
+      lessThanOrEqualTo(tester.getTopLeft(panel).dy),
+    );
 
     fixture.services.editMode.close();
     await tester.pump();
@@ -244,5 +247,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(OnScreenLandmarksPanel), findsNothing);
     expect(find.byKey(const Key('maps_panel')), findsOneWidget);
+  });
+
+  testWidgets('any touch on the map closes a map sheet and a menu panel — a drag too, not only a tap', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const Key('nav_waypoints')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Метки на экране'));
+    await tester.pumpAndSettle();
+    expect(find.byType(OnScreenLandmarksPanel), findsOneWidget);
+
+    await tester.dragFrom(
+      tester.getTopLeft(find.byKey(const Key('sheet_map_area'))) + const Offset(200, 80),
+      const Offset(0, 120),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(OnScreenLandmarksPanel), findsNothing);
+
+    await tester.tap(find.byKey(const Key('nav_map')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('maps_panel')), findsOneWidget);
+    await tester.dragFrom(const Offset(300, 60), const Offset(80, 0));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('maps_panel')), findsNothing);
   });
 }
