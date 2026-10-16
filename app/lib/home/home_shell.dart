@@ -270,17 +270,25 @@ class _BottomNav extends StatelessWidget {
                   color: selected ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
                 ),
                 // Компас с замком: карта повёрнута от севера.
+                // Белый, в тёмной обводке (тот же замок крупнее под ним):
+                // виден и на тёмном круге компаса, и на светлом меню.
                 if (destination.key == const Key('nav_compass'))
                   Positioned(
-                    left: 2,
-                    top: 6,
+                    left: 6,
+                    top: 9,
                     child: Consumer(
                       builder: (context, ref, _) => ref.watch(mapBearingProvider)
-                          ? AppIcon(
-                              AppIcons.lockBadge,
+                          ? SizedBox(
                               key: const Key('nav_compass_lock'),
-                              size: 16,
-                              color: colorScheme.onSurfaceVariant,
+                              width: 18,
+                              height: 18,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  AppIcon(AppIcons.lockBadge, size: 18, color: colorScheme.onSurfaceVariant),
+                                  const AppIcon(AppIcons.lockBadge, size: 12, color: Colors.white),
+                                ],
+                              ),
                             )
                           : const SizedBox.shrink(),
                     ),
