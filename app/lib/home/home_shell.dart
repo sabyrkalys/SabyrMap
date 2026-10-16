@@ -82,14 +82,17 @@ class _HomeShellState extends State<HomeShell> {
                       ),
                     ),
                     if (openTab != null) ...[
-                      // Catches the tap that closes the panel so it never
-                      // reaches the map underneath.
                       Positioned.fill(
-                        // Любое касание карты — тап или начало сдвига.
+                        // Любое касание карты — тап или начало сдвига —
+                        // закрывает меню и доходит до карты: она сразу
+                        // двигается.
                         child: Listener(
                           key: const Key('menu_panel_barrier'),
-                          behavior: HitTestBehavior.opaque,
-                          onPointerDown: (_) => setState(() => _openTab = null),
+                          behavior: HitTestBehavior.translucent,
+                          onPointerDown: (event) {
+                            MapTouchGuard.consume(event.pointer);
+                            setState(() => _openTab = null);
+                          },
                         ),
                       ),
                       Positioned(

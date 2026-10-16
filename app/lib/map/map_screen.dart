@@ -379,6 +379,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onCrosshairPointerUp(PointerUpEvent event) {
     final down = _crosshairPointers.remove(event.pointer);
     final multiTouch = _crosshairMultiTouch;
+    // Это касание закрыло меню или карточку — второй раз её не открывает.
+    if (MapTouchGuard.isConsumed(event.pointer)) {
+      if (_crosshairPointers.isEmpty) _crosshairMultiTouch = false;
+      return;
+    }
     if (_crosshairPointers.isEmpty) _crosshairMultiTouch = false;
     if (down == null || multiTouch) return;
     final (position, time) = down;
@@ -734,6 +739,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Нажатие по метке: у путевой точки — её карточка, у остальных — меню
   /// метки, как в «Всех метках».
   void _onFeatureTapped(Point<double> point, LatLng coordinates, String id, String layerId, Annotation? annotation) {
+    if (MapTouchGuard.justConsumed) return;
     final path = _landmarkLayer?.pathOf(id, layerId);
     if (path == null) return;
     final item = _landmarkIndex.byPath(path);
@@ -1016,11 +1022,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           if (menuOpen && (!_drawing || SetPanel.isActive(_editMode))) ...[
             Positioned.fill(
-              // Любое касание карты — тап или начало сдвига.
+              // Любое касание карты — тап или начало сдвига — закрывает
+              // карточку и доходит до карты: она сразу двигается.
               child: Listener(
                 key: const Key('crosshair_menu_barrier'),
-                behavior: HitTestBehavior.opaque,
-                onPointerDown: (_) => ref.read(crosshairMenuOpenProvider.notifier).close(),
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: (event) {
+                  MapTouchGuard.consume(event.pointer);
+                  ref.read(crosshairMenuOpenProvider.notifier).close();
+                },
               ),
             ),
             // The card's bottom (its triangle tip) sits just above the

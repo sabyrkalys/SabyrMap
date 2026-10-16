@@ -5,6 +5,26 @@ import 'package:flutter/material.dart';
 /// [HomeShell] оказалось бы под ней. Шторка ставит копию меню над собой
 /// ([aboveSheet]); нажатие на вкладку закрывает шторку и открывает эту
 /// вкладку, как обычно.
+/// Касание карты, которое закрыло меню или карточку: оно доходит до карты
+/// (та сразу двигается), но ничего на ней не открывает — ни карточку
+/// прицела, ни метку под пальцем.
+abstract final class MapTouchGuard {
+  static int? _pointer;
+  static DateTime _at = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Касание [pointer] закрыло меню.
+  static void consume(int pointer) {
+    _pointer = pointer;
+    _at = DateTime.now();
+  }
+
+  /// Касание [pointer] — то самое.
+  static bool isConsumed(int pointer) => pointer == _pointer;
+
+  /// Тап по карте сразу после закрытия меню — от того же касания.
+  static bool get justConsumed => DateTime.now().difference(_at) < const Duration(milliseconds: 600);
+}
+
 /// Кнопки карты справа (ортофото, «+», «−») для шторок: их ставит
 /// [MapScreen], пока он на экране; null — карты нет.
 abstract final class MapSideButtons {
@@ -42,7 +62,13 @@ class HomeNavScope extends InheritedWidget {
     // своё поле, и любое касание карты там — тап или начало сдвига —
     // закрывает шторку (барьер шторки ловит только тап).
     return (sheetContext) {
-      void close() => Navigator.of(sheetContext).maybePop();
+      // Сразу, без анимации ухода: пока шторка уезжала (~0,3 с), карта под
+      // ней не принимала касаний и «замирала».
+      void close() {
+        final route = ModalRoute.of(sheetContext);
+        if (route != null && route.isActive) Navigator.of(sheetContext).removeRoute(route);
+      }
+
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -69,7 +95,7 @@ class HomeNavScope extends InheritedWidget {
                             context: sheetContext,
                             removeBottom: true,
                             child: scope.buildNav((index) {
-                              Navigator.of(sheetContext).pop();
+                              close();
                               scope.select(index);
                             }),
                           ),
