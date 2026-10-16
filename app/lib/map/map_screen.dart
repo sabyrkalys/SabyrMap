@@ -499,6 +499,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool get _drawing => _editMode.state.target?.isNew ?? false;
 
   void _onEditModeChanged() {
+    if (!SetPanel.isActive(_editMode)) ref.read(setPanelHeightProvider.notifier).set(0);
     if (mounted) setState(() {});
     unawaited(_syncDraft());
   }
@@ -697,6 +698,33 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
+  /// Кнопки справа внизу: ортофотопланы и масштаб.
+  Widget _mapButtons(bool orthophotosOn) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Ортофотопланы: одно нажатие включает или выключает; во
+        // включённом виде кнопка залита цветом.
+        MapRoundButton(
+          key: const Key('orthophoto_button'),
+          active: orthophotosOn,
+          tooltip: orthophotosOn ? 'Ортофотопланы включены' : 'Ортофотопланы выключены',
+          onTap: _toggleOrthophotos,
+          child: Semantics(
+            toggled: orthophotosOn,
+            label: 'Ортофотопланы',
+            child: AppIcon(AppIcons.drone, size: 26, color: MapRoundButton.iconColorFor(orthophotosOn)),
+          ),
+        ),
+        const SizedBox(height: 12),
+        MapZoomButtons(
+          onZoomIn: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
+          onZoomOut: () => _controller?.animateCamera(CameraUpdate.zoomOut()),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final orthophotosOn = ref.watch(mapLayersProvider.select((state) => state.orthophotosOn));
@@ -819,42 +847,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           // Required by the map providers. At the right screen edge, level
           // with the bottom nav: under extendBody the bottom padding is the
           // nav panel (60 dp) plus the system bar.
-          Positioned(
-            right: MediaQuery.paddingOf(context).right + 5,
-            bottom: MediaQuery.paddingOf(context).bottom - (60 + AttributionButton.size) / 2,
-            child: AttributionButton(text: attribution),
-          ),
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: SafeArea(
-              top: false,
-              left: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Ортофотопланы: одно нажатие включает или выключает; во
-                  // включённом виде кнопка залита цветом.
-                  MapRoundButton(
-                    key: const Key('orthophoto_button'),
-                    active: orthophotosOn,
-                    tooltip: orthophotosOn ? 'Ортофотопланы включены' : 'Ортофотопланы выключены',
-                    onTap: _toggleOrthophotos,
-                    child: Semantics(
-                      toggled: orthophotosOn,
-                      label: 'Ортофотопланы',
-                      child: AppIcon(AppIcons.drone, size: 26, color: MapRoundButton.iconColorFor(orthophotosOn)),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  MapZoomButtons(
-                    onZoomIn: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
-                    onZoomOut: () => _controller?.animateCamera(CameraUpdate.zoomOut()),
-                  ),
-                ],
-              ),
+          // Над шторкой набора точек места для (i) нет — там кнопки карты.
+          if (!SetPanel.isActive(_editMode))
+            Positioned(
+              right: MediaQuery.paddingOf(context).right + 5,
+              bottom: MediaQuery.paddingOf(context).bottom - (60 + AttributionButton.size) / 2,
+              child: AttributionButton(text: attribution),
             ),
-          ),
+          // Ортофотопланы и масштаб; при шторке набора точек — над ней.
+          if (!SetPanel.isActive(_editMode))
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: SafeArea(top: false, left: false, child: _mapButtons(orthophotosOn)),
+            ),
           // Системное «Назад» во время рисования закрывает его (с точками —
           // после вопроса), а не уходит с карты. PopScope действует на
           // весь маршрут, где бы ни стоял.
@@ -865,20 +871,36 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             },
             child: const SizedBox.shrink(),
           ),
-          // Набор точек — панелью «Управление метками» внизу
-          // над нижним меню (его высота — нижний отступ).
-          if (_drawing && _editMode.state.target!.type == LandmarkType.set)
+          // Набор точек — шторкой «Управление метками» у нижнего края;
+          // нижнее меню на это время спрятано (HomeShell).
+          if (SetPanel.isActive(_editMode))
             Positioned(
               left: 0,
               right: 0,
-              bottom: MediaQuery.paddingOf(context).bottom,
-              child: SetPanel(
-                pointCount: _editMode.pointCount,
-                onAddPoint: _addDrawingPoint,
-                onSearch: () => showSetPointsSheet(context, ref),
-                onFinish: () => _editMode.pointCount == 0
-                    ? _editMode.close()
-                    : finishDrawing(context, ref.read(landmarkServicesProvider)),
+              bottom: 0,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16, bottom: 12),
+                      child: _mapButtons(orthophotosOn),
+                    ),
+                  ),
+                  MeasureSize(
+                    onSize: (size) => ref.read(setPanelHeightProvider.notifier).set(size.height),
+                    child: SetPanel(
+                    pointCount: _editMode.pointCount,
+                    onAddPoint: _addDrawingPoint,
+                    onSearch: () => showSetPointsSheet(context, ref),
+                    onFinish: () => _editMode.pointCount == 0
+                        ? _editMode.close()
+                        : finishDrawing(context, ref.read(landmarkServicesProvider)),
+                    ),
+                  ),
+                ],
               ),
             )
           else if (_drawing)

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../app/landmark_services_provider.dart';
 import '../app_icons.dart';
+import '../map/drawing/set_panel.dart';
 import '../map/map_screen.dart';
 import '../map/map_target.dart';
 import '../map/screens/compare/compare_mode_screen.dart';
@@ -106,10 +108,29 @@ class _HomeShellState extends State<HomeShell> {
               );
             },
           ),
-          bottomNavigationBar: _BottomNav(
-            destinations: _destinations,
-            selectedIndex: openTab?.index,
-            onSelected: _onNavSelected,
+          // Пока рисуется набор точек, его шторка стоит у нижнего края, а
+          // меню — над ней.
+          bottomNavigationBar: Consumer(
+            builder: (context, ref, _) {
+              final editMode = ref.watch(landmarkServicesProvider).editMode;
+              return ListenableBuilder(
+                listenable: editMode,
+                builder: (context, _) {
+                  final nav = _BottomNav(
+                    destinations: _destinations,
+                    selectedIndex: openTab?.index,
+                    onSelected: _onNavSelected,
+                  );
+                  if (!SetPanel.isActive(editMode)) return nav;
+                  // Меню — над шторкой: она сама отступает от системных
+                  // кнопок, меню — нет.
+                  return Padding(
+                    padding: EdgeInsets.only(bottom: ref.watch(setPanelHeightProvider) + 8),
+                    child: MediaQuery.removePadding(context: context, removeBottom: true, child: nav),
+                  );
+                },
+              );
+            },
           ),
         ),
       ),

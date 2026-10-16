@@ -2,6 +2,7 @@ import 'package:app/app_icons.dart';
 import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
+import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/menu/menu_toggles.dart';
 import 'package:flutter/material.dart';
@@ -197,5 +198,25 @@ void main() {
 
     await tapNav(tester, 1);
     expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+  });
+
+  testWidgets('while a set is drawn its panel sits at the bottom edge and the nav goes above it', (tester) async {
+    await pumpShell(tester);
+    final screen = tester.getSize(find.byType(HomeShell));
+    final navBottom = tester.getBottomLeft(find.byKey(const Key('bottom_nav'))).dy;
+
+    fixture.services.editMode.startNew(LandmarkType.set);
+    await tester.pump();
+    await tester.pump();
+    final panel = find.byKey(const Key('set_panel'));
+    expect(panel, findsOneWidget);
+    expect(tester.getBottomLeft(panel).dy, screen.height);
+    expect(find.byKey(const Key('nav_map')), findsOneWidget);
+    expect(tester.getBottomLeft(find.byKey(const Key('bottom_nav'))).dy, lessThanOrEqualTo(tester.getTopLeft(panel).dy));
+
+    fixture.services.editMode.close();
+    await tester.pump();
+    await tester.pump();
+    expect(tester.getBottomLeft(find.byKey(const Key('bottom_nav'))).dy, navBottom);
   });
 }

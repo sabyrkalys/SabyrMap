@@ -108,7 +108,7 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.text('12 точ.'), findsOneWidget);
-    expect(find.text('ПУТЕВАЯ ТОЧКА'), findsOneWidget);
+    expect(find.text('Путевая точка'), findsOneWidget);
   });
 
   group('draftFeatures', () {
