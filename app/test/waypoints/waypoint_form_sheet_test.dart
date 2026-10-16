@@ -1,32 +1,31 @@
 import 'package:app/icons/icon_library_scanner.dart';
 import 'package:app/waypoints/waypoint_color.dart';
 import 'package:app/waypoints/waypoint_form_sheet.dart';
-import 'package:app/waypoints/waypoint_models.dart';
+import 'package:app/landmarks/explorer/listing/landmark_item.dart';
+import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:app/waypoints/waypoint_types.dart';
 import 'package:file/memory.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-Waypoint _existingWaypoint() {
-  return Waypoint(
-    id: 'w1',
-    orgId: 'o1',
-    ownerId: 'u1',
-    name: 'Old name',
-    type: 'water',
-    note: 'Old note',
-    lat: 1.0,
-    lng: 2.0,
-    canEdit: true,
-    createdAt: DateTime.utc(2026, 8, 22),
-    color: null,
-  );
-}
+LandmarkItem _existingWaypoint({String kind = 'water', String? description = 'Old note'}) => LandmarkItem(
+  path: '/m/w1.wpt',
+  name: 'Old name',
+  type: LandmarkType.waypoint,
+  kind: kind,
+  description: description,
+  latitude: 1.0,
+  longitude: 2.0,
+  createdAt: 0,
+  updatedAt: 0,
+  fileSizeBytes: 0,
+  fileModifiedAt: DateTime.utc(2026, 8, 22),
+);
 
 Widget _harness(
   VoidCallback onOpen,
   ValueChanged<WaypointFormResult?> onResult, {
-  Waypoint? existing,
+  LandmarkItem? existing,
   IconLibraryScanner? iconScanner,
 }) {
   return MaterialApp(
@@ -106,19 +105,7 @@ void main() {
   });
 
   testWidgets('falls back to the default type color for an unrecognized waypoint type', (tester) async {
-    final existing = Waypoint(
-      id: 'w1',
-      orgId: 'o1',
-      ownerId: 'u1',
-      name: 'Old name',
-      type: 'not-a-real-type',
-      note: null,
-      lat: 1.0,
-      lng: 2.0,
-      canEdit: true,
-      createdAt: DateTime.utc(2026, 8, 22),
-      color: null,
-    );
+    final existing = _existingWaypoint(kind: 'not-a-real-type', description: null);
     await tester.pumpWidget(_harness(() {}, (_) {}, existing: existing));
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();

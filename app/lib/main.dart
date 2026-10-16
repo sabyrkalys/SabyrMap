@@ -27,7 +27,6 @@ Future<void> main() async {
       overrides: [
         landmarkServicesProvider.overrideWithValue(services),
         onScreenRegistryProvider.overrideWithValue(services.onScreen),
-        waypointIconStoreProvider.overrideWithValue(FileWaypointIconStore(services)),
         allMarkersOpenerProvider.overrideWithValue(
           (context) => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const LocalLandmarksScreen())),
         ),

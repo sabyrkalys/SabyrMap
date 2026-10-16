@@ -1,17 +1,18 @@
+import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../icons/icon_library_scanner.dart';
-import '../icons/waypoint_icon_assignments_controller.dart';
-import '../icons/waypoint_icon_store.dart';
+import 'waypoint_edits.dart';
 import 'waypoint_form_sheet.dart';
-import 'waypoint_models.dart';
 import 'waypoint_types.dart';
-import 'waypoints_controller.dart';
 
-/// Shows the view/edit/delete bottom sheet for a waypoint. Shared between the
-/// map screen (tapping a pin) and the waypoints list screen (tapping a row).
-Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, Waypoint waypoint) async {
+/// Карточка путевой точки [item]: просмотр, правка, удаление. Её
+/// открывает нажатие по точке на карте. Точку внутри файла меток только
+/// показывает.
+Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, LandmarkItem item) async {
+  final type = item.kind ?? defaultWaypointType;
+  final note = item.description;
   final action = await showModalBottomSheet<String>(
     context: context,
     builder: (context) => Padding(
@@ -20,14 +21,14 @@ Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, Waypoint w
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(waypoint.name, style: Theme.of(context).textTheme.titleLarge),
+          Text(item.name, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
-          Text(waypointTypeLabels[waypoint.type] ?? waypoint.type),
-          if (waypoint.note != null && waypoint.note!.isNotEmpty) ...[
+          Text(waypointTypeLabels[type] ?? type),
+          if (note != null && note.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(waypoint.note!),
+            Text(note),
           ],
-          if (waypoint.canEdit) ...[
+          if (!item.isNested) ...[
             const SizedBox(height: 16),
             Row(
               children: [
@@ -51,50 +52,30 @@ Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, Waypoint w
 
   if (!context.mounted || action == null) return;
   if (action == 'edit') {
-    await editWaypoint(context, ref, waypoint);
+    await editWaypoint(context, ref, item);
   } else if (action == 'delete') {
-    await deleteWaypoint(context, ref, waypoint);
+    await deleteWaypoint(context, ref, item);
   }
 }
 
-Future<void> editWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoint, {IconLibraryScanner? iconScanner}) async {
-  // Read directly from the underlying store rather than the in-memory
-  // controller state: if the controller's load() (fired from initState on
-  // the map/list screen) failed or hasn't resolved yet, the reactive state
-  // would be an empty map, making a real stored assignment look absent. The
-  // user would then save with "Стандартная" pre-selected and unknowingly
-  // wipe a real icon assignment via setIcon(waypoint.id, null) below.
-  final currentIcon = await ref.read(waypointIconStoreProvider).iconFor(waypoint.id);
-  if (!context.mounted) return;
-  final result = await showWaypointFormSheet(
-    context,
-    existing: waypoint,
-    initialIconFileName: currentIcon,
-    iconScanner: iconScanner,
-  );
+Future<void> editWaypoint(BuildContext context, WidgetRef ref, LandmarkItem item, {IconLibraryScanner? iconScanner}) async {
+  final result = await showWaypointFormSheet(context, existing: item, iconScanner: iconScanner);
   if (result == null || !context.mounted) return;
   try {
-    await ref.read(waypointsControllerProvider.notifier).updateWaypoint(
-          waypoint.id,
+    await ref.read(waypointEditsProvider).update(
+          item.path,
           name: result.name,
           type: result.type,
           note: result.note,
           color: result.color,
+          iconFileName: result.iconFileName,
         );
   } on WaypointException catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    return;
-  }
-  try {
-    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, result.iconFileName);
-  } catch (_) {
-    // The server-side update already succeeded; a local icon-bookkeeping
-    // failure here is a soft failure and shouldn't be surfaced as if the
-    // whole edit failed.
   }
 }
 
-Future<void> deleteWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoint) async {
+Future<void> deleteWaypoint(BuildContext context, WidgetRef ref, LandmarkItem item) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
@@ -107,16 +88,8 @@ Future<void> deleteWaypoint(BuildContext context, WidgetRef ref, Waypoint waypoi
   );
   if (confirmed != true || !context.mounted) return;
   try {
-    await ref.read(waypointsControllerProvider.notifier).deleteWaypoint(waypoint.id);
+    await ref.read(waypointEditsProvider).delete(item.path);
   } on WaypointException catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-    return;
-  }
-  try {
-    await ref.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(waypoint.id, null);
-  } catch (_) {
-    // The server-side delete already succeeded; a local icon-bookkeeping
-    // failure here is a soft failure and shouldn't be surfaced as if the
-    // whole delete failed.
   }
 }

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:app/icons/icon_metadata_migration.dart';
 import 'package:app/icons/waypoint_icon_store.dart';
+import 'package:app/landmarks/drafts/metadata_patch.dart';
+import 'package:app/landmarks/models/landmark_metadata.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:app/storage/storage_paths.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -60,16 +62,12 @@ void main() {
     expect(legacy.data, contains('ещё'), reason: 'runs once');
   });
 
-  test('the file icon store keeps the icon through a rename', () async {
-    final store = FileWaypointIconStore(s);
+  test('an icon in the file stays with the waypoint through a rename', () async {
     final path = await createWaypoint(s, 'Палатка', s.paths.landmarks);
-    await store.setIcon(path, 'tent.png');
-    expect(await store.iconFor(path), 'tent.png');
+    await s.patchMetadata(path, const MetadataPatch(set: {LandmarkMetadata.userIconKey: 'tent.png'}));
+    expect(s.index.byPath(path)!.userIcon, 'tent.png');
 
     final renamed = await s.folders.renameFile(path, 'лагерь');
-    expect(await store.readAll(), {renamed: 'tent.png'});
-
-    await store.setIcon(renamed, null);
-    expect(await store.iconFor(renamed), isNull);
+    expect(s.index.byPath(renamed)!.userIcon, 'tent.png');
   });
 }

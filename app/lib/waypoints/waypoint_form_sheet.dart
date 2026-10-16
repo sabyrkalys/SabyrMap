@@ -1,10 +1,10 @@
+import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:flutter/material.dart';
 
 import '../icons/icon_library_scanner.dart';
 import '../icons/icon_picker_sheet.dart';
 import 'waypoint_color.dart';
 import 'waypoint_color_picker.dart';
-import 'waypoint_models.dart';
 import 'waypoint_types.dart';
 
 class WaypointFormResult {
@@ -25,8 +25,7 @@ class WaypointFormResult {
 
 Future<WaypointFormResult?> showWaypointFormSheet(
   BuildContext context, {
-  Waypoint? existing,
-  String? initialIconFileName,
+  LandmarkItem? existing,
   IconLibraryScanner? iconScanner,
 }) {
   return showModalBottomSheet<WaypointFormResult>(
@@ -34,17 +33,16 @@ Future<WaypointFormResult?> showWaypointFormSheet(
     isScrollControlled: true,
     builder: (context) => WaypointFormSheet(
       existing: existing,
-      initialIconFileName: initialIconFileName,
       iconScanner: iconScanner,
     ),
   );
 }
 
 class WaypointFormSheet extends StatefulWidget {
-  const WaypointFormSheet({super.key, this.existing, this.initialIconFileName, this.iconScanner});
+  const WaypointFormSheet({super.key, this.existing, this.iconScanner});
 
-  final Waypoint? existing;
-  final String? initialIconFileName;
+  /// Точка из индекса меток; null — новая.
+  final LandmarkItem? existing;
   final IconLibraryScanner? iconScanner;
 
   @override
@@ -55,16 +53,17 @@ class _WaypointFormSheetState extends State<WaypointFormSheet> {
   late final TextEditingController _nameController =
       TextEditingController(text: widget.existing?.name ?? '');
   late final TextEditingController _noteController =
-      TextEditingController(text: widget.existing?.note ?? '');
-  late String _selectedType = widget.existing?.type ?? defaultWaypointType;
+      TextEditingController(text: widget.existing?.description ?? '');
+  late String _selectedType = widget.existing?.kind ?? defaultWaypointType;
   String? _selectedColor;
   String? _selectedIconFileName;
 
   @override
   void initState() {
     super.initState();
-    _selectedColor = widget.existing?.color;
-    _selectedIconFileName = widget.initialIconFileName;
+    final color = widget.existing?.colorValue;
+    _selectedColor = color == null ? null : colorToHex(Color(color));
+    _selectedIconFileName = widget.existing?.userIcon;
   }
 
   @override

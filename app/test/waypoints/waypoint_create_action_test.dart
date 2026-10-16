@@ -3,70 +3,53 @@ import 'dart:async';
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/waypoints/waypoint_create_action.dart';
-import 'package:app/waypoints/waypoint_models.dart';
-import 'package:app/waypoints/waypoints_controller.dart';
-import 'package:app/waypoints/waypoints_repository.dart';
+import 'package:app/waypoints/waypoint_edits.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import 'fakes.dart';
+import '../landmarks/services/fixture.dart';
 
-class _SlowWaypointsRepository extends FakeWaypointsRepository {
-  final pending = Completer<Waypoint>();
+/// Records what was created instead of writing files; [pending] holds
+/// the answer back when set.
+class _RecordingEdits extends WaypointEdits {
+  _RecordingEdits(super.services);
+
+  final created = <({String name, double lat, double lng, String? folder})>[];
+  Completer<String>? pending;
 
   @override
-  Future<Waypoint> create({
+  Iterable<String> get names => created.map((c) => c.name);
+
+  @override
+  Future<String> create({
     required String name,
     required String type,
     required String note,
     required String? color,
     required double lat,
     required double lng,
+    String? iconFileName,
     String? folder,
     Map<String, Object> extra = const {},
-  }) =>
-      pending.future;
-}
-
-/// Records what was created and answers with it.
-class _RecordingWaypointsRepository extends FakeWaypointsRepository {
-  final created = <({String name, double lat, double lng})>[];
-
-  @override
-  Future<Waypoint> create({
-    required String name,
-    required String type,
-    required String note,
-    required String? color,
-    required double lat,
-    required double lng,
-    String? folder,
-    Map<String, Object> extra = const {},
-  }) async {
-    created.add((name: name, lat: lat, lng: lng));
-    return Waypoint(
-      id: 'w${created.length}',
-      orgId: 'o',
-      ownerId: 'u',
-      name: name,
-      type: type,
-      note: note.isEmpty ? null : note,
-      lat: lat,
-      lng: lng,
-      color: color,
-      canEdit: true,
-      createdAt: DateTime.utc(2026, 10, 8),
-    );
+  }) {
+    created.add((name: name, lat: lat, lng: lng, folder: folder));
+    return pending?.future ?? Future.value('/m/w${created.length}.wpt');
   }
 }
 
 void main() {
-  Future<ProviderContainer> pumpButton(WidgetTester tester, {WaypointsRepository? repo}) async {
-    final container = ProviderContainer(
-      overrides: [waypointsRepositoryProvider.overrideWithValue(repo ?? FakeWaypointsRepository())],
-    );
+  late ServicesFixture f;
+  late _RecordingEdits repo;
+  setUp(() async {
+    f = await ServicesFixture.create();
+    repo = _RecordingEdits(f.services);
+  });
+  tearDown(() => f.dispose());
+
+  Future<ProviderContainer> pumpButton(WidgetTester tester) async {
+    final container = ProviderContainer(overrides: [waypointEditsProvider.overrideWithValue(repo)]);
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -106,8 +89,7 @@ void main() {
   });
 
   testWidgets('«ОК» creates the waypoint at the crosshair with what was entered', (tester) async {
-    final repo = _RecordingWaypointsRepository();
-    final container = await pumpButton(tester, repo: repo);
+    final container = await pumpButton(tester);
     container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
 
     await tester.tap(find.text('go'));
@@ -122,8 +104,7 @@ void main() {
   });
 
   testWidgets('unnamed waypoints become «Путевая точка 1», «Путевая точка 2», …', (tester) async {
-    final repo = _RecordingWaypointsRepository();
-    final container = await pumpButton(tester, repo: repo);
+    final container = await pumpButton(tester);
     container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
 
     for (var i = 0; i < 2; i++) {
@@ -137,8 +118,7 @@ void main() {
   });
 
   testWidgets('coordinates typed in «Координаты» are where the waypoint is created', (tester) async {
-    final repo = _RecordingWaypointsRepository();
-    final container = await pumpButton(tester, repo: repo);
+    final container = await pumpButton(tester);
     container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
 
     await tester.tap(find.text('go'));
@@ -159,8 +139,8 @@ void main() {
   });
 
   testWidgets('a failure still shows its message after the widget that started it is gone', (tester) async {
-    final repo = _SlowWaypointsRepository();
-    final container = ProviderContainer(overrides: [waypointsRepositoryProvider.overrideWithValue(repo)]);
+    final pending = repo.pending = Completer<String>();
+    final container = ProviderContainer(overrides: [waypointEditsProvider.overrideWithValue(repo)]);
     addTearDown(container.dispose);
     container.read(mapCrosshairProvider.notifier).set(const LatLng(48, 37.8));
     var showButton = true;
@@ -197,29 +177,16 @@ void main() {
     // The panel that started the action closes while the request is in flight.
     setHostState(() => showButton = false);
     await tester.pump();
-    repo.pending.completeError(const WaypointException('boom'));
+    pending.completeError(const WaypointException('boom'));
     await tester.pumpAndSettle();
 
     expect(find.text('boom'), findsOneWidget);
   });
 
   testWidgets('«ОК» saves into the folder of the chosen group', (tester) async {
-    final repo = FakeWaypointsRepository()
-      ..createResult = Waypoint(
-        id: '/l/a.wpt',
-        orgId: '',
-        ownerId: '',
-        name: 'Родник',
-        type: 'generic',
-        note: null,
-        lat: 48,
-        lng: 37.8,
-        canEdit: true,
-        createdAt: DateTime(2026),
-      );
     final container = ProviderContainer(
       overrides: [
-        waypointsRepositoryProvider.overrideWithValue(repo),
+        waypointEditsProvider.overrideWithValue(repo),
         markerGroupFoldersProvider.overrideWithValue(
           const MarkerGroupFolders(unsorted: '/root/landmarks/imported', myMarkers: '/root/landmarks'),
         ),
@@ -248,6 +215,6 @@ void main() {
     await tester.tap(find.byKey(const Key('waypoint_dialog_ok')));
     await tester.pumpAndSettle();
 
-    expect(repo.lastCreateFolder, '/root/landmarks/imported');
+    expect(repo.created.single.folder, '/root/landmarks/imported');
   });
 }

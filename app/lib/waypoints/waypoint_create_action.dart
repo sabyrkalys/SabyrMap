@@ -4,13 +4,11 @@ import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../app/landmark_services_provider.dart';
 import '../icons/icon_library_scanner.dart';
-import '../icons/waypoint_icon_assignments_controller.dart';
 import '../map/map_crosshair.dart';
 import 'waypoint_dialog/marker_group.dart';
 import 'waypoint_dialog/waypoint_data.dart';
 import 'waypoint_dialog/waypoint_dialog.dart';
-import 'waypoint_models.dart';
-import 'waypoints_controller.dart';
+import 'waypoint_edits.dart';
 
 /// [folder] — папка проводника, куда кладётся точка с группой по
 /// умолчанию.
@@ -56,34 +54,27 @@ Future<void> saveWaypoint(
   LatLng at, {
   String? folder,
 }) async {
-  final name = data.name.trim().isNotEmpty
-      ? data.name.trim()
-      : nextWaypointName(container.read(waypointsControllerProvider).map((w) => w.name));
+  final edits = container.read(waypointEditsProvider);
+  final name = data.name.trim().isNotEmpty ? data.name.trim() : nextWaypointName(edits.names);
   try {
-    final created = await container.read(waypointsControllerProvider.notifier).createWaypoint(
-          name: name,
-          type: data.type,
-          note: data.note,
-          color: data.colorHex,
-          lat: at.latitude,
-          lng: at.longitude,
-          // Decision: из проводника точка ложится в открытую там папку, если
-          // в диалоге осталась группа по умолчанию.
-          folder: folder != null && data.groupId == WaypointData.unsortedGroupId
-              ? folder
-              : folderFor(container.read(markerGroupFoldersProvider), data.groupId),
-          extra: {
-            if (data.comment?.trim().isNotEmpty ?? false) 'comment': data.comment!.trim(),
-            'icon': ?data.markerIconId,
-          },
-        );
-    try {
-      await container.read(waypointIconAssignmentsControllerProvider.notifier).setIcon(created.id, data.iconId);
-    } catch (_) {
-      // The waypoint itself was created; a local icon-bookkeeping failure
-      // is a soft failure and shouldn't be reported as a failed creation.
-      // Same reasoning as editWaypoint/deleteWaypoint in waypoint_actions.dart.
-    }
+    await edits.create(
+      name: name,
+      type: data.type,
+      note: data.note,
+      color: data.colorHex,
+      lat: at.latitude,
+      lng: at.longitude,
+      iconFileName: data.iconId,
+      // Decision: из проводника точка ложится в открытую там папку, если
+      // в диалоге осталась группа по умолчанию.
+      folder: folder != null && data.groupId == WaypointData.unsortedGroupId
+          ? folder
+          : folderFor(container.read(markerGroupFoldersProvider), data.groupId),
+      extra: {
+        if (data.comment?.trim().isNotEmpty ?? false) 'comment': data.comment!.trim(),
+        'icon': ?data.markerIconId,
+      },
+    );
   } on WaypointException catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(e.message)));
   }

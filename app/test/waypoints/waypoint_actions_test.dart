@@ -1,170 +1,96 @@
+import 'dart:io';
+
+import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/icons/icon_library_scanner.dart';
-import 'package:app/icons/waypoint_icon_assignments_controller.dart';
-import 'package:app/icons/waypoint_icon_store.dart';
+import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:app/waypoints/waypoint_actions.dart';
-import 'package:app/waypoints/waypoint_models.dart';
-import 'package:app/waypoints/waypoints_controller.dart';
+import 'package:app/waypoints/waypoint_edits.dart';
 import 'package:file/memory.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../icons/fakes.dart';
-import 'fakes.dart';
-
-Waypoint _waypoint() => Waypoint(
-      id: 'w1',
-      orgId: 'o1',
-      ownerId: 'u1',
-      name: 'Summit',
-      type: 'generic',
-      note: null,
-      lat: 1.0,
-      lng: 2.0,
-      canEdit: true,
-      createdAt: DateTime.utc(2026, 8, 22),
-    );
+import '../landmarks/services/fixture.dart';
 
 void main() {
-  testWidgets('editing a waypoint and picking an icon persists the assignment', (tester) async {
-    final fs = MemoryFileSystem();
-    final dir = fs.directory('/base')..createSync(recursive: true);
-    dir.childFile('camp.png').createSync();
-    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
-    final repo = FakeWaypointsRepository()..updateResult = _waypoint();
-    final iconStore = FakeWaypointIconStore();
-    final container = ProviderContainer(
-      overrides: [
-        waypointsRepositoryProvider.overrideWithValue(repo),
-        waypointIconStoreProvider.overrideWithValue(iconStore),
-      ],
-    );
-    addTearDown(container.dispose);
+  late ServicesFixture f;
+  late String path;
 
+  setUp(() async {
+    f = await ServicesFixture.create();
+    path = await WaypointEdits(f.services).create(
+      name: 'Summit',
+      type: 'generic',
+      note: '',
+      color: null,
+      lat: 1,
+      lng: 2,
+    );
+  });
+  tearDown(() => f.dispose());
+
+  LandmarkItem item() => f.services.index.byPath(path)!;
+
+  Future<void> pumpButton(WidgetTester tester, void Function(BuildContext context, WidgetRef ref) onPressed) async {
     await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
+      ProviderScope(
+        overrides: [landmarkServicesProvider.overrideWithValue(f.services)],
         child: MaterialApp(
           home: Consumer(
-            builder: (context, ref, _) => ElevatedButton(
-              onPressed: () => editWaypoint(context, ref, _waypoint(), iconScanner: scanner),
-              child: const Text('go'),
-            ),
+            builder: (context, ref, _) =>
+                ElevatedButton(onPressed: () => onPressed(context, ref), child: const Text('go')),
           ),
         ),
       ),
     );
-    await tester.pump();
     await tester.tap(find.text('go'));
     await tester.pumpAndSettle();
+  }
 
+  /// Даёт записи на диск дойти до индекса.
+  Future<void> waitFor(WidgetTester tester, bool Function() done) async {
+    for (var i = 0; i < 100 && !done(); i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+    }
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('editing a waypoint writes the name and the picked icon into its file', (tester) async {
+    final fs = MemoryFileSystem();
+    fs.directory('/base').createSync(recursive: true);
+    fs.file('/base/camp.png').createSync();
+    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
+    await pumpButton(tester, (context, ref) => editWaypoint(context, ref, item(), iconScanner: scanner));
+
+    expect(tester.widget<TextField>(find.byKey(const Key('waypoint_name_field'))).controller!.text, 'Summit');
     await tester.tap(find.byKey(const Key('waypoint_icon_button')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('icon_picker_tile_camp.png')));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('waypoint_name_field')), 'Summit');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('waypoint_save_button')));
-    await tester.pumpAndSettle();
-
-    expect(await iconStore.iconFor('w1'), 'camp.png');
-    expect(container.read(waypointIconAssignmentsControllerProvider), {'w1': 'camp.png'});
-  });
-
-  testWidgets('editWaypoint: a setIcon failure does not propagate and does not undo the server update', (tester) async {
-    final fs = MemoryFileSystem();
-    final dir = fs.directory('/base')..createSync(recursive: true);
-    dir.childFile('camp.png').createSync();
-    final scanner = IconLibraryScanner(fileSystem: fs, baseDirectoryPath: '/base');
-    final updated = Waypoint(
-      id: 'w1',
-      orgId: 'o1',
-      ownerId: 'u1',
-      name: 'Renamed',
-      type: 'generic',
-      note: null,
-      lat: 1.0,
-      lng: 2.0,
-      canEdit: true,
-      createdAt: DateTime.utc(2026, 8, 22),
-    );
-    final repo = FakeWaypointsRepository(initial: [_waypoint()])..updateResult = updated;
-    final iconStore = FakeWaypointIconStore()..setIconError = Exception('local storage boom');
-    final container = ProviderContainer(
-      overrides: [
-        waypointsRepositoryProvider.overrideWithValue(repo),
-        waypointIconStoreProvider.overrideWithValue(iconStore),
-      ],
-    );
-    addTearDown(container.dispose);
-    await container.read(waypointsControllerProvider.notifier).loadWaypoints();
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: Consumer(
-            builder: (context, ref, _) => ElevatedButton(
-              onPressed: () => editWaypoint(context, ref, _waypoint(), iconScanner: scanner),
-              child: const Text('go'),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.tap(find.text('go'));
-    await tester.pumpAndSettle();
-
     await tester.enterText(find.byKey(const Key('waypoint_name_field')), 'Renamed');
-    await tester.pump();
     await tester.tap(find.byKey(const Key('waypoint_save_button')));
-    await tester.pumpAndSettle();
+    await waitFor(tester, () => item().name == 'Renamed');
 
-    // No unhandled exception should have propagated out of editWaypoint.
-    expect(tester.takeException(), isNull);
-    // The server-side update already took effect.
-    expect(container.read(waypointsControllerProvider).single.name, 'Renamed');
-    // No WaypointException SnackBar was shown for this soft failure.
+    expect(item().name, 'Renamed');
+    expect(item().userIcon, 'camp.png');
     expect(find.byType(SnackBar), findsNothing);
   });
 
-  testWidgets('deleteWaypoint: a setIcon failure does not propagate and does not undo the server delete', (tester) async {
-    final repo = FakeWaypointsRepository(initial: [_waypoint()]);
-    final iconStore = FakeWaypointIconStore()..setIconError = Exception('local storage boom');
-    final container = ProviderContainer(
-      overrides: [
-        waypointsRepositoryProvider.overrideWithValue(repo),
-        waypointIconStoreProvider.overrideWithValue(iconStore),
-      ],
-    );
-    addTearDown(container.dispose);
-    await container.read(waypointsControllerProvider.notifier).loadWaypoints();
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: Consumer(
-            builder: (context, ref, _) => ElevatedButton(
-              onPressed: () => deleteWaypoint(context, ref, _waypoint()),
-              child: const Text('go'),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.pump();
-    await tester.tap(find.text('go'));
-    await tester.pumpAndSettle();
+  testWidgets('deleting a waypoint removes its file after the confirmation', (tester) async {
+    await pumpButton(tester, (context, ref) => deleteWaypoint(context, ref, item()));
     await tester.tap(find.text('Удалить'));
-    await tester.pumpAndSettle();
+    await waitFor(tester, () => f.services.index.byPath(path) == null);
 
-    // No unhandled exception should have propagated out of deleteWaypoint.
-    expect(tester.takeException(), isNull);
-    // The server-side delete already took effect.
-    expect(container.read(waypointsControllerProvider), isEmpty);
-    // No WaypointException SnackBar was shown for this soft failure.
+    expect(File(path).existsSync(), isFalse);
     expect(find.byType(SnackBar), findsNothing);
+  });
+
+  testWidgets('the card of a waypoint inside a landmark file has no edit or delete', (tester) async {
+    final nested = item().copyWith(path: LandmarkItem.nestedPath('/m/set.ldk', 0));
+    await pumpButton(tester, (context, ref) => showWaypointDetails(context, ref, nested));
+
+    expect(find.text('Summit'), findsOneWidget);
+    expect(find.byKey(const Key('waypoint_edit_button')), findsNothing);
+    expect(find.byKey(const Key('waypoint_delete_button')), findsNothing);
   });
 }

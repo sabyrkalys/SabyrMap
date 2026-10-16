@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app/landmark_services_provider.dart';
 import '../dialogs/confirm_dialog.dart';
 import '../format_bytes.dart';
-import '../waypoints/waypoints_controller.dart';
 import 'dialogs/rename_folder_dialog.dart';
 import 'folder_context_actions.dart';
 import 'sheet_menu.dart';
@@ -47,14 +46,8 @@ class FolderContextMenu extends ConsumerWidget {
       if (text != null) messenger.showSnackBar(SnackBar(content: Text(text)));
     }
 
-    // Контроллер точек берётся сразу: после закрытия шторки её ref уже
-    // нельзя использовать.
-    final waypoints = ref.read(waypointsControllerProvider.notifier);
-
-    Future<void> changed() async {
-      await explorer.refresh();
-      await waypoints.loadWaypoints();
-    }
+    // Карта узнаёт об изменениях из индекса меток сама.
+    Future<void> changed() => explorer.refresh();
 
     Widget item(String key, IconData icon, Color color, String label, Future<void> Function() action) => InkWell(
       key: Key('folder_menu_$key'),

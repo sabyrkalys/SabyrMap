@@ -1,5 +1,4 @@
 import 'package:app/app/landmark_services_provider.dart';
-import 'package:app/icons/waypoint_icon_store.dart';
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/map/map_target.dart';
@@ -7,8 +6,6 @@ import 'package:app/menu/menu_toggles.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
 import 'package:app/tracks/tracks_controller.dart';
-import 'package:app/waypoints/waypoint_models.dart';
-import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,11 +14,9 @@ import 'package:app/map/map_overlays.dart';
 import 'package:app/map/state/map_layers_controller.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
-import '../icons/fakes.dart';
 import '../landmarks/services/fixture.dart';
 import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
-import '../waypoints/fakes.dart';
 
 class _NoopTogglesStore implements MenuTogglesStore {
   @override
@@ -40,18 +35,9 @@ class _NoopTogglesStore implements MenuTogglesStore {
 // Метки карты — из индекса настоящих сервисов во временной папке.
 late ServicesFixture _fixture;
 
-_baseOverrides({
-  FakeWaypointsRepository? waypointsRepo,
-  FakeTracksRepository? tracksRepo,
-  FakeWaypointIconStore? iconStore,
-}) {
+_baseOverrides({FakeTracksRepository? tracksRepo}) {
   return [
-    waypointsRepositoryProvider.overrideWithValue(waypointsRepo ?? FakeWaypointsRepository()),
     tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
-    // MapScreen loads the local icon assignments on open; the real store
-    // talks to flutter_secure_storage, which has no platform channel under
-    // flutter test.
-    waypointIconStoreProvider.overrideWithValue(iconStore ?? FakeWaypointIconStore()),
     menuTogglesStoreProvider.overrideWithValue(_NoopTogglesStore()),
     landmarkServicesProvider.overrideWithValue(_fixture.services),
     onScreenRegistryProvider.overrideWithValue(_fixture.services.onScreen),
@@ -75,57 +61,10 @@ void main() {
     expect(find.byType(MapScreen), findsOneWidget);
   });
 
-  testWidgets('creating a waypoint via the controller updates the rendered state', (tester) async {
-    final waypointsRepo = FakeWaypointsRepository()
-      ..createResult = Waypoint(
-        id: 'w1',
-        orgId: 'o1',
-        ownerId: 'u1',
-        name: 'Summit',
-        type: 'generic',
-        note: null,
-        lat: 1.0,
-        lng: 2.0,
-        canEdit: true,
-        createdAt: DateTime.utc(2026, 8, 22),
-      );
-    final container = ProviderContainer(
-      overrides: _baseOverrides(waypointsRepo: waypointsRepo),
-    );
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MapScreen()),
-      ),
-    );
-    await tester.pump();
-
-    // MapLibreMap has no real platform view under flutter test, so this
-    // drives WaypointsController.createWaypoint directly (the same call
-    // _onMapLongClick makes after the form is submitted) rather than
-    // simulating a real long-press gesture on the (unrenderable) map
-    // widget. This verifies the state MapScreen listens to updates
-    // correctly; the long-press gesture itself is covered by manual
-    // device verification (see Step 9 in the task brief).
-    await container.read(waypointsControllerProvider.notifier).createWaypoint(
-          name: 'Summit',
-          type: 'generic',
-          note: '',
-          color: null,
-          lat: 1.0,
-          lng: 2.0,
-        );
-
-    expect(container.read(waypointsControllerProvider), hasLength(1));
-    expect(container.read(waypointsControllerProvider).single.name, 'Summit');
-  });
-
   Offset screenCenter(WidgetTester tester) => tester.getCenter(find.byType(MapLibreMap));
 
-  Future<ProviderContainer> pumpMap(WidgetTester tester, {FakeWaypointsRepository? waypointsRepo}) async {
-    final container = ProviderContainer(overrides: _baseOverrides(waypointsRepo: waypointsRepo));
+  Future<ProviderContainer> pumpMap(WidgetTester tester) async {
+    final container = ProviderContainer(overrides: _baseOverrides());
     addTearDown(container.dispose);
     await tester.pumpWidget(
       UncontrolledProviderScope(container: container, child: const MaterialApp(home: MapScreen())),

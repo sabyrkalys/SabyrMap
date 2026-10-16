@@ -45,12 +45,10 @@ import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
 import '../tracks/tracks_visibility_controller.dart';
-import '../waypoints/file_waypoints_repository.dart';
 import '../waypoints/waypoint_actions.dart';
 import '../waypoints/new_marker/marker_type.dart';
 import '../waypoints/new_marker/new_marker_sheet.dart';
 import '../waypoints/waypoint_create_action.dart';
-import '../waypoints/waypoints_controller.dart';
 
 const String _recordingLineKey = '__recording__';
 
@@ -159,10 +157,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _recordingController = ref.read(trackRecordingControllerProvider.notifier);
     _onScreen = ref.read(onScreenRegistryProvider)..addListener(_onLandmarksChanged);
     _landmarkIndex = ref.read(landmarkServicesProvider).index..addListener(_onLandmarksChanged);
-    Future.microtask(() {
-      if (!mounted) return;
-      ref.read(waypointsControllerProvider.notifier).loadWaypoints();
-    });
     _loadSavedCamera();
     _loadMyLocation();
   }
@@ -694,7 +688,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final item = _landmarkIndex.byPath(path);
     if (item == null || !mounted) return;
     if (item.type == LandmarkType.waypoint) {
-      showWaypointDetails(context, ref, FileWaypointsRepository.fromItem(item));
+      showWaypointDetails(context, ref, item);
     } else {
       ItemContextMenu.show(context, item);
     }

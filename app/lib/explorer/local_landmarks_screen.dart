@@ -26,7 +26,6 @@ import '../map/screens/available_maps/storage_bar.dart';
 import '../waypoints/new_marker/marker_type.dart';
 import '../waypoints/new_marker/new_marker_sheet.dart';
 import '../waypoints/waypoint_create_action.dart';
-import '../waypoints/waypoints_controller.dart';
 import 'explorer_breadcrumbs.dart';
 import 'explorer_create_sheet.dart';
 import 'explorer_dropdown_menu.dart';
@@ -159,11 +158,9 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
     setState(() {});
   }
 
-  /// Файлы на диске изменились — обновить список и точки на карте.
-  Future<void> _changed() async {
-    await _explorer.refresh();
-    await ref.read(waypointsControllerProvider.notifier).loadWaypoints();
-  }
+  /// Файлы на диске изменились — обновить список (карта узнаёт об этом
+  /// из индекса меток сама).
+  Future<void> _changed() => _explorer.refresh();
 
   Future<void> _activate() async {
     final granted = await _services.permissionService.request();

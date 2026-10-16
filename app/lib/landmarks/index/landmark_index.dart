@@ -89,19 +89,20 @@ class LandmarkIndex extends ChangeNotifier {
     if (targets.isEmpty) return _queue;
     return _serial(() async {
       for (final target in targets) {
+        // Сначала читается, потом подменяется: пока файл читается, его
+        // прежняя запись остаётся в индексе.
+        final kind = await FileSystemEntity.type(target, followLinks: false);
+        final fresh = switch (kind) {
+          FileSystemEntityType.directory => await _readUnder(target),
+          FileSystemEntityType.file => await _readFile(target),
+          _ => const <LandmarkItem>[],
+        };
         _items.removeWhere((key, item) {
           final file = item.filePath;
           return file == target || p.isWithin(target, file);
         });
-        final kind = await FileSystemEntity.type(target, followLinks: false);
-        if (kind == FileSystemEntityType.directory) {
-          for (final item in await _readUnder(target)) {
-            _items[item.path] = item;
-          }
-        } else if (kind == FileSystemEntityType.file) {
-          for (final item in await _readFile(target)) {
-            _items[item.path] = item;
-          }
+        for (final item in fresh) {
+          _items[item.path] = item;
         }
       }
       notifyListeners();

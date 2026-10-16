@@ -11,7 +11,6 @@ import 'package:app/menu/menu_toggles.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
 import 'package:app/tracks/tracks_controller.dart';
-import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,7 +19,6 @@ import '../compass/fakes.dart';
 import '../map/state/map_layers_controller_test.dart' show MemoryMapStateStore;
 import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
-import '../waypoints/fakes.dart';
 
 class _MemoryStore implements MenuTogglesStore {
   Map<String, bool> saved = {};
@@ -59,7 +57,6 @@ void main() {
       overrides: [
         allMarkersOpenerProvider.overrideWithValue((_) => openedAllMarkers++),
         menuTogglesStoreProvider.overrideWithValue(_MemoryStore()),
-        waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
         tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
         compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
         mapStateStoreProvider.overrideWithValue(MemoryMapStateStore()),

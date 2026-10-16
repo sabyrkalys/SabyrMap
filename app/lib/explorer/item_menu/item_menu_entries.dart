@@ -9,7 +9,6 @@ import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 import '../../app/landmark_services_provider.dart';
 import '../../dialogs/confirm_dialog.dart';
 import '../../map/map_target.dart';
-import '../../waypoints/waypoints_controller.dart';
 import '../descriptors/context_menu_action.dart';
 import '../descriptors/menu_env.dart';
 import '../details/landmark_details_screen.dart';
@@ -40,12 +39,10 @@ abstract final class ItemMenuEntries {
     }
   }
 
-  /// Файлы изменились: перечитать список и точки на карте.
-  static Future<void> changed(BuildContext context) async {
-    final container = ProviderScope.containerOf(context, listen: false);
-    await container.read(landmarkServicesProvider).explorerController.refresh();
-    await container.read(waypointsControllerProvider.notifier).loadWaypoints();
-  }
+  /// Файлы изменились: перечитать список (карта узнаёт об этом из
+  /// индекса меток сама).
+  static Future<void> changed(BuildContext context) =>
+      ProviderScope.containerOf(context, listen: false).read(landmarkServicesProvider).explorerController.refresh();
 
   static Future<void> _open(BuildContext context, String path) async {
     final open = ItemHooks.maybeOf(context)?.onOpen;

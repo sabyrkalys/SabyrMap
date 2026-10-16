@@ -20,7 +20,7 @@ class TracksController extends Notifier<List<Track>> {
     try {
       state = await _repository.list();
     } on TrackException {
-      // Same intentional silent-swallow as WaypointsController.loadWaypoints():
+      // Intentional silent swallow:
       // an initial-load failure isn't surfaced in this slice.
     }
   }
