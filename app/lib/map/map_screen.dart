@@ -633,8 +633,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final last = _trackLocations.lastOrNull;
     if (last != null) {
       _movingToTrackEnd = true;
+      // Плавно, без скачка; пока карта едет, путь не чертится.
       _controller
-          ?.moveCamera(CameraUpdate.newLatLng(LatLng(last.latitude, last.longitude)))
+          ?.animateCamera(
+            CameraUpdate.newLatLng(LatLng(last.latitude, last.longitude)),
+            duration: const Duration(milliseconds: 250),
+          )
           .whenComplete(() => _movingToTrackEnd = false);
     }
   }
