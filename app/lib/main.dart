@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show MapLibreMap;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/landmark_services_provider.dart';
@@ -15,6 +16,10 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Карта на Android — гибридной композицией, а не виртуальным дисплеем:
+  // виртуальный дисплей после поворота экрана замирал (картинка карты
+  // переставала обновляться до перезапуска приложения).
+  MapLibreMap.useHybridComposition = true;
   await configureSystemUi();
   await installTrustedCertificates();
   registerThirdPartyLicenses();
