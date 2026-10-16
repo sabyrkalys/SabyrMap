@@ -1,4 +1,4 @@
-import 'package:app/icons/waypoint_icon_assignments_controller.dart';
+import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/icons/waypoint_icon_store.dart';
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/map_screen.dart';
@@ -8,7 +8,6 @@ import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
 import 'package:app/tracks/tracks_controller.dart';
 import 'package:app/waypoints/waypoint_models.dart';
-import 'package:app/waypoints/waypoint_types.dart';
 import 'package:app/waypoints/waypoints_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +18,7 @@ import 'package:app/map/state/map_layers_controller.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../icons/fakes.dart';
+import '../landmarks/services/fixture.dart';
 import '../tracks/fake_location_source.dart';
 import '../tracks/fakes.dart';
 import '../waypoints/fakes.dart';
@@ -37,6 +37,9 @@ class _NoopTogglesStore implements MenuTogglesStore {
 // literal without an explicit annotation lets the compiler infer it as
 // `List<Override>` from the `.overrideWithValue()` calls inside, which is
 // assignable everywhere `ProviderContainer`/`ProviderScope` expect one.
+// Метки карты — из индекса настоящих сервисов во временной папке.
+late ServicesFixture _fixture;
+
 _baseOverrides({
   FakeWaypointsRepository? waypointsRepo,
   FakeTracksRepository? tracksRepo,
@@ -50,10 +53,15 @@ _baseOverrides({
     // flutter test.
     waypointIconStoreProvider.overrideWithValue(iconStore ?? FakeWaypointIconStore()),
     menuTogglesStoreProvider.overrideWithValue(_NoopTogglesStore()),
+    landmarkServicesProvider.overrideWithValue(_fixture.services),
+    onScreenRegistryProvider.overrideWithValue(_fixture.services.onScreen),
   ];
 }
 
 void main() {
+  setUp(() async => _fixture = await ServicesFixture.create());
+  tearDown(() => _fixture.root.deleteSync(recursive: true));
+
   testWidgets('MapScreen builds without throwing', (tester) async {
 
     await tester.pumpWidget(
@@ -394,8 +402,8 @@ void main() {
   testWidgets('lines do not swallow taps, so the crosshair still opens the card over the target line', (tester) async {
     await pumpMap(tester);
     final consumed = tester.widget<MapLibreMap>(find.byType(MapLibreMap)).annotationConsumeTapEvents;
-    expect(consumed, isNot(contains(AnnotationType.line)));
-    expect(consumed, containsAll([AnnotationType.circle, AnnotationType.symbol]));
+    // Метки нажимаются через свои слои (LandmarkLayer), аннотации — никогда.
+    expect(consumed, [AnnotationType.fill]);
   });
 
   testWidgets('the map is capped at zoom 22 and the old coordinate HUD is gone', (tester) async {
@@ -427,112 +435,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Карта ещё не готова'), findsOneWidget);
     expect(find.text('ИНФОРМАЦИЯ'), findsNothing);
-  });
-
-  group('circleOptionsForWaypoint', () {
-    Waypoint waypointWith({required String ownerId, required String type}) => Waypoint(
-          id: 'w1',
-          orgId: 'o1',
-          ownerId: ownerId,
-          name: 'Summit',
-          type: type,
-          note: null,
-          lat: 1.0,
-          lng: 2.0,
-          canEdit: true,
-          createdAt: DateTime.utc(2026, 8, 22),
-        );
-
-    test('the halo is a larger, soft, white circle at the same point', () {
-      final waypoint = waypointWith(ownerId: 'u1', type: 'not-a-real-type');
-      final dot = circleOptionsForWaypoint(waypoint);
-      final halo = haloOptionsForWaypoint(waypoint);
-
-      expect(halo.geometry, dot.geometry);
-      expect(halo.circleColor, '#FFFFFF');
-      expect(halo.circleRadius!, greaterThan(dot.circleRadius!));
-      expect(halo.circleOpacity!, inExclusiveRange(0, 1));
-      expect(halo.circleBlur!, greaterThan(0));
-    });
-
-    test('falls back to the default type color for an unrecognized type', () {
-      final waypoint = waypointWith(ownerId: 'u1', type: 'not-a-real-type');
-
-      final options = circleOptionsForWaypoint(waypoint);
-
-      expect(options.circleColor, waypointTypeColors[defaultWaypointType]);
-    });
-
-    test('uses the type color for a recognized type', () {
-      final waypoint = waypointWith(ownerId: 'u1', type: 'danger');
-
-      final options = circleOptionsForWaypoint(waypoint);
-
-      expect(options.circleColor, waypointTypeColors['danger']);
-    });
-
-    test('waypoints get a thin white stroke', () {
-      final waypoint = waypointWith(ownerId: 'u1', type: 'generic');
-
-      final options = circleOptionsForWaypoint(waypoint);
-
-      expect(options.circleStrokeColor, '#FFFFFF');
-      expect(options.circleStrokeWidth, 1);
-    });
-
-    test('a custom color overrides the type color', () {
-      final waypoint = Waypoint(
-        id: 'w1',
-        orgId: 'o1',
-        ownerId: 'u1',
-        name: 'Summit',
-        type: 'danger',
-        note: null,
-        color: '#123456',
-        lat: 1.0,
-        lng: 2.0,
-        canEdit: true,
-        createdAt: DateTime.utc(2026, 8, 22),
-      );
-
-      final options = circleOptionsForWaypoint(waypoint);
-
-      expect(options.circleColor, '#123456');
-    });
-  });
-
-  testWidgets('opening the map loads the locally-stored icon assignments', (tester) async {
-    final iconStore = FakeWaypointIconStore()..icons.addAll({'w1': 'camp.png'});
-    final container = ProviderContainer(
-      overrides: _baseOverrides(iconStore: iconStore),
-    );
-    addTearDown(container.dispose);
-
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: const MaterialApp(home: MapScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    // The assignments are what decide circle-vs-symbol rendering, so they
-    // must be in state by the time the first sync runs. The rendering itself
-    // needs a real MapLibreMapController (none under flutter test, so
-    // _syncSymbols returns at its readiness guard) and is covered by manual
-    // device verification, same precedent as the other map render paths.
-    expect(container.read(waypointIconAssignmentsControllerProvider), {'w1': 'camp.png'});
-    expect(find.byType(MapScreen), findsOneWidget);
-  });
-
-  group('renderModeForWaypoint', () {
-    test('no assigned icon -> circle', () {
-      expect(renderModeForWaypoint(null), WaypointRenderMode.circle);
-    });
-
-    test('an assigned icon -> symbol', () {
-      expect(renderModeForWaypoint('camp.png'), WaypointRenderMode.symbol);
-    });
   });
 
   testWidgets('builds without throwing when the location source has no position available', (tester) async {

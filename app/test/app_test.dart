@@ -1,3 +1,4 @@
+import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/main.dart';
 import 'package:app/tracks/tracks_controller.dart';
@@ -8,10 +9,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'compass/fakes.dart';
+import 'landmarks/services/fixture.dart';
 import 'tracks/fakes.dart';
 import 'waypoints/fakes.dart';
 
 void main() {
+  // Карта рисует метки из индекса настоящих сервисов во временной папке.
+  late ServicesFixture fixture;
+  setUp(() async => fixture = await ServicesFixture.create());
+  tearDown(() => fixture.root.deleteSync(recursive: true));
+
   Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -19,6 +26,8 @@ void main() {
           waypointsRepositoryProvider.overrideWithValue(FakeWaypointsRepository()),
           tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
           compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
+          landmarkServicesProvider.overrideWithValue(fixture.services),
+          onScreenRegistryProvider.overrideWithValue(fixture.services.onScreen),
         ],
         child: const SabyrMapApp(),
       ),

@@ -1,4 +1,5 @@
 import 'package:app/app_icons.dart';
+import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
@@ -12,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../compass/fakes.dart';
+import '../landmarks/services/fixture.dart';
 import '../tracks/fakes.dart';
 import '../waypoints/fakes.dart';
 
@@ -23,6 +25,11 @@ class _MemoryStore implements MenuTogglesStore {
 }
 
 void main() {
+  // Карта рисует метки из индекса настоящих сервисов во временной папке.
+  late ServicesFixture fixture;
+  setUp(() async => fixture = await ServicesFixture.create());
+  tearDown(() => fixture.root.deleteSync(recursive: true));
+
   Future<void> pumpShell(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
@@ -31,6 +38,8 @@ void main() {
           tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
           compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
           menuTogglesStoreProvider.overrideWithValue(_MemoryStore()),
+          landmarkServicesProvider.overrideWithValue(fixture.services),
+          onScreenRegistryProvider.overrideWithValue(fixture.services.onScreen),
         ],
         child: const MaterialApp(home: HomeShell()),
       ),
