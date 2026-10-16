@@ -389,7 +389,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // rebuild on every frame it is only applied once it moved by 0.1 or more.
   void _onCameraMove(CameraPosition position) {
     ref.read(mapBearingProvider.notifier).update(position.bearing);
-    if (_autoDraw) _drawTrackTo(position);
+    if (_autoDraw && !_movingToTrackEnd) _drawTrackTo(position);
     _panelCenter.value = position.target;
     _liveCamera.value = position;
     if (!_mapBusy) {
@@ -629,7 +629,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     if (cut.end case final end?) {
       _editMode.execute(MoveTrackLocationCommand(segmentIndex: segment, index: cut.keep - 1, newLocation: end));
     }
+    // Прицел — на новый конец пути: продолжать можно сразу оттуда.
+    final last = _trackLocations.lastOrNull;
+    if (last != null) {
+      _movingToTrackEnd = true;
+      _controller
+          ?.moveCamera(CameraUpdate.newLatLng(LatLng(last.latitude, last.longitude)))
+          .whenComplete(() => _movingToTrackEnd = false);
+    }
   }
+
+  // Карту ведёт «Удалить», а не палец: путь за прицелом не чертится.
+  bool _movingToTrackEnd = false;
 
   void _onEditModeChanged() {
     if (!_drawingTrack && _autoDraw) _autoDraw = false;
@@ -644,7 +655,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final target = _editMode.state.target;
     if (target == null || !target.isNew) return null;
     final points = LandmarkLayer.drawnPoints(target.object);
-    return target.type == LandmarkType.set || points.isEmpty ? null : points.last;
+    // У набора отрезков нет; путь чертится за прицелом сам.
+    if (target.type == LandmarkType.set || target.type == LandmarkType.track) return null;
+    return points.isEmpty ? null : points.last;
   }
 
   Future<void> _syncDrawingLeg() async {
@@ -991,8 +1004,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             ),
           // Отрезок от последней точки до прицела: расстояние и азимут — в
           // постоянном месте слева сверху от прицела, меняется только текст.
-          // У пути — без цифр: он чертится за прицелом.
-          if (_legStart case final from? when !_drawingTrack)
+          if (_legStart case final from?)
             IgnorePointer(
               child: Center(
                 child: Transform.translate(
