@@ -4,6 +4,7 @@ import 'package:app/compass/compass_source.dart';
 import 'package:app/explorer/on_screen_landmarks_panel.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_bearing.dart';
+import 'package:app/map/screens/layers_panel.dart';
 import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/menu/menu_toggles.dart';
@@ -298,5 +299,20 @@ void main() {
     await tester.tap(find.byKey(const Key('nav_compass')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('orientation_panel')), findsOneWidget);
+  });
+
+  testWidgets('every sheet over the map is non-modal: «Карты на экране» too closes on a map drag', (tester) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const Key('nav_map')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Карты на экране'));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayersPanel), findsOneWidget);
+    // Барьер только у самого экрана — у шторки своего нет: карта под ней
+    // принимает касания.
+    expect(find.byType(ModalBarrier), findsOneWidget);
+    await tester.dragFrom(const Offset(200, 80), const Offset(0, 120));
+    await tester.pumpAndSettle();
+    expect(find.byType(LayersPanel), findsNothing);
   });
 }

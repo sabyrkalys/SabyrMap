@@ -17,16 +17,10 @@ class LayerOpacitySheet extends ConsumerStatefulWidget {
 
   final String sourceId;
 
-  static Future<void> show(BuildContext context, String sourceId) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.transparent,
-    builder: HomeNavScope.aboveSheet(
-      context,
-      (_) => LayerOpacitySheet(sourceId: sourceId),
-      background: onScreenPanelBackground,
-    ),
+  static Future<void> show(BuildContext context, String sourceId) => HomeNavScope.showSheet(
+    context,
+    (_) => LayerOpacitySheet(sourceId: sourceId),
+    background: onScreenPanelBackground,
   );
 
   @override

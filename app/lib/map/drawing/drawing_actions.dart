@@ -105,14 +105,10 @@ Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
   };
   if (waypoints.isEmpty) return;
   final focus = ref.read(mapFocusProvider.notifier);
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: HomeNavScope.aboveSheet(
-      context,
-      background: Theme.of(context).colorScheme.surfaceContainerLow,
-      (context) => SafeArea(
+  await HomeNavScope.showSheet(
+    context,
+    background: Theme.of(context).colorScheme.surfaceContainerLow,
+    (context) => SafeArea(
       child: ListView(
         key: const Key('set_points_sheet'),
         shrinkWrap: true,
@@ -130,13 +126,17 @@ Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
             ),
         ],
       ),
-    ),)
+    ),
   );
 }
 
 /// Метаданные набора (или маршрута, [type]) из его диалога; пустое имя —
 /// следующий «Набор точек N» / «Маршрут N» среди [existingNames].
-LandmarkMetadata setMetadata(WaypointData data, Iterable<String> existingNames, {LandmarkType type = LandmarkType.set}) {
+LandmarkMetadata setMetadata(
+  WaypointData data,
+  Iterable<String> existingNames, {
+  LandmarkType type = LandmarkType.set,
+}) {
   String? text(String? value) => value == null || value.trim().isEmpty ? null : value.trim();
   final name = text(data.name) ?? nextDrawingName(type, existingNames);
   return LandmarkMetadata(
@@ -188,9 +188,8 @@ Future<String?> finishDrawing(BuildContext context, LandmarkServices services) a
   if (given != null && given.trim().isNotEmpty) return _save(editMode, messenger, given);
   final name = await showDialog<String>(
     context: context,
-    builder: (context) => _NameDialog(
-      initial: nextDrawingName(target.type, services.index.byType(target.type).map((i) => i.name)),
-    ),
+    builder: (context) =>
+        _NameDialog(initial: nextDrawingName(target.type, services.index.byType(target.type).map((i) => i.name))),
   );
   if (name == null) return null;
   editMode.execute(UpdateMetadataCommand(patch: MetadataPatch(set: {LandmarkMetadata.nameKey: name})));

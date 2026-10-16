@@ -209,12 +209,7 @@ class FavoriteMapMenu extends ConsumerWidget {
   final VoidCallback? onApplied;
 
   static Future<void> show(BuildContext context, MapSource source, {VoidCallback? onApplied}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: HomeNavScope.aboveSheet(context, (_) => FavoriteMapMenu(source: source, onApplied: onApplied)),
-      );
+      HomeNavScope.showSheet(context, (_) => FavoriteMapMenu(source: source, onApplied: onApplied));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -259,12 +254,7 @@ class FavoriteSetContextMenu extends ConsumerWidget {
   final VoidCallback? onApplied;
 
   static Future<void> show(BuildContext context, MapPreset preset, {VoidCallback? onApplied}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: HomeNavScope.aboveSheet(context, (_) => FavoriteSetContextMenu(preset: preset, onApplied: onApplied)),
-      );
+      HomeNavScope.showSheet(context, (_) => FavoriteSetContextMenu(preset: preset, onApplied: onApplied));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

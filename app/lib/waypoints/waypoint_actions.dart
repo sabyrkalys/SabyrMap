@@ -14,42 +14,45 @@ import 'waypoint_types.dart';
 Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, LandmarkItem item) async {
   final type = item.kind ?? defaultWaypointType;
   final note = item.description;
-  final action = await showModalBottomSheet<String>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: HomeNavScope.aboveSheet(
-      context,
-      background: Theme.of(context).colorScheme.surfaceContainerLow,
-      (context) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(item.name, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(waypointTypeLabels[type] ?? type),
-            if (note != null && note.isNotEmpty) ...[const SizedBox(height: 8), Text(note)],
-            if (!item.isNested) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  TextButton(
-                    key: const Key('waypoint_edit_button'),
-                    onPressed: () => Navigator.of(context).pop('edit'),
-                    child: const Text('Изменить'),
-                  ),
-                  TextButton(
-                    key: const Key('waypoint_delete_button'),
-                    onPressed: () => Navigator.of(context).pop('delete'),
-                    child: const Text('Удалить'),
-                  ),
-                ],
-              ),
-            ],
+  // Шторка немодальная: выбранная кнопка запоминается до её закрытия.
+  String? action;
+  await HomeNavScope.showSheet(
+    context,
+    background: Theme.of(context).colorScheme.surfaceContainerLow,
+    (context) => Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.name, style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 4),
+          Text(waypointTypeLabels[type] ?? type),
+          if (note != null && note.isNotEmpty) ...[const SizedBox(height: 8), Text(note)],
+          if (!item.isNested) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                TextButton(
+                  key: const Key('waypoint_edit_button'),
+                  onPressed: () {
+                    action = 'edit';
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Изменить'),
+                ),
+                TextButton(
+                  key: const Key('waypoint_delete_button'),
+                  onPressed: () {
+                    action = 'delete';
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text('Удалить'),
+                ),
+              ],
+            ),
           ],
-        ),
+        ],
       ),
     ),
   );

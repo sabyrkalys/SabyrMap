@@ -31,13 +31,7 @@ class LayerContextMenu extends ConsumerWidget {
   final bool fromPanel;
 
   static Future<void> show(BuildContext context, String sourceId, {bool fromPanel = false}) =>
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black12,
-        builder: HomeNavScope.aboveSheet(context, (_) => LayerContextMenu(sourceId: sourceId, fromPanel: fromPanel)),
-      );
+      HomeNavScope.showSheet(context, (_) => LayerContextMenu(sourceId: sourceId, fromPanel: fromPanel));
 
   bool get _isBase => sourceId == baseId;
 

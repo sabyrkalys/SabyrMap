@@ -7,13 +7,7 @@ const Color _secondary = Color(0xFF757575);
 
 /// Открывает экран вида слоя (цвет, удаление цвета) внизу поверх карты:
 /// карта над ним видна и меняется сразу.
-Future<void> showLookPanel(BuildContext context, Widget panel) => showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Colors.transparent,
-      builder: HomeNavScope.aboveSheet(context, (_) => panel),
-    );
+Future<void> showLookPanel(BuildContext context, Widget panel) => HomeNavScope.showSheet(context, (_) => panel);
 
 /// Серая плашка экрана: иконка, «Название · слой», ?, 🔧, разделитель, ✓.
 class LookAppBar extends StatelessWidget {

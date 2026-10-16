@@ -212,7 +212,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _landmarkIndex = ref.read(landmarkServicesProvider).index..addListener(_onLandmarksChanged);
     _editMode = ref.read(landmarkServicesProvider).editMode..addListener(_onEditModeChanged);
     _mapBearing = ref.read(mapBearingProvider.notifier);
-    // Кнопки карты над шторками (HomeNavScope.aboveSheet).
+    // Кнопки карты над шторками (HomeNavScope.showSheet).
     MapSideButtons.builder = (_) => Consumer(
       builder: (context, ref, _) => _mapButtons(ref.watch(mapLayersProvider.select((state) => state.orthophotosOn))),
     );

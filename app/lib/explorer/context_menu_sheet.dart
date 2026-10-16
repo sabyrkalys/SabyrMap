@@ -38,19 +38,9 @@ class ContextMenuSheet extends StatefulWidget {
     required Object env,
     required String keyPrefix,
     Key? key,
-  }) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: HomeNavScope.aboveSheet(context, (_) => ContextMenuSheet(
-      key: key,
-      title: title,
-      sections: sections,
-      env: env,
-      origin: context,
-      keyPrefix: keyPrefix,
-    )),
+  }) => HomeNavScope.showSheet(
+    context,
+    (_) => ContextMenuSheet(key: key, title: title, sections: sections, env: env, origin: context, keyPrefix: keyPrefix),
   );
 
   @override
