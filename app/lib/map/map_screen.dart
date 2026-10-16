@@ -10,7 +10,8 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import '../app/landmark_services_provider.dart';
 import '../explorer/item_menu/item_context_menu.dart';
 import '../landmarks/index/landmark_index.dart';
-import '../landmarks/models/landmark_type.dart';
+import '../landmarks/composite/edit_mode/edit_mode_controller.dart';
+import '../landmarks/models/landmark_file.dart';
 import '../landmarks/on_screen/on_screen_registry.dart';
 import '../config.dart';
 import '../icons/icon_image_cache.dart';
@@ -19,6 +20,8 @@ import 'attribution_bar.dart';
 import 'models/map_models.dart';
 import 'catalog/catalog_repository.dart';
 import 'crosshair_menu.dart';
+import 'drawing/drawing_actions.dart';
+import 'drawing/drawing_bar.dart';
 import 'info_panel.dart';
 import 'landmark_layer.dart';
 import 'map_camera_store.dart';
@@ -46,8 +49,6 @@ import '../tracks/track_recording_controller.dart';
 import '../tracks/tracks_controller.dart';
 import '../tracks/tracks_visibility_controller.dart';
 import '../waypoints/waypoint_actions.dart';
-import '../waypoints/new_marker/marker_type.dart';
-import '../waypoints/new_marker/new_marker_sheet.dart';
 import '../waypoints/waypoint_create_action.dart';
 
 const String _recordingLineKey = '__recording__';
@@ -74,6 +75,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   LandmarkLayer? _landmarkLayer;
   bool _landmarksDirty = true;
   late final LandmarkIndex _landmarkIndex;
+
+  // Рисование нового маршрута или области: панель над картой, точки — в
+  // прицел, черновик — своим источником LandmarkLayer.
+  late final EditModeController _editMode;
 
   final Map<String, Line> _linesByTrackId = {};
   // A cheap "did this actually change" key per line id, so _syncLines only
@@ -157,6 +162,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _recordingController = ref.read(trackRecordingControllerProvider.notifier);
     _onScreen = ref.read(onScreenRegistryProvider)..addListener(_onLandmarksChanged);
     _landmarkIndex = ref.read(landmarkServicesProvider).index..addListener(_onLandmarksChanged);
+    _editMode = ref.read(landmarkServicesProvider).editMode..addListener(_onEditModeChanged);
     _loadSavedCamera();
     _loadMyLocation();
   }
@@ -209,6 +215,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void dispose() {
     _onScreen.removeListener(_onLandmarksChanged);
     _landmarkIndex.removeListener(_onLandmarksChanged);
+    _editMode.removeListener(_onEditModeChanged);
     // trackRecordingControllerProvider is a root-scope, non-autoDispose
     // provider: it survives MapScreen being swapped out (e.g. on logout),
     // so without this the geolocator stream would keep appending points in
@@ -364,6 +371,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final (position, time) = down;
     if ((event.position - position).distance > kTouchSlop) return;
     if (event.timeStamp - time > _crosshairTapTimeout) return;
+    // Пока рисуется маршрут или область, нажатие на прицел ставит точку.
+    if (_drawing) {
+      _addDrawingPoint();
+      return;
+    }
     ref.read(crosshairMenuOpenProvider.notifier).toggle();
   }
 
@@ -477,9 +489,33 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     try {
       await _landmarkLayer?.attach();
     } catch (_) {}
+    unawaited(_syncDraft());
     _maybeCenterCamera();
     _requestSync();
     _syncTarget();
+  }
+
+  /// Рисуется новый маршрут или область (не правка существующего).
+  bool get _drawing => _editMode.state.target?.isNew ?? false;
+
+  void _onEditModeChanged() {
+    if (mounted) setState(() {});
+    unawaited(_syncDraft());
+  }
+
+  Future<void> _syncDraft() async {
+    try {
+      await _landmarkLayer?.updateDraft(_drawing ? _editMode.state.target!.object : null);
+    } catch (_) {
+      // Карта ещё не готова: черновик поставит следующая загрузка стиля.
+    }
+  }
+
+  /// Точка в прицел — та, что под ним сейчас, а не при последней остановке.
+  void _addDrawingPoint() {
+    final center = _controller?.cameraPosition?.target ?? ref.read(mapCrosshairProvider);
+    if (center == null) return;
+    _editMode.addPoint(LandmarkLocation(latitude: center.latitude, longitude: center.longitude));
   }
 
   void _onLandmarksChanged() {
@@ -858,7 +894,38 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ),
-          if (menuOpen) ...[
+          if (_drawing)
+            Positioned(
+              top: 0,
+              left: 12,
+              right: 12,
+              // Под панелью X/Y: координаты точки в прицеле видны.
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 84),
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 480),
+                      child: DrawingBar(
+                        type: _editMode.state.target!.type,
+                        pointCount: _editMode.pointCount,
+                        canUndo: _editMode.canUndo,
+                        canRedo: _editMode.canRedo,
+                        canFinish: _editMode.canFinish,
+                        onAddPoint: _addDrawingPoint,
+                        onUndo: _editMode.undo,
+                        onRedo: _editMode.redo,
+                        onFinish: () => finishDrawing(context, ref.read(landmarkServicesProvider)),
+                        onCancel: () => cancelDrawing(context, ref.read(landmarkServicesProvider)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (menuOpen && !_drawing) ...[
             Positioned.fill(
               child: GestureDetector(
                 key: const Key('crosshair_menu_barrier'),
@@ -908,16 +975,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       sk42: ref.read(menuTogglesProvider)[MenuToggle.settingsSk42Grid]!,
                     );
                   },
-                  onNewWaypoint: () async {
+                  onNewWaypoint: () {
                     ref.read(crosshairMenuOpenProvider.notifier).close();
-                    final type = await showNewMarkerSheet(context);
-                    if (type == null || !context.mounted) return;
-                    if (type.id == MarkerTypeIds.waypoint) {
-                      await createWaypointAtCrosshair(context, ref, iconScanner: _iconLibraryScanner);
-                    } else {
-                      // The other types come in a later iteration.
-                      debugPrint('Selected: ${type.id}');
-                    }
+                    openNewMarker(context, ref, iconScanner: _iconLibraryScanner);
                   },
                 ),
               ),

@@ -1,7 +1,7 @@
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../landmarks/map_data/landmark_features.dart';
-import '../landmarks/models/landmark_type.dart';
+import '../landmarks/models/landmark_file.dart';
 import '../waypoints/waypoint_types.dart';
 
 /// Значок метки для карты: файл из библиотеки и цвет → имя картинки,
@@ -40,6 +40,16 @@ class LandmarkLayer {
   static const String iconLayerId = 'landmarks-icon';
   static const String labelLayerId = 'landmarks-label';
 
+  /// Рисуемый сейчас маршрут или область ([updateDraft]) — свой источник
+  /// поверх всех меток.
+  static const String draftSourceId = 'landmarks-draft';
+  static const String draftFillLayerId = 'landmarks-draft-fill';
+  static const String draftLineLayerId = 'landmarks-draft-line';
+  static const String draftVertexLayerId = 'landmarks-draft-vertex';
+
+  /// Цвет рисуемого объекта: виден на снимках и не путается с метками.
+  static const String draftColor = '#FF6D00';
+
   /// Слои, по которым нажатие находит метку.
   static const Set<String> tappableLayerIds = {fillLayerId, lineLayerId, dotLayerId, iconLayerId, labelLayerId};
 
@@ -63,6 +73,9 @@ class LandmarkLayer {
     dotLayerId,
     iconLayerId,
     labelLayerId,
+    draftFillLayerId,
+    draftLineLayerId,
+    draftVertexLayerId,
   ];
 
   /// Источник и слои — после загрузки стиля. Повторный вызов на том же
@@ -86,8 +99,12 @@ class LandmarkLayer {
     for (final id in layerIds.reversed) {
       if (existing.contains(id)) await _controller.removeLayer(id);
     }
-    if ((await _controller.getSourceIds()).contains(sourceId)) await _controller.removeSource(sourceId);
+    final sources = await _controller.getSourceIds();
+    for (final id in [sourceId, draftSourceId]) {
+      if (sources.contains(id)) await _controller.removeSource(id);
+    }
     await _controller.addGeoJsonSource(sourceId, LandmarkFeatures.collection(const []));
+    await _controller.addGeoJsonSource(draftSourceId, LandmarkFeatures.collection(const []));
     List<Object> role(FeatureRole r) => ['==', ['get', 'role'], r.name];
     const hasIcon = ['has', 'icon_image'];
     final dot = ['all', role(FeatureRole.point), ['!', hasIcon]];
@@ -162,6 +179,39 @@ class LandmarkLayer {
       ),
       filter: role(FeatureRole.label),
     );
+    await _controller.addFillLayer(
+      draftSourceId,
+      draftFillLayerId,
+      const FillLayerProperties(fillColor: draftColor, fillOpacity: 0.2),
+      filter: role(FeatureRole.fill),
+      enableInteraction: false,
+    );
+    await _controller.addLineLayer(
+      draftSourceId,
+      draftLineLayerId,
+      const LineLayerProperties(
+        lineColor: draftColor,
+        lineWidth: 3,
+        lineCap: 'round',
+        lineJoin: 'round',
+        lineDasharray: [2, 1],
+      ),
+      filter: role(FeatureRole.line),
+      enableInteraction: false,
+    );
+    // Последняя точка крупнее: от неё пойдёт следующий отрезок.
+    await _controller.addCircleLayer(
+      draftSourceId,
+      draftVertexLayerId,
+      const CircleLayerProperties(
+        circleRadius: ['case', ['get', 'last'], 7, 5],
+        circleColor: '#FFFFFF',
+        circleStrokeColor: draftColor,
+        circleStrokeWidth: 2,
+      ),
+      filter: role(FeatureRole.point),
+      enableInteraction: false,
+    );
     _attached = style == _style;
   }
 
@@ -187,6 +237,34 @@ class LandmarkLayer {
     final prepared = prepare(features, (icon, color) => images['$icon|$color']);
     await _controller.setGeoJsonSource(sourceId, LandmarkFeatures.collection(prepared.features));
     _paths = prepared.paths;
+  }
+
+  /// Рисуемый объект [object] — на карту; null — убрать.
+  Future<void> updateDraft(LandmarkObject? object) async {
+    if (!_attached) return;
+    await _controller.setGeoJsonSource(draftSourceId, LandmarkFeatures.collection(draftFeatures(object)));
+  }
+
+  /// Рисуемый маршрут или область: линия по точкам (у области — замкнутая,
+  /// с заливкой от трёх точек) и сами точки, последняя — с `last`.
+  static List<Map<String, dynamic>> draftFeatures(LandmarkObject? object) {
+    final points = switch (object) {
+      RouteObject(:final waypoints) || SetObject(:final waypoints) => [for (final w in waypoints) w.location],
+      TrackObject(:final segments) => [for (final s in segments) ...s.locations],
+      AreaObject(:final polygons) => polygons.isEmpty ? const <LandmarkLocation>[] : polygons.first.outline,
+      _ => const <LandmarkLocation>[],
+    };
+    final closed = object is AreaObject && points.length >= 3;
+    final ring = [for (final l in points) [l.longitude, l.latitude]];
+    Map<String, dynamic> feature(Map<String, dynamic> geometry, FeatureRole role, [Map<String, dynamic> extra = const {}]) =>
+        {'type': 'Feature', 'geometry': geometry, 'properties': {'role': role.name, ...extra}};
+    return [
+      if (closed) feature({'type': 'Polygon', 'coordinates': [[...ring, ring.first]]}, FeatureRole.fill),
+      if (points.length >= 2 && object is! SetObject)
+        feature({'type': 'LineString', 'coordinates': [...ring, if (closed) ring.first]}, FeatureRole.line),
+      for (final (i, c) in ring.indexed)
+        feature({'type': 'Point', 'coordinates': c}, FeatureRole.point, {'last': i == ring.length - 1}),
+    ];
   }
 
   /// Путь метки по нажатию: [featureId] и [layerId] из onFeatureTapped;

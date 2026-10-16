@@ -19,6 +19,8 @@ class MarkerType {
 /// Ids the map screen acts on; the other types are not implemented yet.
 abstract final class MarkerTypeIds {
   static const waypoint = 'waypoint';
+  static const route = 'route';
+  static const area = 'area';
 }
 
 /// Everything the sheet lists, in display order. Material Icons in their
@@ -41,7 +43,7 @@ const List<MarkerType> markerTypes = [
     category: MarkerCategory.local,
   ),
   MarkerType(
-    id: 'route',
+    id: MarkerTypeIds.route,
     title: 'Маршрут',
     subtitle: 'Проложить маршрут на карте по заданным точкам.',
     icon: Icons.route_sharp,
@@ -55,7 +57,7 @@ const List<MarkerType> markerTypes = [
     category: MarkerCategory.local,
   ),
   MarkerType(
-    id: 'area',
+    id: MarkerTypeIds.area,
     title: 'Область',
     subtitle: 'Начертить область на карте.',
     icon: Icons.pentagon_outlined,

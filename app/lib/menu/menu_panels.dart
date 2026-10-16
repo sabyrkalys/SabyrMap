@@ -10,7 +10,7 @@ import '../map/screens/on_screen/favorite_sets_section.dart';
 import '../tracks/track_recording_actions.dart';
 import '../tracks/track_recording_controller.dart';
 import '../app/landmark_services_provider.dart';
-import '../waypoints/waypoint_create_action.dart';
+import '../map/drawing/drawing_actions.dart';
 import 'menu_toggles.dart';
 import 'menu_widgets.dart';
 
@@ -152,7 +152,7 @@ class _WaypointsPanel extends ConsumerWidget {
         MenuListItem(
           icon: AppIcons.flagPlus,
           label: 'Новая метка',
-          onTap: () => createWaypointAtCrosshair(context, ref),
+          onTap: () => openNewMarker(context, ref, onDrawingStarted: onClose),
         ),
         const MenuListItem(icon: AppIcons.search, label: 'Поиск на карте'),
       ],
