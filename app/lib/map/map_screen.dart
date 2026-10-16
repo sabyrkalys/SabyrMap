@@ -955,16 +955,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: SizedBox(
                   width: 48,
                   height: 48,
-                  // A bright white 8 dp dot in a 2 dp dark border.
+                  // A white dot 6 dp across, its 1 dp dark border included.
                   child: Center(
                     child: Container(
                       key: const Key('map_crosshair'),
-                      width: 12,
-                      height: 12,
+                      width: 6,
+                      height: 6,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white,
-                        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 2),
+                        border: Border.all(color: Theme.of(context).colorScheme.onSurface, width: 1),
                       ),
                     ),
                   ),

@@ -76,4 +76,9 @@ void main() {
       expect(_props(prepared.features.single).containsKey('icon_image'), isFalse);
     });
   });
+
+  test('a tap on the larger invisible circle under a point finds the point', () {
+    expect(LandmarkLayer.tappableLayerIds, contains(LandmarkLayer.hitLayerId));
+    expect(LandmarkLayer.layerIds, contains(LandmarkLayer.hitLayerId));
+  });
 }

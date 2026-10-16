@@ -233,15 +233,15 @@ void main() {
     expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).onMapClick, isNull);
   });
 
-  testWidgets('the crosshair is a white 8 dp dot in a 2 dp dark border', (tester) async {
+  testWidgets('the crosshair is a white dot 6 dp across, in a 1 dp dark border', (tester) async {
     await pumpMap(tester);
     final dot = tester.widget<Container>(find.byKey(const Key('map_crosshair')));
     final decoration = dot.decoration! as BoxDecoration;
     expect(decoration.color, Colors.white);
     final border = decoration.border! as Border;
-    expect(border.top.width, 2);
+    expect(border.top.width, 1);
     expect(border.top.color, Theme.of(tester.element(find.byKey(const Key('map_crosshair')))).colorScheme.onSurface);
-    expect(tester.getSize(find.byKey(const Key('map_crosshair'))), const Size(12, 12));
+    expect(tester.getSize(find.byKey(const Key('map_crosshair'))), const Size(6, 6));
   });
 
   testWidgets('distance label follows «Статус цели»', (tester) async {

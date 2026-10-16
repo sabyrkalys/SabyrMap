@@ -37,6 +37,10 @@ class LandmarkLayer {
   static const String lineLayerId = 'landmarks-line';
   static const String haloLayerId = 'landmarks-halo';
   static const String dotLayerId = 'landmarks-dot';
+
+  /// Невидимый круг побольше под каждой точкой: по кружку в 6 dp пальцем
+  /// не попасть.
+  static const String hitLayerId = 'landmarks-hit';
   static const String iconLayerId = 'landmarks-icon';
   static const String labelLayerId = 'landmarks-label';
 
@@ -51,7 +55,17 @@ class LandmarkLayer {
   static const String draftColor = '#FF6D00';
 
   /// Слои, по которым нажатие находит метку.
-  static const Set<String> tappableLayerIds = {fillLayerId, lineLayerId, dotLayerId, iconLayerId, labelLayerId};
+  static const Set<String> tappableLayerIds = {
+    fillLayerId,
+    lineLayerId,
+    dotLayerId,
+    hitLayerId,
+    iconLayerId,
+    labelLayerId,
+  };
+
+  /// Диаметр кружка точки вместе с белой обводкой, dp.
+  static const double dotDiameter = 6;
 
   /// Шрифт надписей: есть на сервере глифов ([LayerManager.glyphsUrl]).
   static const List<String> labelFont = ['Noto Sans Regular'];
@@ -71,6 +85,7 @@ class LandmarkLayer {
     lineLayerId,
     haloLayerId,
     dotLayerId,
+    hitLayerId,
     iconLayerId,
     labelLayerId,
     draftFillLayerId,
@@ -133,20 +148,27 @@ class LandmarkLayer {
     await _controller.addCircleLayer(
       sourceId,
       haloLayerId,
-      const CircleLayerProperties(circleRadius: 14, circleColor: '#FFFFFF', circleOpacity: 0.55, circleBlur: 0.7),
+      const CircleLayerProperties(circleRadius: 6, circleColor: '#FFFFFF', circleOpacity: 0.55, circleBlur: 0.7),
       filter: dot,
       enableInteraction: false,
     );
     await _controller.addCircleLayer(
       sourceId,
       dotLayerId,
+      // Радиус 2.5 и обводка 0.5 — вместе [dotDiameter].
       const CircleLayerProperties(
-        circleRadius: 8,
+        circleRadius: 2.5,
         circleColor: color,
         circleStrokeColor: '#FFFFFF',
-        circleStrokeWidth: 1,
+        circleStrokeWidth: 0.5,
       ),
       filter: dot,
+    );
+    await _controller.addCircleLayer(
+      sourceId,
+      hitLayerId,
+      const CircleLayerProperties(circleRadius: 12, circleColor: '#000000', circleOpacity: 0),
+      filter: role(FeatureRole.point),
     );
     // Все картинки значков одного размера (kIconLogicalSize в пикселях
     // экрана) — масштаб один на всех. Значки не прячутся друг за другом и
@@ -204,10 +226,10 @@ class LandmarkLayer {
       draftSourceId,
       draftVertexLayerId,
       const CircleLayerProperties(
-        circleRadius: ['case', ['get', 'last'], 7, 5],
+        circleRadius: ['case', ['get', 'last'], 3, 2],
         circleColor: '#FFFFFF',
         circleStrokeColor: draftColor,
-        circleStrokeWidth: 2,
+        circleStrokeWidth: 1,
       ),
       filter: role(FeatureRole.point),
       enableInteraction: false,
