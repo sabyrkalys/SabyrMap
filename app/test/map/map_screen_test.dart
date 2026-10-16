@@ -360,6 +360,11 @@ void main() {
     expect(consumed, [AnnotationType.fill]);
   });
 
+  testWidgets("MapLibre's own compass is off: the menu compass with a lock turns the map north", (tester) async {
+    await pumpMap(tester);
+    expect(tester.widget<MapLibreMap>(find.byType(MapLibreMap)).compassEnabled, isFalse);
+  });
+
   testWidgets('the map is capped at zoom 22 and the old coordinate HUD is gone', (tester) async {
     await pumpMap(tester);
     final map = tester.widget<MapLibreMap>(find.byType(MapLibreMap));

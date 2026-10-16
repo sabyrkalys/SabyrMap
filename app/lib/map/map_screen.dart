@@ -845,8 +845,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             // AttributionButton replaces it.
             attributionButtonPosition: AttributionButtonPosition.bottomRight,
             attributionButtonMargins: const Point(-200, -200),
-            compassViewPosition: CompassViewPosition.topRight,
-            compassViewMargins: const Point(4, AttributionButton.hitSize),
+            // Свой компас MapLibre не нужен: повёрнутую карту на север
+            // возвращает компас с замком в нижнем меню.
+            compassEnabled: false,
           ),
           if (_mapBusy && toggles[MenuToggle.mapsLoadingIndicators]!)
             const Positioned(
@@ -931,8 +932,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           // Required by the map providers. At the right screen edge, level
           // with the bottom nav: under extendBody the bottom padding is the
           // nav panel (60 dp) plus the system bar.
-          // Источники карт — маленькой (i) в верхнем правом углу; компас
-          // MapLibre сдвинут под неё.
+          // Источники карт — маленькой (i) в верхнем правом углу.
           Positioned(
             top: MediaQuery.paddingOf(context).top,
             right: MediaQuery.paddingOf(context).right,
