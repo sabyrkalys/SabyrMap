@@ -37,12 +37,8 @@ String formatClock(DateTime? local) {
 }
 
 Future<void> showPointInfoSheet(BuildContext context, {required LatLng point, required bool sk42}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: Colors.transparent,
-    isScrollControlled: true,
-    builder: HomeNavScope.aboveSheet(context, (_) => PointInfoSheet(point: point, sk42: sk42, now: DateTime.now())),
-  );
+  // Немодальная шторка над картой: меню над ней, карта под ней живая.
+  return HomeNavScope.showSheet(context, (_) => PointInfoSheet(point: point, sk42: sk42, now: DateTime.now()));
 }
 
 /// ИНФОРМАЦИЯ: details about one point (the spot under the crosshair).

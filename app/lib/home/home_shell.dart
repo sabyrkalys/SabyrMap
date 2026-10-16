@@ -28,6 +28,77 @@ class _HomeShellState extends State<HomeShell> {
 
   MenuTab? _openTab;
 
+  // Немодальная шторка над картой (HomeNavScope.showSheet) — в Scaffold:
+  // карта под ней принимает касания.
+  final _scaffold = GlobalKey<ScaffoldState>();
+  PersistentBottomSheetController? _sheet;
+
+  Future<void> _openSheet(WidgetBuilder builder) {
+    _sheet?.close();
+    final container = ProviderScope.containerOf(context, listen: false);
+    final controller = _scaffold.currentState!.showBottomSheet(
+      (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Меню слева, кнопки карты справа — как над шторкой набора точек.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: MediaQuery.removePadding(
+                  context: sheetContext,
+                  removeBottom: true,
+                  child: _BottomNav(
+                    destinations: _destinations,
+                    selectedIndex: null,
+                    onSelected: (index) {
+                      _sheet?.close();
+                      _onNavSelected(index);
+                    },
+                  ),
+                ),
+              ),
+              if (MapSideButtons.builder case final buttons?)
+                Padding(padding: const EdgeInsets.only(right: 16), child: buttons(sheetContext)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Flexible(child: builder(sheetContext)),
+        ],
+      ),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      enableDrag: false,
+    );
+    setState(() {
+      _sheet = controller;
+      _openTab = null;
+    });
+    container.read(mapSheetOpenProvider.notifier).set(true);
+    return controller.closed.whenComplete(() {
+      if (!identical(_sheet, controller)) return;
+      _sheet = null;
+      if (mounted) setState(() {});
+      container.read(mapSheetOpenProvider.notifier).set(false);
+    });
+  }
+
+  @override
+  void dispose() {
+    HomeNavScope.current = null;
+    super.dispose();
+  }
+
+  bool _isMapOnTop() => mounted && (ModalRoute.of(context)?.isCurrent ?? true);
+
+  void _closeSheetOnMapTouch(PointerDownEvent event) {
+    final sheet = _sheet;
+    if (sheet == null) return;
+    MapTouchGuard.consume(event.pointer);
+    sheet.close();
+  }
+
   static const _destinations = [
     _NavDestination(key: Key('nav_settings'), icon: AppIcons.peakMark, label: 'Настройки'),
     _NavDestination(key: Key('nav_map'), icon: AppIcons.map, label: 'Карты'),
@@ -62,21 +133,30 @@ class _HomeShellState extends State<HomeShell> {
           if (!didPop) setState(() => _openTab = null);
         },
         child: Scaffold(
+          key: _scaffold,
           // The nav panel is half transparent and doesn't span the full width,
           // so the map must continue underneath it.
           extendBody: true,
           // Builder: the extendBody bottom padding only exists below the Scaffold.
           // Шторки над картой ставят это меню над собой (HomeNavScope).
-          body: HomeNavScope(
+          body: HomeNavScope.current = HomeNavScope(
             buildNav: (onSelected) =>
                 _BottomNav(destinations: _destinations, selectedIndex: null, onSelected: onSelected),
             select: _onNavSelected,
+            openSheet: _openSheet,
+            isMapOnTop: _isMapOnTop,
             child: Builder(
               builder: (context) {
                 final padding = MediaQuery.paddingOf(context);
                 return Stack(
                   children: [
-                    const MapScreen(),
+                    // Касание карты закрывает немодальную шторку и тут же
+                    // двигает карту (Listener не забирает касание).
+                    Listener(
+                      behavior: HitTestBehavior.translucent,
+                      onPointerDown: _closeSheetOnMapTouch,
+                      child: const MapScreen(),
+                    ),
                     // Режим сравнения слоёв: панель над нижним меню.
                     Positioned(
                       left: 0,
@@ -140,6 +220,8 @@ class _HomeShellState extends State<HomeShell> {
                     selectedIndex: openTab?.index,
                     onSelected: _onNavSelected,
                   );
+                  // Шторка над картой: меню — её часть, над ней.
+                  if (_sheet != null) return const SizedBox.shrink();
                   if (!SetPanel.isActive(editMode)) return nav;
                   // Меню — над шторкой: она сама отступает от системных
                   // кнопок, меню — нет.

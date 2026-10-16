@@ -234,15 +234,15 @@ void main() {
     await tester.tap(find.text('Метки на экране'));
     await tester.pumpAndSettle();
 
+    // Меню одно — над шторкой (внизу его нет), шторка у нижнего края.
     final sheetNav = find.byKey(const Key('bottom_nav'));
-    // Два меню: под шторкой (в HomeShell) и над ней — то, что над ней, выше.
-    expect(sheetNav, findsNWidgets(2));
+    expect(sheetNav, findsOneWidget);
     final panelTop = tester.getTopLeft(find.byType(OnScreenLandmarksPanel)).dy;
     expect(tester.getBottomLeft(sheetNav.last).dy, lessThanOrEqualTo(panelTop));
-    // Кнопки «+» и «−» — тоже над шторкой.
+    // Кнопки «+» и «−» — тоже только над шторкой.
     final zoomIn = find.byKey(const Key('zoom_in_button'));
-    expect(zoomIn, findsNWidgets(2));
-    expect(tester.getBottomLeft(zoomIn.last).dy, lessThanOrEqualTo(panelTop));
+    expect(zoomIn, findsOneWidget);
+    expect(tester.getBottomLeft(zoomIn).dy, lessThanOrEqualTo(panelTop));
 
     await tester.tap(find.descendant(of: sheetNav.last, matching: find.byKey(const Key('nav_map'))));
     await tester.pumpAndSettle();
@@ -258,12 +258,12 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(OnScreenLandmarksPanel), findsOneWidget);
 
-    await tester.dragFrom(
-      tester.getTopLeft(find.byKey(const Key('sheet_map_area'))) + const Offset(200, 80),
-      const Offset(0, 120),
-    );
+    // Шторка немодальная: касание карты над ней доходит до карты и
+    // закрывает шторку.
+    await tester.dragFrom(const Offset(200, 80), const Offset(0, 120));
     await tester.pumpAndSettle();
     expect(find.byType(OnScreenLandmarksPanel), findsNothing);
+    expect(find.byKey(const Key('bottom_nav')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('nav_map')));
     await tester.pumpAndSettle();

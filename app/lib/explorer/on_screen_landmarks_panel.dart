@@ -31,14 +31,9 @@ import 'ldk/ldk_create_dialog.dart';
 class OnScreenLandmarksPanel extends ConsumerStatefulWidget {
   const OnScreenLandmarksPanel({super.key});
 
-  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black12,
-    // Главное меню — над шторкой.
-    builder: HomeNavScope.aboveSheet(context, (_) => const OnScreenLandmarksPanel()),
-  );
+  // Немодальная шторка над картой: меню над ней, карта под ней живая.
+  static Future<void> show(BuildContext context) =>
+      HomeNavScope.showSheet(context, (_) => const OnScreenLandmarksPanel());
 
   /// Файлы меток (с подпапками, без объектов внутри `.ldk`), что на экране.
   static List<LandmarkItem> itemsOf(LandmarkServices services, OnScreenRegistry onScreen) => [

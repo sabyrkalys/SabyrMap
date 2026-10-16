@@ -54,14 +54,8 @@ class LayersPanel extends ConsumerWidget {
   /// Показывается, пока базовая карта не выбрана: карта стартует с неё.
   static const String defaultBaseId = CatalogRepository.defaultBaseSourceId;
 
-  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black12,
-    // Главное меню — над шторкой.
-    builder: HomeNavScope.aboveSheet(context, (_) => const LayersPanel()),
-  );
+  // Немодальная шторка над картой: меню над ней, карта под ней живая.
+  static Future<void> show(BuildContext context) => HomeNavScope.showSheet(context, (_) => const LayersPanel());
 
   /// Панель прячется, пока открыта шторка непрозрачности (карта видна
   /// целиком), и возвращается, когда шторку закрыли.

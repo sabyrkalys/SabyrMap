@@ -1058,8 +1058,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             right: MediaQuery.paddingOf(context).right,
             child: AttributionButton(text: attribution),
           ),
-          // Ортофотопланы и масштаб; при шторке набора точек — над ней.
-          if (!SetPanel.isActive(_editMode))
+          // Ортофотопланы и масштаб; при шторке набора точек или шторке
+          // над картой — над ними.
+          if (!SetPanel.isActive(_editMode) && !ref.watch(mapSheetOpenProvider))
             Positioned(
               right: 16,
               bottom: 16,
