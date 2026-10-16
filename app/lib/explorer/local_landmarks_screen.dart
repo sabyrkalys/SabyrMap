@@ -19,6 +19,7 @@ import 'package:path/path.dart' as p;
 
 import '../app/landmark_services_provider.dart';
 import '../dialogs/confirm_dialog.dart';
+import '../map/drawing/shape_dialogs.dart';
 import '../map/map_crosshair.dart';
 import '../map/screens/available_maps/available_maps_models.dart';
 import '../map/screens/available_maps/maps_app_bar.dart';
@@ -248,6 +249,13 @@ class _LocalLandmarksScreenState extends ConsumerState<LocalLandmarksScreen> {
         await _changed();
       case 'waypoint_set' || 'route' || 'path' || 'area':
         await _createComposite(type, folder);
+      // Круг и текст — в прицеле карты, в открытую папку.
+      case MarkerTypeIds.circle:
+        await createCircleAtCrosshair(context, ProviderScope.containerOf(context, listen: false), folder: folder);
+        await _changed();
+      case MarkerTypeIds.text:
+        await createTextAtCrosshair(context, ProviderScope.containerOf(context, listen: false), folder: folder);
+        await _changed();
       default:
         _snack('«${type.title}» пока нельзя создать: формат меток этого не поддерживает');
     }

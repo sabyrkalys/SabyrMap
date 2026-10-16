@@ -1,10 +1,14 @@
 import 'dart:io';
 
+import 'package:app/explorer/local_landmarks_screen.dart';
 import 'package:app/landmarks/drafts/marker_draft.dart';
 import 'package:app/landmarks/models/landmark_type.dart';
+import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/screens/available_maps/maps_app_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 import 'package:path/path.dart' as p;
 
 import 'explorer_test_harness.dart';
@@ -158,19 +162,48 @@ void main() {
     await h.dispose(tester);
   });
 
-  testWidgets('«+» → an unsupported kind explains itself', (tester) async {
-    h = await ExplorerHarness.create(tester);
-    await h.pumpApp(tester);
+  Future<void> openCreateItem(WidgetTester tester, String key) async {
     await h.tap(tester, find.byKey(const Key('explorer_fab')));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.byKey(const Key('marker_type_text')),
+      find.byKey(Key(key)),
       200,
       scrollable: find.descendant(of: find.byKey(const Key('explorer_create_sheet')), matching: find.byType(Scrollable)),
     );
-    await tester.tap(find.byKey(const Key('marker_type_text')));
+    await tester.tap(find.byKey(Key(key)));
     await h.settle(tester);
-    expect(find.textContaining('«Текст» пока нельзя создать'), findsOneWidget);
+  }
+
+  testWidgets('«+» → an unsupported kind explains itself', (tester) async {
+    h = await ExplorerHarness.create(tester);
+    await h.pumpApp(tester);
+    await openCreateItem(tester, 'marker_type_photo');
+    expect(find.textContaining('«Фототочка» пока нельзя создать'), findsOneWidget);
+    await h.dispose(tester);
+  });
+
+  testWidgets('«+» → «Текст» and «Круг» are made at the map crosshair, in the open folder', (tester) async {
+    h = await ExplorerHarness.create(tester);
+    await h.pumpApp(tester);
+    ProviderScope.containerOf(
+      tester.element(find.byType(LocalLandmarksScreen)),
+    ).read(mapCrosshairProvider.notifier).set(const LatLng(48.5, 37.0));
+
+    await openCreateItem(tester, 'marker_type_text');
+    await tester.enterText(find.byKey(const Key('text_field')), 'Брод');
+    await tester.pump();
+    await h.tap(tester, find.byKey(const Key('text_ok')));
+
+    await openCreateItem(tester, 'marker_type_circle');
+    await tester.tap(find.byKey(const Key('circle_radius_250')));
+    await tester.pump();
+    await h.tap(tester, find.byKey(const Key('circle_ok')));
+    await tester.pumpAndSettle();
+
+    final files = (await tester.runAsync(() => h.f.services.repository.listIn(h.f.paths.landmarks)))!;
+    expect(files.map(p.extension), unorderedEquals(['.lbl', '.cir']));
+    expect(find.text('Брод'), findsWidgets);
+    expect(find.text('Круг 1'), findsWidgets);
     await h.dispose(tester);
   });
 }

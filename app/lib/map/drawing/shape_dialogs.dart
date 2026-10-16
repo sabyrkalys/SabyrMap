@@ -35,9 +35,10 @@ double? parseRadius(String text) {
   return value;
 }
 
-/// «Круг»: имя и радиус, центр — в прицеле. Пока диалог открыт, круг
-/// виден на карте ([drawingPreviewProvider]).
-Future<void> createCircleAtCrosshair(BuildContext context, ProviderContainer container) async {
+/// «Круг»: имя и радиус, центр — в прицеле; сохраняется в [folder]
+/// (по умолчанию — несортированные метки). Пока диалог открыт, круг виден
+/// на карте ([drawingPreviewProvider]).
+Future<void> createCircleAtCrosshair(BuildContext context, ProviderContainer container, {String? folder}) async {
   final at = container.read(mapCrosshairProvider);
   final messenger = ScaffoldMessenger.of(context);
   if (at == null) {
@@ -67,14 +68,15 @@ Future<void> createCircleAtCrosshair(BuildContext context, ProviderContainer con
       longitude: at.longitude,
       name: result.name,
       radiusMeters: result.radius,
-      targetFolder: container.read(markerGroupFoldersProvider).unsorted,
+      targetFolder: folder ?? container.read(markerGroupFoldersProvider).unsorted,
     ),
     result.name,
   );
 }
 
-/// «Текст»: надпись и её размер в прицеле. Имя метки — сама надпись.
-Future<void> createTextAtCrosshair(BuildContext context, ProviderContainer container) async {
+/// «Текст»: надпись и её размер в прицеле, в [folder] (по умолчанию —
+/// несортированные метки). Имя метки — сама надпись.
+Future<void> createTextAtCrosshair(BuildContext context, ProviderContainer container, {String? folder}) async {
   final LatLng? at = container.read(mapCrosshairProvider);
   final messenger = ScaffoldMessenger.of(context);
   if (at == null) {
@@ -96,7 +98,7 @@ Future<void> createTextAtCrosshair(BuildContext context, ProviderContainer conta
       name: result.text,
       text: result.text,
       extraMetadata: {TextObject.textSizeKey: result.size},
-      targetFolder: container.read(markerGroupFoldersProvider).unsorted,
+      targetFolder: folder ?? container.read(markerGroupFoldersProvider).unsorted,
     ),
     result.text,
   );
