@@ -276,11 +276,11 @@ class _BottomNav extends StatelessWidget {
                     top: 6,
                     child: Consumer(
                       builder: (context, ref, _) => ref.watch(mapBearingProvider)
-                          ? Container(
+                          ? AppIcon(
+                              AppIcons.lockBadge,
                               key: const Key('nav_compass_lock'),
-                              padding: const EdgeInsets.all(1),
-                              decoration: BoxDecoration(color: colorScheme.surface, shape: BoxShape.circle),
-                              child: AppIcon(AppIcons.lockBadge, size: 16, color: colorScheme.onSurfaceVariant),
+                              size: 16,
+                              color: colorScheme.onSurfaceVariant,
                             )
                           : const SizedBox.shrink(),
                     ),
