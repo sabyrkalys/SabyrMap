@@ -117,6 +117,12 @@ void main() {
       tester.getBottomLeft(find.byKey(const Key('crosshair_menu_triangle'))).dy,
       lessThanOrEqualTo(tester.getTopLeft(find.byKey(const Key('map_crosshair'))).dy),
     );
+    // Close to it: the tip is a few dp above the crosshair, not far off.
+    expect(
+      tester.getTopLeft(find.byKey(const Key('map_crosshair'))).dy -
+          tester.getBottomLeft(find.byKey(const Key('crosshair_menu_triangle'))).dy,
+      lessThan(6),
+    );
     expect(
       tester.getCenter(find.byKey(const Key('crosshair_menu_triangle'))).dx,
       closeTo(tester.getCenter(find.byKey(const Key('map_crosshair'))).dx, 0.5),
@@ -126,6 +132,18 @@ void main() {
     await tester.tapAt(screenCenter(tester));
     await tester.pumpAndSettle();
     expect(card, findsNothing);
+  });
+
+  testWidgets('system back closes the open card instead of leaving the map', (tester) async {
+    await pumpMap(tester);
+    await tester.tapAt(screenCenter(tester));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('crosshair_menu')), findsNothing);
+    expect(find.byType(MapScreen), findsOneWidget);
   });
 
   testWidgets('tapping outside the card closes it', (tester) async {

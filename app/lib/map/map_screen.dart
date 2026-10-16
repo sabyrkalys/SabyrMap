@@ -919,10 +919,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           // Системное «Назад» во время рисования закрывает его (с точками —
           // после вопроса), а не уходит с карты. PopScope действует на
           // весь маршрут, где бы ни стоял.
+          // Открытую карточку прицела «Назад» сначала закрывает.
           PopScope(
-            canPop: !_drawing,
+            canPop: !_drawing && !menuOpen,
             onPopInvokedWithResult: (didPop, _) {
-              if (!didPop && _drawing) cancelDrawing(context, ref.read(landmarkServicesProvider));
+              if (didPop) return;
+              if (menuOpen) {
+                ref.read(crosshairMenuOpenProvider.notifier).close();
+              } else if (_drawing) {
+                cancelDrawing(context, ref.read(landmarkServicesProvider));
+              }
             },
             child: const SizedBox.shrink(),
           ),
@@ -1002,12 +1008,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
             // The card's bottom (its triangle tip) sits just above the
-            // crosshair: half the screen minus the crosshair's radius.
+            // crosshair: half the screen plus the crosshair's radius (5 dp)
+            // and a 3 dp gap.
             Positioned(
               left: 16,
               right: 16,
               top: MediaQuery.paddingOf(context).top + 8,
-              bottom: MediaQuery.sizeOf(context).height / 2 + 16 + 2,
+              bottom: MediaQuery.sizeOf(context).height / 2 + 5 + 3,
               child: Align(
                 alignment: Alignment.bottomCenter,
                 child: CrosshairMenu(
