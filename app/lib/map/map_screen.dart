@@ -518,6 +518,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   }
 
   void _onCameraIdle() {
+    _movingToTrackEnd = false;
     final position = _controller?.cameraPosition;
     if (position == null) return;
     _prefetchAround(position.zoom);
@@ -633,13 +634,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final last = _trackLocations.lastOrNull;
     if (last != null) {
       _movingToTrackEnd = true;
-      // Плавно, без скачка; пока карта едет, путь не чертится.
-      _controller
-          ?.animateCamera(
-            CameraUpdate.newLatLng(LatLng(last.latitude, last.longitude)),
-            duration: const Duration(milliseconds: 250),
-          )
-          .whenComplete(() => _movingToTrackEnd = false);
+      // Плавно, без скачка; пока карта едет, путь не чертится. Снимает
+      // запрет остановка карты (_onCameraIdle), а не конец этой анимации:
+      // при быстрых нажатиях анимации идут одна за другой.
+      _controller?.animateCamera(
+        CameraUpdate.newLatLng(LatLng(last.latitude, last.longitude)),
+        duration: const Duration(milliseconds: 250),
+      );
     }
   }
 
