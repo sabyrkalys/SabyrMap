@@ -245,9 +245,20 @@ class LandmarkLayer {
     await _controller.setGeoJsonSource(draftSourceId, LandmarkFeatures.collection(draftFeatures(object)));
   }
 
-  /// Рисуемый маршрут или область: линия по точкам (у области — замкнутая,
-  /// с заливкой от трёх точек) и сами точки, последняя — с `last`.
+  /// Рисуемый маршрут, путь, набор или область: линия по точкам (у
+  /// области — замкнутая, с заливкой от трёх точек; у набора линии нет) и
+  /// сами точки, последняя — с `last`. Круг — заливка с контуром и центр.
   static List<Map<String, dynamic>> draftFeatures(LandmarkObject? object) {
+    if (object case CircleObject(:final center, :final radiusMeters)) {
+      return draftFeatures(
+        AreaObject(polygons: [AreaPolygon(outline: LandmarkFeatures.circleOutline(center, radiusMeters))]),
+      ).where((f) => (f['properties'] as Map)['role'] != FeatureRole.point.name).toList()
+        ..add({
+          'type': 'Feature',
+          'geometry': {'type': 'Point', 'coordinates': [center.longitude, center.latitude]},
+          'properties': {'role': FeatureRole.point.name, 'last': true},
+        });
+    }
     final points = switch (object) {
       RouteObject(:final waypoints) || SetObject(:final waypoints) => [for (final w in waypoints) w.location],
       TrackObject(:final segments) => [for (final s in segments) ...s.locations],

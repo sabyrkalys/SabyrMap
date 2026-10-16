@@ -2,6 +2,7 @@ import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/map/drawing/drawing_actions.dart';
 import 'package:app/map/drawing/drawing_bar.dart';
+import 'package:app/map/drawing/shape_dialogs.dart';
 import 'package:app/map/landmark_layer.dart';
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/map_screen.dart';
@@ -68,6 +69,14 @@ void main() {
     expect(tester.getSize(find.byKey(const Key('drawing_bar'))).height, greaterThan(0));
   });
 
+  test('parseRadius takes positive metres, with a comma too', () {
+    expect(parseRadius('250'), 250);
+    expect(parseRadius(' 12,5 '), 12.5);
+    expect(parseRadius('0'), isNull);
+    expect(parseRadius('-3'), isNull);
+    expect(parseRadius('abc'), isNull);
+  });
+
   group('draftFeatures', () {
     List<String> roles(List<Map<String, dynamic>> fs) => [for (final f in fs) (f['properties'] as Map)['role'] as String];
 
@@ -88,6 +97,19 @@ void main() {
         [4.0, 3.0],
       ]);
       expect([for (final f in fs.skip(1)) (f['properties'] as Map)['last']], [false, true]);
+    });
+
+    test('a circle is a closed fill around its centre, with the centre as the only point', () {
+      final fs = LandmarkLayer.draftFeatures(CircleObject(center: _loc(48.5, 37), radiusMeters: 500));
+      expect(roles(fs), ['fill', 'line', 'point']);
+      expect((fs.last['geometry'] as Map)['coordinates'], [37.0, 48.5]);
+    });
+
+    test('a set is points only', () {
+      final fs = LandmarkLayer.draftFeatures(
+        SetObject(waypoints: [WaypointObject(location: _loc(1, 2)), WaypointObject(location: _loc(3, 4))]),
+      );
+      expect(roles(fs), ['point', 'point']);
     });
 
     test('an area of two points is an open line; from three it is filled and closed', () {
@@ -213,6 +235,91 @@ void main() {
       expect(find.text('«Тропа» сохранено'), findsOneWidget);
     });
 
+    Future<ProviderContainer> pumpHost(WidgetTester tester, Future<void> Function(BuildContext, ProviderContainer) action) async {
+      final container = ProviderContainer(
+        overrides: [
+          landmarkServicesProvider.overrideWithValue(f.services),
+          markerGroupFoldersProvider.overrideWithValue(
+            MarkerGroupFolders(unsorted: f.paths.importDefault, myMarkers: f.paths.landmarks),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container.read(mapCrosshairProvider.notifier).set(const LatLng(48.5, 37.0));
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: Scaffold(
+              body: Builder(
+                builder: (context) =>
+                    TextButton(onPressed: () => action(context, container), child: const Text('go')),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.text('go'));
+      await tester.pumpAndSettle();
+      return container;
+    }
+
+    Future<void> waitForIndex(WidgetTester tester, LandmarkType type) async {
+      for (var i = 0; i < 100 && f.services.index.byType(type).isEmpty; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+      }
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('«Круг»: the circle under the crosshair is previewed while the radius is chosen, then saved', (
+      tester,
+    ) async {
+      final container = await pumpHost(tester, createCircleAtCrosshair);
+      expect(tester.takeException(), isNull);
+      expect((container.read(drawingPreviewProvider) as CircleObject).radiusMeters, 100);
+      expect(tester.widget<TextField>(find.byKey(const Key('circle_name_field'))).controller!.text, 'Круг 1');
+
+      await tester.tap(find.byKey(const Key('circle_radius_500')));
+      await tester.pump();
+      final preview = container.read(drawingPreviewProvider) as CircleObject;
+      expect(preview.radiusMeters, 500);
+      expect(preview.center.latitude, closeTo(48.5, 1e-9));
+
+      await tester.enterText(find.byKey(const Key('circle_radius_field')), '0');
+      await tester.pump();
+      expect(tester.widget<FilledButton>(find.byKey(const Key('circle_ok'))).onPressed, isNull);
+      await tester.enterText(find.byKey(const Key('circle_radius_field')), '750');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('circle_ok')));
+      await waitForIndex(tester, LandmarkType.circle);
+
+      expect(container.read(drawingPreviewProvider), isNull);
+      final item = f.services.index.byType(LandmarkType.circle).single;
+      expect(item.name, 'Круг 1');
+      final stored = (await tester.runAsync(() => f.services.repository.load(item.path)))!.content as CircleObject;
+      expect(stored.radiusMeters, 750);
+    });
+
+    testWidgets('«Текст»: the label and its size are saved at the crosshair', (tester) async {
+      await pumpHost(tester, createTextAtCrosshair);
+      expect(tester.widget<FilledButton>(find.byKey(const Key('text_ok'))).onPressed, isNull);
+
+      await tester.enterText(find.byKey(const Key('text_field')), 'Брод');
+      await tester.tap(find.byKey(const Key('text_size_24')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('text_ok')));
+      await waitForIndex(tester, LandmarkType.text);
+
+      final item = f.services.index.byType(LandmarkType.text).single;
+      expect(item.name, 'Брод');
+      final stored = (await tester.runAsync(() => f.services.repository.load(item.path)))!.content as TextObject;
+      expect(stored.text, 'Брод');
+      expect(stored.userMetadata.entries[TextObject.textSizeKey], 24);
+      expect(stored.location.latitude, closeTo(48.5, 1e-6));
+    });
+
     testWidgets('the cross closes an empty drawing at once, one with points after a confirmation', (tester) async {
       await pumpMap(tester);
       await startRoute(tester);
@@ -232,6 +339,22 @@ void main() {
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
       expect(f.services.index.byType(LandmarkType.route), isEmpty);
     });
+
+    for (final (title, type) in [('Путь', LandmarkType.track), ('Набор точек', LandmarkType.set)]) {
+      testWidgets('«Новая метка» → «$title» starts drawing ${type.name}', (tester) async {
+        await pumpMap(tester);
+        await tester.tapAt(tester.getCenter(find.byType(MapLibreMap)));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Новая метка...'));
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(find.text(title), 100);
+        await tester.tap(find.text(title));
+        await tester.pumpAndSettle();
+
+        expect(f.services.editMode.state.target?.type, type);
+        expect(find.text(DrawingBar.titleOf(type)), findsOneWidget);
+      });
+    }
 
     testWidgets('«Новая метка» → «Область» starts drawing an area', (tester) async {
       await pumpMap(tester);

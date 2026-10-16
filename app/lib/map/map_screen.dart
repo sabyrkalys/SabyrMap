@@ -22,6 +22,7 @@ import 'catalog/catalog_repository.dart';
 import 'crosshair_menu.dart';
 import 'drawing/drawing_actions.dart';
 import 'drawing/drawing_bar.dart';
+import 'drawing/shape_dialogs.dart';
 import 'info_panel.dart';
 import 'landmark_layer.dart';
 import 'map_camera_store.dart';
@@ -505,7 +506,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   Future<void> _syncDraft() async {
     try {
-      await _landmarkLayer?.updateDraft(_drawing ? _editMode.state.target!.object : null);
+      await _landmarkLayer?.updateDraft(
+        _drawing ? _editMode.state.target!.object : ref.read(drawingPreviewProvider),
+      );
     } catch (_) {
       // Карта ещё не готова: черновик поставит следующая загрузка стиля.
     }
@@ -749,6 +752,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     ref.listen<bool>(mapLayersProvider.select((state) => state.orthophotosOn), (previous, next) {
       if (next && previous == false) unawaited(_updateOrthophotos());
     });
+
+    // Круг из диалога «Круг» — черновиком, пока выбирается радиус.
+    ref.listen(drawingPreviewProvider, (previous, next) => unawaited(_syncDraft()));
 
     ref.listen<MapFocusRequest?>(mapFocusProvider, (previous, next) {
       if (next != null) _controller?.animateCamera(CameraUpdate.newLatLng(next.point));

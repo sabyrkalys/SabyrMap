@@ -21,6 +21,10 @@ abstract final class MarkerTypeIds {
   static const waypoint = 'waypoint';
   static const route = 'route';
   static const area = 'area';
+  static const path = 'path';
+  static const set = 'waypoint_set';
+  static const circle = 'circle';
+  static const text = 'text';
 }
 
 /// Everything the sheet lists, in display order. Material Icons in their
@@ -36,7 +40,7 @@ const List<MarkerType> markerTypes = [
   MarkerType(id: 'photo', title: 'Фототочка', icon: Icons.photo_camera_sharp, category: MarkerCategory.local),
   MarkerType(id: 'audio', title: 'Аудиоточка', icon: Icons.volume_up_sharp, category: MarkerCategory.local),
   MarkerType(
-    id: 'waypoint_set',
+    id: MarkerTypeIds.set,
     title: 'Набор точек',
     subtitle: 'Создать набор путевых точек на карте.',
     icon: Icons.share_location_sharp,
@@ -50,7 +54,7 @@ const List<MarkerType> markerTypes = [
     category: MarkerCategory.local,
   ),
   MarkerType(
-    id: 'path',
+    id: MarkerTypeIds.path,
     title: 'Путь',
     subtitle: 'Начертить путь на карте.',
     icon: Icons.polyline_sharp,
@@ -64,14 +68,14 @@ const List<MarkerType> markerTypes = [
     category: MarkerCategory.local,
   ),
   MarkerType(
-    id: 'circle',
+    id: MarkerTypeIds.circle,
     title: 'Круг',
     subtitle: 'Создать круговую область с заданным радиусом.',
     icon: Icons.radio_button_unchecked_sharp,
     category: MarkerCategory.local,
   ),
   MarkerType(
-    id: 'text',
+    id: MarkerTypeIds.text,
     title: 'Текст',
     subtitle: 'Добавить текст на карту.',
     icon: Icons.title_sharp,

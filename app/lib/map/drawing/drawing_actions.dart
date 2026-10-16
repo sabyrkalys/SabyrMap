@@ -11,11 +11,13 @@ import '../../waypoints/new_marker/marker_type.dart';
 import '../../waypoints/new_marker/new_marker_sheet.dart';
 import '../../waypoints/waypoint_create_action.dart';
 import '../map_target.dart';
+import 'shape_dialogs.dart';
 
-/// «Новая метка»: лист типов; путевая точка — диалог точки в прицеле,
-/// маршрут и область — рисование на карте (панель покажет карта). Общий
-/// вход для меню МЕТКИ и карточки прицела; [onDrawingStarted] — меню
-/// закрывается, чтобы не загораживать карту.
+/// «Новая метка»: лист типов; путевая точка — диалог точки в прицеле;
+/// маршрут, путь, область, набор — рисование на карте (панель покажет
+/// карта); круг и текст — диалог, объект встаёт в прицел. Общий вход для
+/// меню МЕТКИ и карточки прицела; [onDrawingStarted] — меню закрывается,
+/// чтобы не загораживать карту.
 Future<void> openNewMarker(
   BuildContext context,
   WidgetRef ref, {
@@ -24,15 +26,31 @@ Future<void> openNewMarker(
 }) async {
   final type = await showNewMarkerSheet(context);
   if (type == null || !context.mounted) return;
+  final drawn = switch (type.id) {
+    MarkerTypeIds.route => LandmarkType.route,
+    MarkerTypeIds.path => LandmarkType.track,
+    MarkerTypeIds.area => LandmarkType.area,
+    MarkerTypeIds.set => LandmarkType.set,
+    _ => null,
+  };
+  if (drawn != null) {
+    startDrawing(ref, drawn);
+    onDrawingStarted?.call();
+    return;
+  }
+  // Круг и текст: диалог — от навигатора, а не от меню, которое сейчас
+  // закроется; контейнер берётся до того, как ref меню пропадёт.
+  final host = Navigator.of(context).context;
+  final container = ProviderScope.containerOf(context, listen: false);
   switch (type.id) {
     case MarkerTypeIds.waypoint:
       await createWaypointAtCrosshair(context, ref, iconScanner: iconScanner);
-    case MarkerTypeIds.route:
-      startDrawing(ref, LandmarkType.route);
+    case MarkerTypeIds.circle:
       onDrawingStarted?.call();
-    case MarkerTypeIds.area:
-      startDrawing(ref, LandmarkType.area);
+      await createCircleAtCrosshair(host, container);
+    case MarkerTypeIds.text:
       onDrawingStarted?.call();
+      await createTextAtCrosshair(host, container);
     default:
       // The other types come in a later iteration.
       debugPrint('Selected: ${type.id}');
@@ -53,6 +71,7 @@ String nextDrawingName(LandmarkType type, Iterable<String> existingNames) {
     LandmarkType.area => 'Область',
     LandmarkType.track => 'Путь',
     LandmarkType.set => 'Набор точек',
+    LandmarkType.circle => 'Круг',
     _ => 'Метка',
   };
   final pattern = RegExp('^${RegExp.escape(base)} (\\d+)\$');
