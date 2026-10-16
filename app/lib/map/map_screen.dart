@@ -10,6 +10,8 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import '../app/landmark_services_provider.dart';
 import '../explorer/item_menu/item_context_menu.dart';
 import '../landmarks/index/landmark_index.dart';
+import '../landmarks/composite/distance/haversine.dart';
+import '../landmarks/composite/edit_mode/edit_commands.dart';
 import '../landmarks/composite/edit_mode/edit_mode_controller.dart';
 import '../landmarks/models/landmark_file.dart';
 import '../landmarks/on_screen/on_screen_registry.dart';
@@ -504,7 +506,29 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     unawaited(_syncDraft());
   }
 
+  /// Последняя точка рисуемого маршрута, пути или области: от неё до
+  /// прицела натив рисует отрезок (MainActivity «setDrawingLeg»).
+  LandmarkLocation? get _legStart {
+    final target = _editMode.state.target;
+    if (target == null || !target.isNew) return null;
+    final points = LandmarkLayer.drawnPoints(target.object);
+    return target.type == LandmarkType.set || points.isEmpty ? null : points.last;
+  }
+
+  Future<void> _syncDrawingLeg() async {
+    final from = _legStart;
+    try {
+      await _mapChannel.invokeMethod<int>('setDrawingLeg', {
+        if (from != null) 'lat': from.latitude,
+        if (from != null) 'lng': from.longitude,
+      });
+    } catch (_) {
+      // Not on Android (tests, other platforms).
+    }
+  }
+
   Future<void> _syncDraft() async {
+    unawaited(_syncDrawingLeg());
     try {
       await _landmarkLayer?.updateDraft(
         _drawing ? _editMode.state.target!.object : ref.read(drawingPreviewProvider),
@@ -512,6 +536,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     } catch (_) {
       // Карта ещё не готова: черновик поставит следующая загрузка стиля.
     }
+  }
+
+  /// «Удалить» в «Управлении метками»: последняя точка набора или маршрута.
+  void _removeLastDrawingPoint() {
+    final n = _editMode.pointCount;
+    if (n > 0) _editMode.execute(RemoveWaypointCommand(index: n - 1));
   }
 
   /// Точка в прицел — та, что под ним сейчас, а не при последней остановке.
@@ -825,6 +855,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ),
+          // Отрезок от последней точки до прицела: расстояние и азимут — в
+          // постоянном месте слева сверху от прицела, меняется только текст.
+          if (_legStart case final from?)
+            IgnorePointer(
+              child: Center(
+                child: Transform.translate(
+                  offset: const Offset(-14, -14),
+                  child: FractionalTranslation(
+                    translation: const Offset(-1, -1),
+                    child: ValueListenableBuilder<CameraPosition?>(
+                      valueListenable: _liveCamera,
+                      builder: (context, camera, _) {
+                        final to = camera?.target ?? ref.read(mapCrosshairProvider);
+                        if (to == null) return const SizedBox.shrink();
+                        return DrawingLegLabel(key: const Key('drawing_leg_label'), from: from, to: to);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (target != null && center != null && toggles[MenuToggle.waypointsTargetStatus]!)
             IgnorePointer(
               child: Center(
@@ -895,6 +946,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     onSize: (size) => ref.read(setPanelHeightProvider.notifier).set(size.height),
                     child: SetPanel(
                     pointCount: _editMode.pointCount,
+                    lengthMeters: _editMode.state.target!.type == LandmarkType.route
+                        ? Haversine.totalDistance(LandmarkLayer.drawnPoints(_editMode.state.target!.object))
+                        : null,
+                    onDelete: _removeLastDrawingPoint,
                     onAddPoint: _addDrawingPoint,
                     onSearch: () => showSetPointsSheet(context, ref),
                     onFinish: () => _editMode.pointCount == 0

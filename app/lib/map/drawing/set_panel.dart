@@ -6,13 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../screens/layers_panel.dart' show onScreenPanelBackground;
 
-/// «Управление метками»: шторка нового набора точек у нижнего края экрана,
-/// в оформлении шторок приложения («Метки на экране»). Шапка — значок,
-/// название, поиск по точкам и галочка «Готово»; под ней число точек и
-/// «+ Путевая точка», которая ставит точку в прицел.
-///
-/// Decision: пока шторка открыта, нижнее меню приложения спрятано
-/// ([isActive]) — шторка стоит у самого края, как в образце.
 /// Высота шторки на экране, dp (0 — шторки нет): над ней встаёт нижнее
 /// меню приложения ([HomeShell]).
 class SetPanelHeight extends Notifier<double> {
@@ -55,6 +48,13 @@ class MeasureSizeBox extends RenderProxyBox {
   }
 }
 
+/// «Управление метками»: шторка нового набора точек или маршрута у нижнего
+/// края экрана, в оформлении шторок приложения («Метки на экране»). Шапка —
+/// значок, название, поиск по точкам и галочка «Готово»; под ней число
+/// точек и «+ Путевая точка», которая ставит точку в прицел.
+///
+/// Decision: пока шторка открыта, нижнее меню и кнопки карты стоят над ней
+/// ([setPanelHeightProvider]), сама шторка — у самого края экрана.
 class SetPanel extends StatelessWidget {
   const SetPanel({
     super.key,
@@ -62,10 +62,18 @@ class SetPanel extends StatelessWidget {
     required this.onAddPoint,
     required this.onSearch,
     required this.onFinish,
+    this.lengthMeters,
+    this.onDelete,
   });
 
   final int pointCount;
   final VoidCallback onAddPoint;
+
+  /// Длина маршрута — рядом с числом точек; null — у набора её нет.
+  final double? lengthMeters;
+
+  /// «Удалить»: убирает последнюю точку; кнопка видна, пока точки есть.
+  final VoidCallback? onDelete;
 
   /// Поиск по точкам набора; без точек — недоступен.
   final VoidCallback onSearch;
@@ -75,14 +83,19 @@ class SetPanel extends StatelessWidget {
 
   static const Color _ink = Color(0xFF333333);
 
-  /// Рисуется новый набор точек — шторка на экране, нижнее меню спрятано.
+  /// Рисуется новый набор точек или маршрут — шторка на экране.
   static bool isActive(EditModeController editMode) {
     final target = editMode.state.target;
-    return target != null && target.isNew && target.type == LandmarkType.set;
+    return target != null && target.isNew && (target.type == LandmarkType.set || target.type == LandmarkType.route);
   }
 
-  /// «0 точ.», «12 точ.».
-  static String countLabel(int n) => '$n точ.';
+  /// «0 точ.», «12 точ.»; с длиной маршрута — «4 точ.   775 м».
+  static String countLabel(int n, [double? meters]) =>
+      meters == null || n < 2 ? '$n точ.' : '$n точ.   ${formatLength(meters)}';
+
+  /// «775 м», «2,35 км».
+  static String formatLength(double meters) =>
+      meters < 1000 ? '${meters.round()} м' : '${(meters / 1000).toStringAsFixed(2).replaceAll('.', ',')} км';
 
   /// Высота системных кнопок внизу, dp — у самого окна: в карте нижний
   /// отступ MediaQuery занят нижним меню. Кнопки обычно спрятаны
@@ -141,7 +154,7 @@ class SetPanel extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  countLabel(pointCount),
+                  countLabel(pointCount, lengthMeters),
                   key: const Key('set_panel_count'),
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 15, color: Color(0xFF616161)),
@@ -149,12 +162,30 @@ class SetPanel extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                // FilledButton в теме растянут во всю ширину — здесь так и нужно.
-                child: FilledButton.tonalIcon(
-                  key: const Key('set_panel_add'),
-                  onPressed: onAddPoint,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Путевая точка'),
+                // FilledButton в теме растянут во всю ширину — в Expanded так
+                // и нужно.
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        key: const Key('set_panel_add'),
+                        onPressed: onAddPoint,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Путевая точка'),
+                      ),
+                    ),
+                    if (onDelete != null && pointCount > 0) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          key: const Key('set_panel_delete'),
+                          onPressed: onDelete,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Удалить'),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ],

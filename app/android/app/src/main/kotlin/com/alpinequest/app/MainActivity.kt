@@ -23,6 +23,9 @@ class MainActivity : FlutterActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val targetLine = TargetLine()
 
+    // Рисуемый маршрут, путь, область: отрезок от последней точки до прицела.
+    private val drawingLeg = TargetLine(color = "#212121", showDot = false, prefix = "sabyrmap-drawing-leg")
+
     // Snapshots in flight: held so they aren't collected before they answer,
     // and so a timeout and a late result don't both reply.
     private val snapshotters = mutableSetOf<MapSnapshotter>()
@@ -176,6 +179,14 @@ class MainActivity : FlutterActivity() {
                     val target = if (lat != null && lng != null) LatLng(lat, lng) else null
                     val maps = mapViews(flutterEngine)
                     maps.forEach { view -> targetLine.set(view, target) }
+                    result.success(maps.size)
+                }
+                "setDrawingLeg" -> {
+                    val lat = call.argument<Double>("lat")
+                    val lng = call.argument<Double>("lng")
+                    val from = if (lat != null && lng != null) LatLng(lat, lng) else null
+                    val maps = mapViews(flutterEngine)
+                    maps.forEach { view -> drawingLeg.set(view, from) }
                     result.success(maps.size)
                 }
                 else -> result.notImplemented()

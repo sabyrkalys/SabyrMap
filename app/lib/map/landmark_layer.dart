@@ -270,6 +270,14 @@ class LandmarkLayer {
   /// Рисуемый маршрут, путь, набор или область: линия по точкам (у
   /// области — замкнутая, с заливкой от трёх точек; у набора линии нет) и
   /// сами точки, последняя — с `last`. Круг — заливка с контуром и центр.
+  /// Точки рисуемого объекта по порядку (у области — первый контур).
+  static List<LandmarkLocation> drawnPoints(LandmarkObject? object) => switch (object) {
+    RouteObject(:final waypoints) || SetObject(:final waypoints) => [for (final w in waypoints) w.location],
+    TrackObject(:final segments) => [for (final s in segments) ...s.locations],
+    AreaObject(:final polygons) => polygons.isEmpty ? const <LandmarkLocation>[] : polygons.first.outline,
+    _ => const <LandmarkLocation>[],
+  };
+
   static List<Map<String, dynamic>> draftFeatures(LandmarkObject? object) {
     if (object case CircleObject(:final center, :final radiusMeters)) {
       return draftFeatures(
@@ -281,12 +289,7 @@ class LandmarkLayer {
           'properties': {'role': FeatureRole.point.name, 'last': true},
         });
     }
-    final points = switch (object) {
-      RouteObject(:final waypoints) || SetObject(:final waypoints) => [for (final w in waypoints) w.location],
-      TrackObject(:final segments) => [for (final s in segments) ...s.locations],
-      AreaObject(:final polygons) => polygons.isEmpty ? const <LandmarkLocation>[] : polygons.first.outline,
-      _ => const <LandmarkLocation>[],
-    };
+    final points = drawnPoints(object);
     final closed = object is AreaObject && points.length >= 3;
     final ring = [for (final l in points) [l.longitude, l.latitude]];
     Map<String, dynamic> feature(Map<String, dynamic> geometry, FeatureRole role, [Map<String, dynamic> extra = const {}]) =>

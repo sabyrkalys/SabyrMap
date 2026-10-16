@@ -41,13 +41,25 @@ Future<WaypointData?> showWaypointDialog(
 
 /// Opens «Набор точек»: the waypoint dialog without coordinates (the
 /// points are drawn on the map afterwards), with the set's «Ещё...».
-Future<WaypointData?> showSetDialog(BuildContext context, {IconLibraryScanner? iconScanner}) {
+Future<WaypointData?> showSetDialog(BuildContext context, {IconLibraryScanner? iconScanner}) =>
+    _showPointsDialog(context, 'Набор точек', Icons.share_location_sharp, iconScanner);
+
+/// Opens «Маршрут»: the same dialog as [showSetDialog], titled for a route.
+Future<WaypointData?> showRouteDialog(BuildContext context, {IconLibraryScanner? iconScanner}) =>
+    _showPointsDialog(context, 'Маршрут', Icons.route_sharp, iconScanner);
+
+Future<WaypointData?> _showPointsDialog(
+  BuildContext context,
+  String title,
+  IconData icon,
+  IconLibraryScanner? iconScanner,
+) {
   return showDialog<WaypointData>(
     context: context,
     builder: (_) => WaypointDialog(
       iconScanner: iconScanner,
-      title: 'Набор точек',
-      titleIcon: Icons.share_location_sharp,
+      title: title,
+      titleIcon: icon,
       showCoordinates: false,
       properties: setProperties,
     ),

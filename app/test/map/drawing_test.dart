@@ -91,6 +91,13 @@ void main() {
     expect(parseRadius('abc'), isNull);
   });
 
+  test('route length next to the point count', () {
+    expect(SetPanel.countLabel(1, 0), '1 точ.');
+    expect(SetPanel.countLabel(4, 775.4), '4 точ.   775 м');
+    expect(SetPanel.countLabel(3, 2349), '3 точ.   2,35 км');
+    expect(SetPanel.countLabel(3), '3 точ.');
+  });
+
   testWidgets('«Управление метками» fits a narrow phone with the app theme', (tester) async {
     tester.view.physicalSize = const Size(1216, 2688);
     tester.view.devicePixelRatio = 3.25;
@@ -101,13 +108,20 @@ void main() {
         home: Scaffold(
           body: Align(
             alignment: Alignment.bottomCenter,
-            child: SetPanel(pointCount: 12, onAddPoint: () {}, onSearch: () {}, onFinish: () {}),
+            child: SetPanel(
+              pointCount: 12,
+              lengthMeters: 2349,
+              onAddPoint: () {},
+              onDelete: () {},
+              onSearch: () {},
+              onFinish: () {},
+            ),
           ),
         ),
       ),
     );
     expect(tester.takeException(), isNull);
-    expect(find.text('12 точ.'), findsOneWidget);
+    expect(find.text('12 точ.   2,35 км'), findsOneWidget);
     expect(find.text('Путевая точка'), findsOneWidget);
   });
 
@@ -186,19 +200,21 @@ void main() {
       return container;
     }
 
-    Future<void> startRoute(WidgetTester tester) async {
-      f.services.editMode.startNew(LandmarkType.route, folder: f.paths.importDefault);
+    // Верхняя панель рисования — у пути и области; маршрут и набор точек
+    // рисуются шторкой «Управление метками».
+    Future<void> startTrack(WidgetTester tester) async {
+      f.services.editMode.startNew(LandmarkType.track, folder: f.paths.importDefault);
       await tester.pump();
     }
 
     String status(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('drawing_status'))).data!;
 
-    testWidgets('a new route shows the drawing bar; «Точка» adds the point under the crosshair', (tester) async {
+    testWidgets('a new path shows the drawing bar; «Точка» adds the point under the crosshair', (tester) async {
       await pumpMap(tester);
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
 
-      await startRoute(tester);
-      expect(find.text('Новый маршрут'), findsOneWidget);
+      await startTrack(tester);
+      expect(find.text('Новый путь'), findsOneWidget);
       expect(tester.widget<FilledButton>(find.byKey(const Key('drawing_finish'))).onPressed, isNull);
 
       await tester.tap(find.byKey(const Key('drawing_add_point')));
@@ -217,7 +233,7 @@ void main() {
 
     testWidgets('while drawing, a tap on the crosshair adds a point instead of opening the card', (tester) async {
       await pumpMap(tester);
-      await startRoute(tester);
+      await startTrack(tester);
 
       await tester.tapAt(tester.getCenter(find.byType(MapLibreMap)));
       await tester.pump();
@@ -242,7 +258,8 @@ void main() {
           ),
         ),
       );
-      await startRoute(tester);
+      f.services.editMode.startNew(LandmarkType.route, folder: f.paths.importDefault);
+      await tester.pump();
       f.services.editMode
         ..addPoint(_loc(48.5, 37.0))
         ..addPoint(_loc(48.6, 37.1));
@@ -386,12 +403,12 @@ void main() {
 
     testWidgets('the cross closes an empty drawing at once, one with points after a confirmation', (tester) async {
       await pumpMap(tester);
-      await startRoute(tester);
+      await startTrack(tester);
       await tester.tap(find.byKey(const Key('drawing_cancel')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
 
-      await startRoute(tester);
+      await startTrack(tester);
       f.services.editMode.addPoint(_loc(48.5, 37.0));
       await tester.pump();
       await tester.tap(find.byKey(const Key('drawing_cancel')));
@@ -401,7 +418,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
-      expect(f.services.index.byType(LandmarkType.route), isEmpty);
+      expect(f.services.index.byType(LandmarkType.track), isEmpty);
     });
 
     Future<void> chooseNewMarker(WidgetTester tester, String title) async {
@@ -413,6 +430,36 @@ void main() {
       await tester.tap(find.text(title));
       await tester.pumpAndSettle();
     }
+
+    testWidgets('«Маршрут» opens its dialog, then «Управление метками» with length and «Удалить»', (tester) async {
+      await pumpMap(tester);
+      await chooseNewMarker(tester, 'Маршрут');
+      expect(find.byKey(const Key('set_dialog')), findsOneWidget);
+      expect(find.text('Маршрут'), findsWidgets);
+      expect(find.byKey(const Key('waypoint_dialog_coords')), findsNothing);
+      await tester.tap(find.byKey(const Key('waypoint_dialog_ok')));
+      await tester.pumpAndSettle();
+
+      final target = f.services.editMode.state.target!;
+      expect(target.type, LandmarkType.route);
+      expect(target.object.userMetadata.name, 'Маршрут 1');
+      expect(find.byKey(const Key('set_panel')), findsOneWidget);
+      expect(find.byKey(const Key('set_panel_delete')), findsNothing);
+
+      f.services.editMode
+        ..addPoint(_loc(48.5, 37.0))
+        ..addPoint(_loc(48.5, 37.01));
+      await tester.pump();
+      final count = tester.widget<Text>(find.byKey(const Key('set_panel_count'))).data!;
+      expect(count, startsWith('2 точ.'));
+      expect(count, endsWith(' м'));
+      expect(find.byKey(const Key('drawing_leg_label')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('set_panel_delete')));
+      await tester.pump();
+      expect(f.services.editMode.pointCount, 1);
+      expect(tester.widget<Text>(find.byKey(const Key('set_panel_count'))).data, '1 точ.');
+    });
 
     testWidgets('«Новая метка» → «Путь» starts drawing a track', (tester) async {
       await pumpMap(tester);

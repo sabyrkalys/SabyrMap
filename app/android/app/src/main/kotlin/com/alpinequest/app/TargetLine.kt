@@ -24,7 +24,17 @@ import org.maplibre.geojson.Point
  * the line is hidden (the dot stays), and it is back once the map slows
  * below [SHOW_SPEED] or stops.
  */
-class TargetLine {
+class TargetLine(
+    private val color: String = COLOR,
+    private val showDot: Boolean = true,
+    prefix: String = "sabyrmap-target",
+) {
+    private val lineSource = "$prefix-line"
+    private val dotSource = "$prefix-dot"
+    private val casingLayer = "$prefix-line-casing"
+    private val lineLayer = "$prefix-line"
+    private val dotLayer = "$prefix-dot"
+
     private var target: LatLng? = null
 
     // Map centre and time the map's speed is measured from.
@@ -70,18 +80,18 @@ class TargetLine {
             listOf(Point.fromLngLat(center.longitude, center.latitude), Point.fromLngLat(target.longitude, target.latitude)),
         )
         val dot = Point.fromLngLat(target.longitude, target.latitude)
-        val lineSource = style.getSourceAs<GeoJsonSource>(LINE_SOURCE)
-        val dotSource = style.getSourceAs<GeoJsonSource>(DOT_SOURCE)
-        if (lineSource != null && dotSource != null) {
-            lineSource.setGeoJson(line)
-            dotSource.setGeoJson(dot)
+        val lines = style.getSourceAs<GeoJsonSource>(lineSource)
+        val dots = style.getSourceAs<GeoJsonSource>(dotSource)
+        if (lines != null && dots != null) {
+            lines.setGeoJson(line)
+            dots.setGeoJson(dot)
             return
         }
         remove(style)
-        style.addSource(GeoJsonSource(LINE_SOURCE, line))
-        style.addSource(GeoJsonSource(DOT_SOURCE, dot))
+        style.addSource(GeoJsonSource(lineSource, line))
+        style.addSource(GeoJsonSource(dotSource, dot))
         style.addLayer(
-            LineLayer(CASING_LAYER, LINE_SOURCE).withProperties(
+            LineLayer(casingLayer, lineSource).withProperties(
                 PropertyFactory.visibility(if (lineHidden) Property.NONE else Property.VISIBLE),
                 PropertyFactory.lineColor("#FFFFFF"),
                 PropertyFactory.lineOpacity(0.6f),
@@ -90,19 +100,21 @@ class TargetLine {
             ),
         )
         style.addLayer(
-            LineLayer(LINE_LAYER, LINE_SOURCE).withProperties(
+            LineLayer(lineLayer, lineSource).withProperties(
                 PropertyFactory.visibility(if (lineHidden) Property.NONE else Property.VISIBLE),
-                PropertyFactory.lineColor(COLOR),
+                PropertyFactory.lineColor(color),
                 PropertyFactory.lineWidth(LINE_WIDTH),
                 PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
             ),
         )
-        style.addLayer(
-            CircleLayer(DOT_LAYER, DOT_SOURCE).withProperties(
-                PropertyFactory.circleColor(COLOR),
-                PropertyFactory.circleRadius(DOT_RADIUS),
-            ),
-        )
+        if (showDot) {
+            style.addLayer(
+                CircleLayer(dotLayer, dotSource).withProperties(
+                    PropertyFactory.circleColor(color),
+                    PropertyFactory.circleRadius(DOT_RADIUS),
+                ),
+            )
+        }
     }
 
     /**
@@ -141,12 +153,12 @@ class TargetLine {
         lineHidden = hidden
         val style = map.style ?: return
         val visibility = PropertyFactory.visibility(if (hidden) Property.NONE else Property.VISIBLE)
-        for (layer in listOf(CASING_LAYER, LINE_LAYER)) style.getLayer(layer)?.setProperties(visibility)
+        for (layer in listOf(casingLayer, lineLayer)) style.getLayer(layer)?.setProperties(visibility)
     }
 
     private fun remove(style: Style) {
-        for (layer in listOf(DOT_LAYER, LINE_LAYER, CASING_LAYER)) style.removeLayer(layer)
-        for (source in listOf(LINE_SOURCE, DOT_SOURCE)) style.removeSource(source)
+        for (layer in listOf(dotLayer, lineLayer, casingLayer)) style.removeLayer(layer)
+        for (source in listOf(lineSource, dotSource)) style.removeSource(source)
     }
 
     companion object {
@@ -165,10 +177,5 @@ class TargetLine {
 
         // 14 dp, a bit larger than the crosshair.
         private const val DOT_RADIUS = 7f
-        private const val LINE_SOURCE = "sabyrmap-target-line"
-        private const val DOT_SOURCE = "sabyrmap-target-dot"
-        private const val CASING_LAYER = "sabyrmap-target-line-casing"
-        private const val LINE_LAYER = "sabyrmap-target-line"
-        private const val DOT_LAYER = "sabyrmap-target-dot"
     }
 }

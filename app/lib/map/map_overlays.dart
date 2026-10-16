@@ -1,6 +1,8 @@
+import 'package:app/landmarks/models/landmark_location.dart';
 import 'package:flutter/material.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
+import 'drawing/set_panel.dart';
 import 'geo_utils.dart';
 import 'map_scale.dart';
 
@@ -97,6 +99,38 @@ class TargetDistanceLabel extends StatelessWidget {
           style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700),
         ),
       ),
+    );
+  }
+}
+
+/// Расстояние и азимут от последней точки рисуемого маршрута до прицела:
+/// «285 м» над «150.1°», цветом цели, в белой обводке — без плашки, чтобы
+/// не закрывать карту.
+class DrawingLegLabel extends StatelessWidget {
+  const DrawingLegLabel({super.key, required this.from, required this.to});
+
+  final LandmarkLocation from;
+  final LatLng to;
+
+  static const TextStyle _style = TextStyle(
+    color: targetColor,
+    fontSize: 15,
+    fontWeight: FontWeight.w700,
+    height: 1.15,
+    shadows: [
+      Shadow(color: Colors.white, blurRadius: 2),
+      Shadow(color: Colors.white, blurRadius: 4),
+    ],
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final meters = distanceMeters(from.latitude, from.longitude, to.latitude, to.longitude);
+    final azimuth = bearingDegrees(from.latitude, from.longitude, to.latitude, to.longitude);
+    return Text(
+      '${SetPanel.formatLength(meters)}\n${azimuth.toStringAsFixed(1)}°',
+      textAlign: TextAlign.center,
+      style: _style,
     );
   }
 }

@@ -32,25 +32,31 @@ Future<void> openNewMarker(
 }) async {
   final type = await showNewMarkerSheet(context);
   if (type == null || !context.mounted) return;
-  // Набор точек: сначала его свойства — диалог путевой точки без
-  // координат, потом точки рисуются на карте.
-  if (type.id == MarkerTypeIds.set) {
+  // Набор точек и маршрут: сначала свойства — диалог путевой точки без
+  // координат, потом точки ставятся шторкой «Управление метками».
+  final pointsType = switch (type.id) {
+    MarkerTypeIds.set => LandmarkType.set,
+    MarkerTypeIds.route => LandmarkType.route,
+    _ => null,
+  };
+  if (pointsType != null) {
     final container = ProviderScope.containerOf(context, listen: false);
-    final data = await showSetDialog(context, iconScanner: iconScanner);
+    final data = pointsType == LandmarkType.set
+        ? await showSetDialog(context, iconScanner: iconScanner)
+        : await showRouteDialog(context, iconScanner: iconScanner);
     if (data == null) return;
     final services = container.read(landmarkServicesProvider);
     final folders = container.read(markerGroupFoldersProvider);
     container.read(crosshairMenuOpenProvider.notifier).close();
     services.editMode.startNew(
-      LandmarkType.set,
+      pointsType,
       folder: folderFor(folders, data.groupId) ?? folders.unsorted,
-      metadata: setMetadata(data, services.index.byType(LandmarkType.set).map((i) => i.name)),
+      metadata: setMetadata(data, services.index.byType(pointsType).map((i) => i.name), type: pointsType),
     );
     onDrawingStarted?.call();
     return;
   }
   final drawn = switch (type.id) {
-    MarkerTypeIds.route => LandmarkType.route,
     MarkerTypeIds.path => LandmarkType.track,
     MarkerTypeIds.area => LandmarkType.area,
     _ => null,
@@ -85,11 +91,15 @@ void startDrawing(WidgetRef ref, LandmarkType type) {
   ref.read(landmarkServicesProvider).editMode.startNew(type, folder: ref.read(markerGroupFoldersProvider).unsorted);
 }
 
-/// Поиск в «Управлении метками»: точки рисуемого набора списком;
-/// нажатие показывает точку на карте.
+/// Поиск в «Управлении метками»: точки рисуемого набора или маршрута
+/// списком; нажатие показывает точку на карте.
 Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
   final object = ref.read(landmarkServicesProvider).editMode.state.target?.object;
-  if (object is! SetObject || object.waypoints.isEmpty) return;
+  final waypoints = switch (object) {
+    SetObject(:final waypoints) || RouteObject(:final waypoints) => waypoints,
+    _ => const <WaypointObject>[],
+  };
+  if (waypoints.isEmpty) return;
   final focus = ref.read(mapFocusProvider.notifier);
   await showModalBottomSheet<void>(
     context: context,
@@ -98,7 +108,7 @@ Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
         key: const Key('set_points_sheet'),
         shrinkWrap: true,
         children: [
-          for (final (i, w) in object.waypoints.indexed)
+          for (final (i, w) in waypoints.indexed)
             ListTile(
               key: Key('set_point_$i'),
               leading: const Icon(Icons.location_on_sharp),
@@ -115,11 +125,11 @@ Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
   );
 }
 
-/// Метаданные набора из диалога «Набор точек»; пустое имя — следующий
-/// «Набор точек N» среди [existingNames].
-LandmarkMetadata setMetadata(WaypointData data, Iterable<String> existingNames) {
+/// Метаданные набора (или маршрута, [type]) из его диалога; пустое имя —
+/// следующий «Набор точек N» / «Маршрут N» среди [existingNames].
+LandmarkMetadata setMetadata(WaypointData data, Iterable<String> existingNames, {LandmarkType type = LandmarkType.set}) {
   String? text(String? value) => value == null || value.trim().isEmpty ? null : value.trim();
-  final name = text(data.name) ?? nextDrawingName(LandmarkType.set, existingNames);
+  final name = text(data.name) ?? nextDrawingName(type, existingNames);
   return LandmarkMetadata(
     entries: {
       LandmarkMetadata.nameKey: name,
