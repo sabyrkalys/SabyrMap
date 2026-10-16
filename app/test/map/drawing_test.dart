@@ -205,40 +205,40 @@ void main() {
       return container;
     }
 
-    // Верхняя панель рисования — у пути и области; маршрут и набор точек
-    // рисуются шторкой «Управление метками».
-    Future<void> startTrack(WidgetTester tester) async {
-      f.services.editMode.startNew(LandmarkType.track, folder: f.paths.importDefault);
+    // Верхняя панель рисования — у области; набор, маршрут и путь рисуются
+    // шторкой «Управление метками».
+    Future<void> startArea(WidgetTester tester) async {
+      f.services.editMode.startNew(LandmarkType.area, folder: f.paths.importDefault);
       await tester.pump();
     }
 
     String status(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('drawing_status'))).data!;
 
-    testWidgets('a new path shows the drawing bar; «Точка» adds the point under the crosshair', (tester) async {
+    testWidgets('a new area shows the drawing bar; «Точка» adds the point under the crosshair', (tester) async {
       await pumpMap(tester);
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
 
-      await startTrack(tester);
-      expect(find.text('Новый путь'), findsOneWidget);
+      await startArea(tester);
+      expect(find.text('Новая область'), findsOneWidget);
       expect(tester.widget<FilledButton>(find.byKey(const Key('drawing_finish'))).onPressed, isNull);
 
-      await tester.tap(find.byKey(const Key('drawing_add_point')));
-      await tester.pump();
-      await tester.tap(find.byKey(const Key('drawing_add_point')));
-      await tester.pump();
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byKey(const Key('drawing_add_point')));
+        await tester.pump();
+      }
 
-      expect(status(tester), 'Точек: 2');
-      expect(f.services.editMode.pointCount, 2);
+      expect(status(tester), 'Точек: 3');
+      expect(f.services.editMode.pointCount, 3);
       expect(tester.widget<FilledButton>(find.byKey(const Key('drawing_finish'))).onPressed, isNotNull);
 
       await tester.tap(find.byKey(const Key('drawing_undo')));
       await tester.pump();
-      expect(f.services.editMode.pointCount, 1);
+      expect(f.services.editMode.pointCount, 2);
     });
 
     testWidgets('while drawing, a tap on the crosshair adds a point instead of opening the card', (tester) async {
       await pumpMap(tester);
-      await startTrack(tester);
+      await startArea(tester);
 
       await tester.tapAt(tester.getCenter(find.byType(MapLibreMap)));
       await tester.pump();
@@ -408,12 +408,12 @@ void main() {
 
     testWidgets('the cross closes an empty drawing at once, one with points after a confirmation', (tester) async {
       await pumpMap(tester);
-      await startTrack(tester);
+      await startArea(tester);
       await tester.tap(find.byKey(const Key('drawing_cancel')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
 
-      await startTrack(tester);
+      await startArea(tester);
       f.services.editMode.addPoint(_loc(48.5, 37.0));
       await tester.pump();
       await tester.tap(find.byKey(const Key('drawing_cancel')));
@@ -423,7 +423,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('drawing_bar')), findsNothing);
-      expect(f.services.index.byType(LandmarkType.track), isEmpty);
+      expect(f.services.index.byType(LandmarkType.area), isEmpty);
     });
 
     Future<void> chooseNewMarker(WidgetTester tester, String title) async {
@@ -474,12 +474,46 @@ void main() {
       expect(tester.widget<Text>(find.byKey(const Key('set_panel_count'))).data, '1 точ.');
     });
 
-    testWidgets('«Новая метка» → «Путь» starts drawing a track', (tester) async {
+    testWidgets('«Путь»: dialog without icon, then the panel — «Начертить», «Путевая точка», «Удалить», stats', (
+      tester,
+    ) async {
       await pumpMap(tester);
       await chooseNewMarker(tester, 'Путь');
+      expect(find.byKey(const Key('set_dialog')), findsOneWidget);
+      expect(find.byKey(const Key('waypoint_dialog_icon')), findsNothing);
+      expect(find.byKey(const Key('waypoint_dialog_coords')), findsNothing);
+      await tester.tap(find.byKey(const Key('waypoint_dialog_more')));
+      await tester.pumpAndSettle();
+      expect(find.descendant(of: find.byKey(const Key('more_properties_sheet')), matching: find.text('Иконка')), findsNothing);
+      await tester.tap(find.byKey(const Key('more_properties_cancel')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('waypoint_dialog_ok')));
+      await tester.pumpAndSettle();
 
-      expect(f.services.editMode.state.target?.type, LandmarkType.track);
-      expect(find.text(DrawingBar.titleOf(LandmarkType.track)), findsOneWidget);
+      final target = f.services.editMode.state.target!;
+      expect(target.type, LandmarkType.track);
+      expect(target.object.userMetadata.name, 'Путь 1');
+      expect(find.byKey(const Key('set_panel_draw')), findsOneWidget);
+      expect(find.byKey(const Key('drawing_bar')), findsNothing);
+      expect(find.text('СТАТИСТИКА'), findsOneWidget);
+      expect(tester.widget<Text>(find.byKey(const Key('set_panel_climb'))).data, 'нет данных о высотах');
+
+      // «Путевая точка» — точка на путь, а не точка линии.
+      await tester.tap(find.byKey(const Key('set_panel_add')));
+      await tester.pump();
+      expect((f.services.editMode.state.target!.object as TrackObject).waypoints, hasLength(1));
+      expect(f.services.editMode.pointCount, 0);
+
+      // «Удалить» снимает небольшой отрезок с конца линии, а не весь путь
+      // (на масштабе городской карты, 15).
+      (tester.state(find.byType(MapScreen)) as dynamic).debugZoom = 15.0;
+      for (var i = 0; i < 15; i++) {
+        f.services.editMode.addPoint(_loc(48.5 + i * 0.0001, 37.0));
+      }
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('set_panel_delete')));
+      await tester.pump();
+      expect(f.services.editMode.pointCount, inExclusiveRange(0, 15));
     });
 
     testWidgets('«Набор точек» opens the waypoint dialog without coordinates, then drawing with what was entered', (

@@ -64,7 +64,14 @@ class SetPanel extends StatelessWidget {
     required this.onFinish,
     this.lengthMeters,
     this.onDelete,
+    this.drawing,
+    this.onDrawingChanged,
   });
+
+  /// Путь: «Начертить» включён — путь сам рисуется за прицелом; null — не
+  /// путь (набор, маршрут), кнопки нет.
+  final bool? drawing;
+  final ValueChanged<bool>? onDrawingChanged;
 
   final int pointCount;
   final VoidCallback onAddPoint;
@@ -83,10 +90,12 @@ class SetPanel extends StatelessWidget {
 
   static const Color _ink = Color(0xFF333333);
 
-  /// Рисуется новый набор точек или маршрут — шторка на экране.
+  /// Рисуется новый набор точек, маршрут или путь — шторка на экране.
   static bool isActive(EditModeController editMode) {
     final target = editMode.state.target;
-    return target != null && target.isNew && (target.type == LandmarkType.set || target.type == LandmarkType.route);
+    return target != null &&
+        target.isNew &&
+        (target.type == LandmarkType.set || target.type == LandmarkType.route || target.type == LandmarkType.track);
   }
 
   /// «0 точ.», «12 точ.»; с длиной маршрута — «4 точ.   775 м».
@@ -151,48 +160,135 @@ class SetPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(
-                  countLabel(pointCount, lengthMeters),
-                  key: const Key('set_panel_count'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15, color: Color(0xFF616161)),
+              if (drawing != null)
+                ..._pathBody()
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    countLabel(pointCount, lengthMeters),
+                    key: const Key('set_panel_count'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 15, color: Color(0xFF616161)),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                // FilledButton в теме растянут во всю ширину — в Expanded так
-                // и нужно; подпись в половине ширины не переносится, а
-                // уменьшается.
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.tonalIcon(
-                        key: const Key('set_panel_add'),
-                        onPressed: onAddPoint,
-                        icon: const Icon(Icons.add),
-                        label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Путевая точка', maxLines: 1)),
-                      ),
-                    ),
-                    if (onDelete != null && pointCount > 0) ...[
-                      const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  // FilledButton в теме растянут во всю ширину — в Expanded так
+                  // и нужно; подпись в половине ширины не переносится, а
+                  // уменьшается.
+                  child: Row(
+                    children: [
                       Expanded(
                         child: FilledButton.tonalIcon(
-                          key: const Key('set_panel_delete'),
-                          onPressed: onDelete,
-                          icon: const Icon(Icons.delete_outline),
-                          label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Удалить', maxLines: 1)),
+                          key: const Key('set_panel_add'),
+                          onPressed: onAddPoint,
+                          icon: const Icon(Icons.add),
+                          label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Путевая точка', maxLines: 1)),
                         ),
                       ),
+                      if (onDelete != null && pointCount > 0) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            key: const Key('set_panel_delete'),
+                            onPressed: onDelete,
+                            icon: const Icon(Icons.delete_outline),
+                            label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Удалить', maxLines: 1)),
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
       ),
     );
   }
+
+  /// Кнопка ряда пути: значок над подписью в две строки, как в образце.
+  static Widget _pathButton(Key key, IconData icon, String label, VoidCallback? onPressed) => Expanded(
+    child: FilledButton.tonal(
+      key: key,
+      onPressed: onPressed,
+      style: ButtonStyle(
+        minimumSize: WidgetStateProperty.all(const Size(0, 52)),
+        padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 6, vertical: 4)),
+        shape: WidgetStateProperty.all(RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 22),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 2,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, height: 1.15, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  /// Путь: «Начертить», «Путевая точка», «Удалить», под ними статистика.
+  List<Widget> _pathBody() => [
+    const SizedBox(height: 4),
+    Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Row(
+        children: [
+          _pathButton(
+            const Key('set_panel_draw'),
+            drawing! ? Icons.check_box : Icons.check_box_outline_blank,
+            'Начертить',
+            () => onDrawingChanged?.call(!drawing!),
+          ),
+          const SizedBox(width: 6),
+          _pathButton(const Key('set_panel_add'), Icons.add, 'Путевая точка', onAddPoint),
+          const SizedBox(width: 6),
+          _pathButton(const Key('set_panel_delete'), Icons.delete, 'Удалить', pointCount > 0 ? onDelete : null),
+        ],
+      ),
+    ),
+    const SizedBox(height: 12),
+    const Text(
+      'СТАТИСТИКА',
+      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF616161), letterSpacing: 0.5),
+    ),
+    const SizedBox(height: 6),
+    _statRow('Длина', formatLength(lengthMeters ?? 0), const Key('set_panel_length')),
+    // Высот у точек пути нет (не с чего взять) — подъём и спуск не считаются.
+    _statRow('Подъём/Спуск', 'нет данных о высотах', const Key('set_panel_climb')),
+  ];
+
+  static Widget _statRow(String label, String value, Key key) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 120,
+          child: Text(
+            label,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: Color(0xFF616161)),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            value,
+            key: key,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF212121)),
+          ),
+        ),
+      ],
+    ),
+  );
 }

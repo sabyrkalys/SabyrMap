@@ -26,6 +26,16 @@ const List<WaypointProperty> waypointProperties = [
   WaypointProperty(type: WaypointPropertyType.description, title: 'Описание', icon: Icons.article_sharp),
 ];
 
+/// «Ещё...» пути: как у набора, без иконки.
+const List<WaypointProperty> trackProperties = [
+  WaypointProperty(type: WaypointPropertyType.color, title: 'Цвет', icon: Icons.palette_sharp),
+  WaypointProperty(type: WaypointPropertyType.style, title: 'Стиль', icon: Icons.text_fields_sharp),
+  WaypointProperty(type: WaypointPropertyType.comment, title: 'Комментарий', icon: Icons.edit_sharp),
+  WaypointProperty(type: WaypointPropertyType.website, title: 'Сайт', icon: Icons.link_sharp),
+  WaypointProperty(type: WaypointPropertyType.keywords, title: 'Ключевые слова', icon: Icons.local_offer_sharp),
+  WaypointProperty(type: WaypointPropertyType.description, title: 'Описание', icon: Icons.article_sharp),
+];
+
 /// «Ещё...» набора точек: только то, что хранится у набора.
 const List<WaypointProperty> setProperties = [
   WaypointProperty(type: WaypointPropertyType.icon, title: 'Иконка', icon: Icons.flag_sharp),

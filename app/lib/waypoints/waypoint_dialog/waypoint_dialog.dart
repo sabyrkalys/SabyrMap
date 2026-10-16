@@ -48,12 +48,19 @@ Future<WaypointData?> showSetDialog(BuildContext context, {IconLibraryScanner? i
 Future<WaypointData?> showRouteDialog(BuildContext context, {IconLibraryScanner? iconScanner}) =>
     _showPointsDialog(context, 'Маршрут', Icons.route_sharp, iconScanner);
 
+/// Opens «Путь»: as [showRouteDialog], but a path has no icon — no flag
+/// button and no «Иконка» in «Ещё...».
+Future<WaypointData?> showTrackDialog(BuildContext context) =>
+    _showPointsDialog(context, 'Путь', Icons.polyline_sharp, null, properties: trackProperties, showIcon: false);
+
 Future<WaypointData?> _showPointsDialog(
   BuildContext context,
   String title,
   IconData icon,
-  IconLibraryScanner? iconScanner,
-) {
+  IconLibraryScanner? iconScanner, {
+  List<WaypointProperty> properties = setProperties,
+  bool showIcon = true,
+}) {
   return showDialog<WaypointData>(
     context: context,
     builder: (_) => WaypointDialog(
@@ -61,7 +68,8 @@ Future<WaypointData?> _showPointsDialog(
       title: title,
       titleIcon: icon,
       showCoordinates: false,
-      properties: setProperties,
+      properties: properties,
+      showIcon: showIcon,
     ),
   );
 }
@@ -80,7 +88,11 @@ class WaypointDialog extends ConsumerStatefulWidget {
     this.titleIcon = Icons.location_on_sharp,
     this.showCoordinates = true,
     this.properties = waypointProperties,
+    this.showIcon = true,
   });
+
+  /// The flag button (the icon); a path has none.
+  final bool showIcon;
 
   final IconLibraryScanner? iconScanner;
   final String pointLabel;
@@ -716,7 +728,7 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
               children: [
                 // A chosen icon or colour has its own row above instead of
                 // its button here.
-                if (_icon == null) ...[
+                if (_icon == null && widget.showIcon) ...[
                   ActionButton(key: const Key('waypoint_dialog_icon'), icon: Icons.flag_sharp, onTap: _pickIcon),
                   const SizedBox(width: 8),
                 ],

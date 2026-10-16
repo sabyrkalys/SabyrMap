@@ -38,13 +38,17 @@ Future<void> openNewMarker(
   final pointsType = switch (type.id) {
     MarkerTypeIds.set => LandmarkType.set,
     MarkerTypeIds.route => LandmarkType.route,
+    MarkerTypeIds.path => LandmarkType.track,
     _ => null,
   };
   if (pointsType != null) {
     final container = ProviderScope.containerOf(context, listen: false);
-    final data = pointsType == LandmarkType.set
-        ? await showSetDialog(context, iconScanner: iconScanner)
-        : await showRouteDialog(context, iconScanner: iconScanner);
+    final dialog = switch (pointsType) {
+      LandmarkType.set => showSetDialog(context, iconScanner: iconScanner),
+      LandmarkType.track => showTrackDialog(context),
+      _ => showRouteDialog(context, iconScanner: iconScanner),
+    };
+    final data = await dialog;
     if (data == null) return;
     final services = container.read(landmarkServicesProvider);
     final folders = container.read(markerGroupFoldersProvider);
@@ -58,7 +62,6 @@ Future<void> openNewMarker(
     return;
   }
   final drawn = switch (type.id) {
-    MarkerTypeIds.path => LandmarkType.track,
     MarkerTypeIds.area => LandmarkType.area,
     _ => null,
   };

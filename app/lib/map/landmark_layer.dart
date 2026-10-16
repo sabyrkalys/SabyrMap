@@ -314,8 +314,16 @@ class LandmarkLayer {
       if (closed) feature({'type': 'Polygon', 'coordinates': [[...ring, ring.first]]}, FeatureRole.fill),
       if (points.length >= 2 && object is! SetObject)
         feature({'type': 'LineString', 'coordinates': [...ring, if (closed) ring.first]}, FeatureRole.line),
-      for (final (i, c) in ring.indexed)
-        feature({'type': 'Point', 'coordinates': c}, FeatureRole.point, {'last': i == ring.length - 1}),
+      // У пути точек линии сотни (она чертится за прицелом) — кружками
+      // только его путевые точки.
+      if (object case TrackObject(:final waypoints))
+        for (final w in waypoints)
+          feature({'type': 'Point', 'coordinates': [w.location.longitude, w.location.latitude]}, FeatureRole.point, {
+            'last': true,
+          })
+      else
+        for (final (i, c) in ring.indexed)
+          feature({'type': 'Point', 'coordinates': c}, FeatureRole.point, {'last': i == ring.length - 1}),
     ];
   }
 

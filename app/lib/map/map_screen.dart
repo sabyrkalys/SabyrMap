@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math' show Point;
+import 'dart:math' show Point, cos, pi, pow;
 
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
@@ -84,6 +84,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // прицел, черновик — своим источником LandmarkLayer.
   late final EditModeController _editMode;
 
+  // Путь: «Начертить» включён — точки пути ставятся сами, пока карта
+  // движется под прицелом (каждые [_drawStepDp] сдвига).
+  bool _autoDraw = false;
+  static const double _drawStepDp = 8;
+
+  /// «Удалить» у пути снимает с конца отрезок такой длины на экране —
+  /// небольшой в любом масштабе.
+  static const double _trackDeleteDp = 48;
+
+  /// Метров в одном dp карты на широте [latitude] при масштабе [zoom].
+  static double _metersPerDp(double latitude, double zoom) =>
+      40075016.686 * cos(latitude * pi / 180) / (512 * pow(2, zoom));
+
   // Поворот карты от севера — для компаса с замком в нижнем меню.
   late final MapBearing _mapBearing;
 
@@ -134,6 +147,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // a pan gesture).
   LatLng? _crosshairPosition;
   double _cameraZoom = initialMapCamera.zoom;
+
+  /// Тесты: масштаб без настоящей карты.
+  @visibleForTesting
+  set debugZoom(double zoom) => _cameraZoom = zoom;
 
   // Live camera centre, tracked only while a target is set so the distance
   // label follows a drag without rebuilding on every frame otherwise.
@@ -348,6 +365,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // rebuild on every frame it is only applied once it moved by 0.1 or more.
   void _onCameraMove(CameraPosition position) {
     ref.read(mapBearingProvider.notifier).update(position.bearing);
+    if (_autoDraw) _drawTrackTo(position);
     _panelCenter.value = position.target;
     _liveCamera.value = position;
     if (!_mapBusy) {
@@ -530,7 +548,67 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// Рисуется новый маршрут или область (не правка существующего).
   bool get _drawing => _editMode.state.target?.isNew ?? false;
 
+  bool get _drawingTrack {
+    final target = _editMode.state.target;
+    return target != null && target.isNew && target.type == LandmarkType.track;
+  }
+
+  /// Точки пути из шторки (без путевых точек на нём).
+  List<LandmarkLocation> get _trackLocations => switch (_editMode.state.target?.object) {
+    TrackObject(:final segments) => [for (final s in segments) ...s.locations],
+    _ => const [],
+  };
+
+  /// «Начертить»: путь продолжается до [position], если прицел ушёл от
+  /// последней точки дальше [_drawStepDp] (на экране, в этом масштабе).
+  void _drawTrackTo(CameraPosition position) {
+    if (!_drawingTrack) return;
+    final at = position.target;
+    final points = _trackLocations;
+    if (points.isNotEmpty) {
+      final last = points.last;
+      final meters = Haversine.distance(last, LandmarkLocation(latitude: at.latitude, longitude: at.longitude));
+      if (meters < _drawStepDp * _metersPerDp(at.latitude, position.zoom)) return;
+    }
+    _editMode.addPoint(LandmarkLocation(latitude: at.latitude, longitude: at.longitude));
+  }
+
+  void _setAutoDraw(bool on) {
+    setState(() => _autoDraw = on);
+    // Включили — путь начинается (или продолжается) с точки под прицелом.
+    final camera = _controller?.cameraPosition;
+    if (on && camera != null) _drawTrackTo(camera);
+  }
+
+  /// «Путевая точка» у пути: точка на путь, в прицел.
+  void _addTrackWaypoint() {
+    final center = _controller?.cameraPosition?.target ?? ref.read(mapCrosshairProvider);
+    if (center == null) return;
+    final at = LandmarkLocation(latitude: center.latitude, longitude: center.longitude);
+    _editMode.execute(AddWaypointCommand(waypoint: WaypointObject(location: at)));
+  }
+
+  /// «Удалить» у пути: последний небольшой отрезок — точки с конца, пока
+  /// снятая длина меньше [_trackDeleteDp] на экране (хотя бы одна точка).
+  void _removeTrackTail() {
+    final object = _editMode.state.target?.object;
+    if (object is! TrackObject || object.segments.isEmpty) return;
+    final segment = object.segments.length - 1;
+    final points = object.segments[segment].locations;
+    if (points.isEmpty) return;
+    final zoom = _controller?.cameraPosition?.zoom ?? _cameraZoom;
+    final limit = _trackDeleteDp * _metersPerDp(points.last.latitude, zoom);
+    var removed = 0.0;
+    var i = points.length - 1;
+    do {
+      _editMode.execute(RemoveTrackLocationCommand(segmentIndex: segment, index: i));
+      if (i > 0) removed += Haversine.distance(points[i - 1], points[i]);
+      i--;
+    } while (i >= 0 && removed < limit);
+  }
+
   void _onEditModeChanged() {
+    if (!_drawingTrack && _autoDraw) _autoDraw = false;
     if (!SetPanel.isActive(_editMode)) ref.read(setPanelHeightProvider.notifier).set(0);
     if (mounted) setState(() {});
     unawaited(_syncDraft());
@@ -983,11 +1061,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     onSize: (size) => ref.read(setPanelHeightProvider.notifier).set(size.height),
                     child: SetPanel(
                     pointCount: _editMode.pointCount,
-                    lengthMeters: _editMode.state.target!.type == LandmarkType.route
-                        ? Haversine.totalDistance(LandmarkLayer.drawnPoints(_editMode.state.target!.object))
-                        : null,
-                    onDelete: _removeLastDrawingPoint,
-                    onAddPoint: _addDrawingPoint,
+                    lengthMeters: switch (_editMode.state.target!.type) {
+                      LandmarkType.route || LandmarkType.track => Haversine.totalDistance(
+                        LandmarkLayer.drawnPoints(_editMode.state.target!.object),
+                      ),
+                      _ => null,
+                    },
+                    drawing: _drawingTrack ? _autoDraw : null,
+                    onDrawingChanged: _setAutoDraw,
+                    onDelete: _drawingTrack ? _removeTrackTail : _removeLastDrawingPoint,
+                    onAddPoint: _drawingTrack ? _addTrackWaypoint : _addDrawingPoint,
                     onSearch: () => showSetPointsSheet(context, ref),
                     onFinish: () => _editMode.pointCount == 0
                         ? _editMode.close()
