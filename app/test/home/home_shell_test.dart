@@ -3,6 +3,7 @@ import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/explorer/on_screen_landmarks_panel.dart';
 import 'package:app/home/home_shell.dart';
+import 'package:app/map/map_bearing.dart';
 import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/menu/menu_toggles.dart';
@@ -270,5 +271,32 @@ void main() {
     await tester.dragFrom(const Offset(300, 60), const Offset(80, 0));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('maps_panel')), findsNothing);
+  });
+
+  testWidgets('a rotated map shows the compass with a lock; a tap turns the map north instead of opening the menu', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    final container = ProviderScope.containerOf(tester.element(find.byType(HomeShell)));
+    expect(find.byKey(const Key('nav_compass_lock')), findsNothing);
+
+    var northUps = 0;
+    container.read(mapBearingProvider.notifier)
+      ..attach(() => northUps++)
+      ..update(37);
+    await tester.pump();
+    expect(find.byKey(const Key('nav_compass_lock')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('nav_compass')));
+    await tester.pumpAndSettle();
+    expect(northUps, 1);
+    expect(find.byKey(const Key('orientation_panel')), findsNothing);
+
+    container.read(mapBearingProvider.notifier).update(0.2);
+    await tester.pump();
+    expect(find.byKey(const Key('nav_compass_lock')), findsNothing);
+    await tester.tap(find.byKey(const Key('nav_compass')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('orientation_panel')), findsOneWidget);
   });
 }

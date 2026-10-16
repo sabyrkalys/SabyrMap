@@ -6,6 +6,7 @@ import '../app/landmark_services_provider.dart';
 import '../app_icons.dart';
 import 'home_nav_scope.dart';
 import '../map/drawing/set_panel.dart';
+import '../map/map_bearing.dart';
 import '../map/map_screen.dart';
 import '../map/map_target.dart';
 import '../map/screens/compare/compare_mode_screen.dart';
@@ -39,6 +40,13 @@ class _HomeShellState extends State<HomeShell> {
     final tab = MenuTab.values[index];
     final container = ProviderScope.containerOf(context, listen: false);
     container.read(crosshairMenuOpenProvider.notifier).close();
+    // Карта повёрнута — компас с замком: нажатие возвращает её на север,
+    // меню ориентирования не открывается.
+    if (tab == MenuTab.orientation && container.read(mapBearingProvider)) {
+      container.read(mapBearingProvider.notifier).northUp();
+      setState(() => _openTab = null);
+      return;
+    }
     setState(() => _openTab = _openTab == tab ? null : tab);
   }
 
@@ -261,6 +269,22 @@ class _BottomNav extends StatelessWidget {
                   size: _iconSize,
                   color: selected ? colorScheme.onSecondaryContainer : colorScheme.onSurfaceVariant,
                 ),
+                // Компас с замком: карта повёрнута от севера.
+                if (destination.key == const Key('nav_compass'))
+                  Positioned(
+                    left: 2,
+                    top: 6,
+                    child: Consumer(
+                      builder: (context, ref, _) => ref.watch(mapBearingProvider)
+                          ? Container(
+                              key: const Key('nav_compass_lock'),
+                              padding: const EdgeInsets.all(1),
+                              decoration: BoxDecoration(color: colorScheme.surface, shape: BoxShape.circle),
+                              child: AppIcon(AppIcons.lockBadge, size: 16, color: colorScheme.onSurfaceVariant),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ),
               ],
             ),
           ),

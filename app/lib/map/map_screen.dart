@@ -29,6 +29,7 @@ import 'drawing/set_panel.dart';
 import 'drawing/shape_dialogs.dart';
 import 'info_panel.dart';
 import 'landmark_layer.dart';
+import 'map_bearing.dart';
 import 'map_camera_store.dart';
 import 'map_crosshair.dart';
 import 'map_overlays.dart';
@@ -82,6 +83,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // Рисование нового маршрута или области: панель над картой, точки — в
   // прицел, черновик — своим источником LandmarkLayer.
   late final EditModeController _editMode;
+
+  // Поворот карты от севера — для компаса с замком в нижнем меню.
+  late final MapBearing _mapBearing;
 
   final Map<String, Line> _linesByTrackId = {};
   // A cheap "did this actually change" key per line id, so _syncLines only
@@ -166,6 +170,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _onScreen = ref.read(onScreenRegistryProvider)..addListener(_onLandmarksChanged);
     _landmarkIndex = ref.read(landmarkServicesProvider).index..addListener(_onLandmarksChanged);
     _editMode = ref.read(landmarkServicesProvider).editMode..addListener(_onEditModeChanged);
+    _mapBearing = ref.read(mapBearingProvider.notifier);
     // Кнопки карты над шторками (HomeNavScope.aboveSheet).
     MapSideButtons.builder = (_) => Consumer(
       builder: (context, ref, _) => _mapButtons(ref.watch(mapLayersProvider.select((state) => state.orthophotosOn))),
@@ -224,6 +229,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _landmarkIndex.removeListener(_onLandmarksChanged);
     _editMode.removeListener(_onEditModeChanged);
     MapSideButtons.builder = null;
+    _mapBearing.detach();
     // trackRecordingControllerProvider is a root-scope, non-autoDispose
     // provider: it survives MapScreen being swapped out (e.g. on logout),
     // so without this the geolocator stream would keep appending points in
@@ -252,6 +258,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   void _onMapCreated(MapLibreMapController controller) {
     _controller = controller;
+    _mapBearing.attach(() => _controller?.animateCamera(CameraUpdate.bearingTo(0)));
     _landmarkLayer = LandmarkLayer(controller);
     controller.onFeatureTapped.add(_onFeatureTapped);
     ref.read(mapViewportProvider.notifier).register(() async {
@@ -340,6 +347,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   // The zoom feeds the info panel's scale readout during a pinch; to avoid a
   // rebuild on every frame it is only applied once it moved by 0.1 or more.
   void _onCameraMove(CameraPosition position) {
+    ref.read(mapBearingProvider.notifier).update(position.bearing);
     _panelCenter.value = position.target;
     _liveCamera.value = position;
     if (!_mapBusy) {
