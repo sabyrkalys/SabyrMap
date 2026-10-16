@@ -67,6 +67,16 @@ class LandmarkLayer {
   /// Диаметр кружка точки вместе с белой обводкой, dp.
   static const double dotDiameter = 10;
 
+  /// Диаметр точки маршрута или пути (она на линии — мельче), dp.
+  static const double lineDotDiameter = 6;
+
+  /// Точка лежит на линии маршрута или пути.
+  static const List<Object> _onLine = [
+    'in',
+    ['get', 'type'],
+    ['literal', ['route', 'track']],
+  ];
+
   /// Шрифт надписей: есть на сервере глифов ([LayerManager.glyphsUrl]).
   static const List<String> labelFont = ['Noto Sans Regular'];
 
@@ -148,16 +158,22 @@ class LandmarkLayer {
     await _controller.addCircleLayer(
       sourceId,
       haloLayerId,
-      const CircleLayerProperties(circleRadius: 9, circleColor: '#FFFFFF', circleOpacity: 0.55, circleBlur: 0.7),
+      const CircleLayerProperties(
+        circleRadius: ['case', _onLine, 5, 9],
+        circleColor: '#FFFFFF',
+        circleOpacity: 0.55,
+        circleBlur: 0.7,
+      ),
       filter: dot,
       enableInteraction: false,
     );
     await _controller.addCircleLayer(
       sourceId,
       dotLayerId,
-      // Радиус 4.5 и обводка 0.5 — вместе [dotDiameter].
+      // Радиус 4.5 и обводка 0.5 — вместе [dotDiameter]; точки на линии
+      // маршрута или пути — [lineDotDiameter].
       const CircleLayerProperties(
-        circleRadius: 4.5,
+        circleRadius: ['case', _onLine, 2.5, 4.5],
         circleColor: color,
         circleStrokeColor: '#FFFFFF',
         circleStrokeWidth: 0.5,
@@ -226,7 +242,7 @@ class LandmarkLayer {
       draftSourceId,
       draftVertexLayerId,
       const CircleLayerProperties(
-        circleRadius: ['case', ['get', 'last'], 5, 4],
+        circleRadius: ['case', ['get', 'last'], 4, 3],
         circleColor: '#FFFFFF',
         circleStrokeColor: draftColor,
         circleStrokeWidth: 1,

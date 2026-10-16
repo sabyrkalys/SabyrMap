@@ -122,6 +122,11 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(find.text('12 точ.   2,35 км'), findsOneWidget);
+    // Подписи в половинах ряда — одной строкой.
+    for (final key in ['set_panel_add', 'set_panel_delete']) {
+      final text = find.descendant(of: find.byKey(Key(key)), matching: find.byType(Text));
+      expect(tester.getSize(text).height, lessThan(30), reason: key);
+    }
     expect(find.text('Путевая точка'), findsOneWidget);
   });
 
@@ -445,6 +450,14 @@ void main() {
       expect(target.object.userMetadata.name, 'Маршрут 1');
       expect(find.byKey(const Key('set_panel')), findsOneWidget);
       expect(find.byKey(const Key('set_panel_delete')), findsNothing);
+
+      // Тап по прицелу — обычная карточка, а не точка.
+      await tester.tapAt(tester.getCenter(find.byType(MapLibreMap)));
+      await tester.pumpAndSettle();
+      expect(f.services.editMode.pointCount, 0);
+      expect(find.byKey(const Key('crosshair_menu_barrier')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('crosshair_menu_barrier')));
+      await tester.pumpAndSettle();
 
       f.services.editMode
         ..addPoint(_loc(48.5, 37.0))

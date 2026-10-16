@@ -373,8 +373,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     final (position, time) = down;
     if ((event.position - position).distance > kTouchSlop) return;
     if (event.timeStamp - time > _crosshairTapTimeout) return;
-    // Пока рисуется маршрут или область, нажатие на прицел ставит точку.
-    if (_drawing) {
+    // Путь и область: нажатие на прицел ставит точку. У маршрута и набора
+    // точки ставит «+ Путевая точка» в шторке, а прицел открывает свою
+    // обычную карточку.
+    if (_drawing && !SetPanel.isActive(_editMode)) {
       _addDrawingPoint();
       return;
     }
@@ -991,7 +993,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
               ),
             ),
-          if (menuOpen && !_drawing) ...[
+          if (menuOpen && (!_drawing || SetPanel.isActive(_editMode))) ...[
             Positioned.fill(
               child: GestureDetector(
                 key: const Key('crosshair_menu_barrier'),

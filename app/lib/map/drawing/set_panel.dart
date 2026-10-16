@@ -163,7 +163,8 @@ class SetPanel extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(right: 8),
                 // FilledButton в теме растянут во всю ширину — в Expanded так
-                // и нужно.
+                // и нужно; подпись в половине ширины не переносится, а
+                // уменьшается.
                 child: Row(
                   children: [
                     Expanded(
@@ -171,7 +172,7 @@ class SetPanel extends StatelessWidget {
                         key: const Key('set_panel_add'),
                         onPressed: onAddPoint,
                         icon: const Icon(Icons.add),
-                        label: const Text('Путевая точка'),
+                        label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Путевая точка', maxLines: 1)),
                       ),
                     ),
                     if (onDelete != null && pointCount > 0) ...[
@@ -181,7 +182,7 @@ class SetPanel extends StatelessWidget {
                           key: const Key('set_panel_delete'),
                           onPressed: onDelete,
                           icon: const Icon(Icons.delete_outline),
-                          label: const Text('Удалить'),
+                          label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Удалить', maxLines: 1)),
                         ),
                       ),
                     ],
