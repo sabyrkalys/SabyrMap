@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../home/home_nav_scope.dart';
 import 'descriptors/context_menu_action.dart';
 import 'descriptors/context_menu_section.dart';
 import 'sheet_menu.dart';
@@ -42,14 +43,14 @@ class ContextMenuSheet extends StatefulWidget {
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => ContextMenuSheet(
+    builder: HomeNavScope.aboveSheet(context, (_) => ContextMenuSheet(
       key: key,
       title: title,
       sections: sections,
       env: env,
       origin: context,
       keyPrefix: keyPrefix,
-    ),
+    )),
   );
 
   @override

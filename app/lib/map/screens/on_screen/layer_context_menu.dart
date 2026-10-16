@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dialogs/confirm_dialog.dart';
 import '../../../explorer/sheet_menu.dart';
+import '../../../home/home_nav_scope.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../models/layer_look.dart';
 import '../../services/layer_manager.dart';
@@ -35,7 +36,7 @@ class LayerContextMenu extends ConsumerWidget {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         barrierColor: Colors.black12,
-        builder: (_) => LayerContextMenu(sourceId: sourceId, fromPanel: fromPanel),
+        builder: HomeNavScope.aboveSheet(context, (_) => LayerContextMenu(sourceId: sourceId, fromPanel: fromPanel)),
       );
 
   bool get _isBase => sourceId == baseId;

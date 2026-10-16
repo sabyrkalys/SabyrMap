@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/landmark_services_provider.dart';
 import '../app_icons.dart';
+import 'home_nav_scope.dart';
 import '../map/drawing/set_panel.dart';
 import '../map/map_screen.dart';
 import '../map/map_target.dart';
@@ -57,56 +58,62 @@ class _HomeShellState extends State<HomeShell> {
           // so the map must continue underneath it.
           extendBody: true,
           // Builder: the extendBody bottom padding only exists below the Scaffold.
-          body: Builder(
-            builder: (context) {
-              final padding = MediaQuery.paddingOf(context);
-              return Stack(
-                children: [
-                  const MapScreen(),
-                  // Режим сравнения слоёв: панель над нижним меню.
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: padding.bottom,
-                    child: Consumer(
-                      builder: (context, ref, _) => switch (ref.watch(compareRequestProvider)) {
-                        final ids? => CompareModeScreen(key: ValueKey(ids), layerIds: ids),
-                        null => const SizedBox.shrink(),
-                      },
-                    ),
-                  ),
-                  if (openTab != null) ...[
-                    // Catches the tap that closes the panel so it never
-                    // reaches the map underneath.
-                    Positioned.fill(
-                      child: GestureDetector(
-                        key: const Key('menu_panel_barrier'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => _openTab = null),
+          // Шторки над картой ставят это меню над собой (HomeNavScope).
+          body: HomeNavScope(
+            buildNav: (onSelected) =>
+                _BottomNav(destinations: _destinations, selectedIndex: null, onSelected: onSelected),
+            select: _onNavSelected,
+            child: Builder(
+              builder: (context) {
+                final padding = MediaQuery.paddingOf(context);
+                return Stack(
+                  children: [
+                    const MapScreen(),
+                    // Режим сравнения слоёв: панель над нижним меню.
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: padding.bottom,
+                      child: Consumer(
+                        builder: (context, ref, _) => switch (ref.watch(compareRequestProvider)) {
+                          final ids? => CompareModeScreen(key: ValueKey(ids), layerIds: ids),
+                          null => const SizedBox.shrink(),
+                        },
                       ),
                     ),
-                    Positioned(
-                      // The nav icons sit inside a SafeArea, so a side system
-                      // bar (landscape) shifts them; the panel follows.
-                      left: padding.left + _panelMargin,
-                      right: padding.right + _panelMargin,
-                      top: padding.top + _panelMargin,
-                      // With extendBody the bottom padding is the nav panel's
-                      // height; the panel's arrow fills the gap down to it.
-                      bottom: padding.bottom,
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: menuPanelFor(
-                          openTab,
-                          arrowCenterX: _BottomNav.iconCenterX(openTab.index) - _panelMargin,
-                          onClose: () => setState(() => _openTab = null),
+                    if (openTab != null) ...[
+                      // Catches the tap that closes the panel so it never
+                      // reaches the map underneath.
+                      Positioned.fill(
+                        child: GestureDetector(
+                          key: const Key('menu_panel_barrier'),
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _openTab = null),
                         ),
                       ),
-                    ),
+                      Positioned(
+                        // The nav icons sit inside a SafeArea, so a side system
+                        // bar (landscape) shifts them; the panel follows.
+                        left: padding.left + _panelMargin,
+                        right: padding.right + _panelMargin,
+                        top: padding.top + _panelMargin,
+                        // With extendBody the bottom padding is the nav panel's
+                        // height; the panel's arrow fills the gap down to it.
+                        bottom: padding.bottom,
+                        child: Align(
+                          alignment: Alignment.bottomLeft,
+                          child: menuPanelFor(
+                            openTab,
+                            arrowCenterX: _BottomNav.iconCenterX(openTab.index) - _panelMargin,
+                            onClose: () => setState(() => _openTab = null),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              );
-            },
+                );
+              },
+            ),
           ),
           // Пока рисуется набор точек, его шторка стоит у нижнего края, а
           // меню — над ней.

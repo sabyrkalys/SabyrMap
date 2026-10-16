@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../home/home_nav_scope.dart';
 
 const Color _ink = Color(0xFF333333);
 const Color _accent = Color(0xFF00A38E);
@@ -11,7 +12,7 @@ Future<void> showLookPanel(BuildContext context, Widget panel) => showModalBotto
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.transparent,
-      builder: (_) => panel,
+      builder: HomeNavScope.aboveSheet(context, (_) => panel),
     );
 
 /// Серая плашка экрана: иконка, «Название · слой», ?, 🔧, разделитель, ✓.

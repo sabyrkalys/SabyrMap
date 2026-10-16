@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../home/home_nav_scope.dart';
 import '../../catalog/catalog_repository.dart';
 import '../../state/map_layers_controller.dart';
 import '../layers_panel.dart';
@@ -18,10 +19,13 @@ class LayerOpacitySheet extends ConsumerStatefulWidget {
 
   static Future<void> show(BuildContext context, String sourceId) => showModalBottomSheet<void>(
     context: context,
-    backgroundColor: onScreenPanelBackground,
+    backgroundColor: Colors.transparent,
     barrierColor: Colors.transparent,
-    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-    builder: (_) => LayerOpacitySheet(sourceId: sourceId),
+    builder: HomeNavScope.aboveSheet(
+      context,
+      (_) => LayerOpacitySheet(sourceId: sourceId),
+      background: onScreenPanelBackground,
+    ),
   );
 
   @override

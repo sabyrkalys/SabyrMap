@@ -2,6 +2,7 @@ import 'package:app/landmarks/explorer/listing/landmark_item.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../home/home_nav_scope.dart';
 import '../icons/icon_library_scanner.dart';
 import 'waypoint_edits.dart';
 import 'waypoint_form_sheet.dart';
@@ -15,37 +16,39 @@ Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, LandmarkIt
   final note = item.description;
   final action = await showModalBottomSheet<String>(
     context: context,
-    builder: (context) => Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(item.name, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 4),
-          Text(waypointTypeLabels[type] ?? type),
-          if (note != null && note.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(note),
+    backgroundColor: Colors.transparent,
+    builder: HomeNavScope.aboveSheet(
+      context,
+      background: Theme.of(context).colorScheme.surfaceContainerLow,
+      (context) => Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(item.name, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(waypointTypeLabels[type] ?? type),
+            if (note != null && note.isNotEmpty) ...[const SizedBox(height: 8), Text(note)],
+            if (!item.isNested) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  TextButton(
+                    key: const Key('waypoint_edit_button'),
+                    onPressed: () => Navigator.of(context).pop('edit'),
+                    child: const Text('Изменить'),
+                  ),
+                  TextButton(
+                    key: const Key('waypoint_delete_button'),
+                    onPressed: () => Navigator.of(context).pop('delete'),
+                    child: const Text('Удалить'),
+                  ),
+                ],
+              ),
+            ],
           ],
-          if (!item.isNested) ...[
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                TextButton(
-                  key: const Key('waypoint_edit_button'),
-                  onPressed: () => Navigator.of(context).pop('edit'),
-                  child: const Text('Изменить'),
-                ),
-                TextButton(
-                  key: const Key('waypoint_delete_button'),
-                  onPressed: () => Navigator.of(context).pop('delete'),
-                  child: const Text('Удалить'),
-                ),
-              ],
-            ),
-          ],
-        ],
+        ),
       ),
     ),
   );
@@ -58,11 +61,18 @@ Future<void> showWaypointDetails(BuildContext context, WidgetRef ref, LandmarkIt
   }
 }
 
-Future<void> editWaypoint(BuildContext context, WidgetRef ref, LandmarkItem item, {IconLibraryScanner? iconScanner}) async {
+Future<void> editWaypoint(
+  BuildContext context,
+  WidgetRef ref,
+  LandmarkItem item, {
+  IconLibraryScanner? iconScanner,
+}) async {
   final result = await showWaypointFormSheet(context, existing: item, iconScanner: iconScanner);
   if (result == null || !context.mounted) return;
   try {
-    await ref.read(waypointEditsProvider).update(
+    await ref
+        .read(waypointEditsProvider)
+        .update(
           item.path,
           name: result.name,
           type: result.type,

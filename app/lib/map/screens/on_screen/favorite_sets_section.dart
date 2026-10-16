@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../dialogs/confirm_dialog.dart';
 import '../../../explorer/sheet_menu.dart';
-import '../../models/map_models.dart';
+import '../../../home/home_nav_scope.dart';
 import '../../catalog/catalog_repository.dart';
+import '../../models/map_models.dart';
 import '../../services/map_previews.dart';
 import '../../state/map_layers_controller.dart';
 import '../layers_panel.dart';
@@ -212,7 +213,7 @@ class FavoriteMapMenu extends ConsumerWidget {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => FavoriteMapMenu(source: source, onApplied: onApplied),
+        builder: HomeNavScope.aboveSheet(context, (_) => FavoriteMapMenu(source: source, onApplied: onApplied)),
       );
 
   @override
@@ -262,7 +263,7 @@ class FavoriteSetContextMenu extends ConsumerWidget {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => FavoriteSetContextMenu(preset: preset, onApplied: onApplied),
+        builder: HomeNavScope.aboveSheet(context, (_) => FavoriteSetContextMenu(preset: preset, onApplied: onApplied)),
       );
 
   @override

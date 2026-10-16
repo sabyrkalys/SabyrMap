@@ -1,6 +1,7 @@
 import 'package:app/app_icons.dart';
 import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_source.dart';
+import 'package:app/explorer/on_screen_landmarks_panel.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:app/map/map_screen.dart';
@@ -218,5 +219,26 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(tester.getBottomLeft(find.byKey(const Key('bottom_nav'))).dy, navBottom);
+  });
+
+  testWidgets('«Метки на экране» opens with the main menu above it; a tab there closes the sheet and opens the tab', (
+    tester,
+  ) async {
+    await pumpShell(tester);
+    await tester.tap(find.byKey(const Key('nav_waypoints')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Метки на экране'));
+    await tester.pumpAndSettle();
+
+    final sheetNav = find.byKey(const Key('bottom_nav'));
+    // Два меню: под шторкой (в HomeShell) и над ней — то, что над ней, выше.
+    expect(sheetNav, findsNWidgets(2));
+    final panelTop = tester.getTopLeft(find.byType(OnScreenLandmarksPanel)).dy;
+    expect(tester.getBottomLeft(sheetNav.last).dy, lessThanOrEqualTo(panelTop));
+
+    await tester.tap(find.descendant(of: sheetNav.last, matching: find.byKey(const Key('nav_map'))));
+    await tester.pumpAndSettle();
+    expect(find.byType(OnScreenLandmarksPanel), findsNothing);
+    expect(find.byKey(const Key('maps_panel')), findsOneWidget);
   });
 }

@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/landmark_services_provider.dart';
 import '../dialogs/confirm_dialog.dart';
+import '../home/home_nav_scope.dart';
 import '../map/map_crosshair.dart';
 import '../map/screens/layers_panel.dart' show onScreenPanelBackground;
 import 'context_menu_sheet.dart';
@@ -35,7 +36,8 @@ class OnScreenLandmarksPanel extends ConsumerStatefulWidget {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black12,
-    builder: (_) => const OnScreenLandmarksPanel(),
+    // Главное меню — над шторкой.
+    builder: HomeNavScope.aboveSheet(context, (_) => const OnScreenLandmarksPanel()),
   );
 
   /// Файлы меток (с подпапками, без объектов внутри `.ldk`), что на экране.

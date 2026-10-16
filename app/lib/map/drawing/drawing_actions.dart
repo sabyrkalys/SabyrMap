@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../../app/landmark_services_provider.dart';
+import '../../home/home_nav_scope.dart';
 import '../../icons/icon_library_scanner.dart';
 import '../../waypoints/new_marker/marker_type.dart';
 import '../../waypoints/new_marker/new_marker_sheet.dart';
@@ -103,7 +104,11 @@ Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
   final focus = ref.read(mapFocusProvider.notifier);
   await showModalBottomSheet<void>(
     context: context,
-    builder: (context) => SafeArea(
+    backgroundColor: Colors.transparent,
+    builder: HomeNavScope.aboveSheet(
+      context,
+      background: Theme.of(context).colorScheme.surfaceContainerLow,
+      (context) => SafeArea(
       child: ListView(
         key: const Key('set_points_sheet'),
         shrinkWrap: true,
@@ -121,7 +126,7 @@ Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
             ),
         ],
       ),
-    ),
+    ),)
   );
 }
 

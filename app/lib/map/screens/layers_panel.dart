@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../home/home_nav_scope.dart';
 import '../base/world_base_map.dart';
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
@@ -58,7 +59,8 @@ class LayersPanel extends ConsumerWidget {
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
     barrierColor: Colors.black12,
-    builder: (_) => const LayersPanel(),
+    // Главное меню — над шторкой.
+    builder: HomeNavScope.aboveSheet(context, (_) => const LayersPanel()),
   );
 
   /// Панель прячется, пока открыта шторка непрозрачности (карта видна

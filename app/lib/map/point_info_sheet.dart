@@ -6,6 +6,7 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import '../app_icons.dart';
 import '../geo/sun_times.dart';
 import '../geo/wmm.dart';
+import '../home/home_nav_scope.dart';
 import '../menu/menu_widgets.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/app_icon.dart';
@@ -40,7 +41,7 @@ Future<void> showPointInfoSheet(BuildContext context, {required LatLng point, re
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => PointInfoSheet(point: point, sk42: sk42, now: DateTime.now()),
+    builder: HomeNavScope.aboveSheet(context, (_) => PointInfoSheet(point: point, sk42: sk42, now: DateTime.now())),
   );
 }
 
