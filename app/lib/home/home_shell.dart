@@ -160,6 +160,9 @@ class _BottomNav extends StatelessWidget {
   static const double _screenMargin = 5;
   static const double _backgroundOpacity = 0.5;
 
+  /// Зазор под меню у нижнего края экрана (системные кнопки спрятаны).
+  static const double _bottomGap = 4;
+
   /// Each item is icon + gap wide, so half a gap sits on either side of the
   /// icon (5 dp to the panel edge for the outer ones).
   static const double _itemWidth = _iconSize + _gap;
@@ -177,7 +180,7 @@ class _BottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.only(left: _screenMargin),
+        padding: const EdgeInsets.only(left: _screenMargin, bottom: _bottomGap),
         child: Align(
           alignment: Alignment.bottomLeft,
           heightFactor: 1,
