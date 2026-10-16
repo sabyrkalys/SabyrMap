@@ -1,3 +1,4 @@
+import 'package:app/landmarks/models/landmark_metadata.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
@@ -73,6 +74,8 @@ Future<void> saveWaypoint(
       extra: {
         if (data.comment?.trim().isNotEmpty ?? false) 'comment': data.comment!.trim(),
         'icon': ?data.markerIconId,
+        if (data.website?.isNotEmpty ?? false) LandmarkMetadata.websiteKey: data.website!,
+        if (data.keywords?.isNotEmpty ?? false) LandmarkMetadata.keywordsKey: data.keywords!,
       },
     );
   } on WaypointException catch (e) {

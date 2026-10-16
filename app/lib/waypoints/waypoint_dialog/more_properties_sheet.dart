@@ -5,14 +5,17 @@ import 'waypoint_property.dart';
 
 /// Opens «Ещё...» over the waypoint dialog. Completes with the chosen
 /// property's type, or null on «ОТМЕНА».
-Future<WaypointPropertyType?> showMorePropertiesSheet(BuildContext context) {
+Future<WaypointPropertyType?> showMorePropertiesSheet(
+  BuildContext context, {
+  List<WaypointProperty> properties = waypointProperties,
+}) {
   return showModalBottomSheet<WaypointPropertyType>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: MorePropertiesSheet.background,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-    builder: (_) => const MorePropertiesSheet(),
+    builder: (_) => MorePropertiesSheet(properties: properties),
   );
 }
 

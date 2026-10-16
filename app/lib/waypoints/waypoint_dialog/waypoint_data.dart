@@ -18,6 +18,8 @@ class WaypointData {
     this.type = defaultWaypointType,
     this.note = '',
     this.comment,
+    this.website,
+    this.keywords,
   });
 
   /// «Несортированные метки», where waypoints go by default.
@@ -50,6 +52,10 @@ class WaypointData {
   /// «Комментарий»: one line, not stored by the server yet; null when the
   /// field was not opened.
   final String? comment;
+
+  /// «Сайт» и «Ключевые слова» из «Ещё...»; null — поле не открывали.
+  final String? website;
+  final String? keywords;
 
   /// [colorValue] as the API's `#RRGGBB`.
   String? get colorHex => colorValue == null ? null : colorToHex(Color(colorValue!));

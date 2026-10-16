@@ -3,6 +3,7 @@ import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/map/drawing/drawing_actions.dart';
 import 'package:app/map/drawing/drawing_bar.dart';
 import 'package:app/map/drawing/shape_dialogs.dart';
+import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:app/map/landmark_layer.dart';
 import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/map_screen.dart';
@@ -65,6 +66,20 @@ void main() {
     );
     expect(tester.takeException(), isNull);
     expect(tester.getSize(find.byKey(const Key('drawing_bar'))).height, greaterThan(0));
+  });
+
+  test('setMetadata keeps what was entered and numbers an unnamed set', () {
+    final m = setMetadata(
+      const WaypointData(colorValue: 0xFF112233, type: 'danger', comment: ' север ', note: '', website: '', keywords: 'a, b'),
+      const ['Набор точек 2'],
+    ).entries;
+    expect(m[LandmarkMetadata.nameKey], 'Набор точек 3');
+    expect(m[LandmarkMetadata.kindKey], 'danger');
+    expect(m[LandmarkMetadata.colorKey], 0xFF112233);
+    expect(m[LandmarkMetadata.commentKey], 'север');
+    expect(m[LandmarkMetadata.keywordsKey], 'a, b');
+    expect(m.containsKey(LandmarkMetadata.descriptionKey), isFalse);
+    expect(m.containsKey(LandmarkMetadata.websiteKey), isFalse);
   });
 
   test('parseRadius takes positive metres, with a comma too', () {
@@ -317,6 +332,37 @@ void main() {
       expect(stored.location.latitude, closeTo(48.5, 1e-6));
     });
 
+    testWidgets('«Готово» saves a set named in its dialog straight away, without asking again', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                key: const Key('drawing_finish'),
+                onPressed: () => finishDrawing(context, f.services),
+                child: const Text('go'),
+              ),
+            ),
+          ),
+        ),
+      );
+      f.services.editMode
+        ..startNew(
+          LandmarkType.set,
+          folder: f.paths.importDefault,
+          metadata: const LandmarkMetadata(entries: {LandmarkMetadata.nameKey: 'Посты'}),
+        )
+        ..addPoint(_loc(48.5, 37.0));
+      await tester.tap(find.byKey(const Key('drawing_finish')));
+      await tester.pump();
+      expect(find.byKey(const Key('drawing_name_field')), findsNothing);
+      for (var i = 0; i < 100 && f.services.index.byType(LandmarkType.set).isEmpty; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+      }
+      await tester.pumpAndSettle();
+      expect(f.services.index.byType(LandmarkType.set).single.name, 'Посты');
+    });
+
     testWidgets('the cross closes an empty drawing at once, one with points after a confirmation', (tester) async {
       await pumpMap(tester);
       await startRoute(tester);
@@ -337,21 +383,63 @@ void main() {
       expect(f.services.index.byType(LandmarkType.route), isEmpty);
     });
 
-    for (final (title, type) in [('Путь', LandmarkType.track), ('Набор точек', LandmarkType.set)]) {
-      testWidgets('«Новая метка» → «$title» starts drawing ${type.name}', (tester) async {
-        await pumpMap(tester);
-        await tester.tapAt(tester.getCenter(find.byType(MapLibreMap)));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Новая метка...'));
-        await tester.pumpAndSettle();
-        await tester.scrollUntilVisible(find.text(title), 100);
-        await tester.tap(find.text(title));
-        await tester.pumpAndSettle();
-
-        expect(f.services.editMode.state.target?.type, type);
-        expect(find.text(DrawingBar.titleOf(type)), findsOneWidget);
-      });
+    Future<void> chooseNewMarker(WidgetTester tester, String title) async {
+      await tester.tapAt(tester.getCenter(find.byType(MapLibreMap)));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Новая метка...'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text(title), 100);
+      await tester.tap(find.text(title));
+      await tester.pumpAndSettle();
     }
+
+    testWidgets('«Новая метка» → «Путь» starts drawing a track', (tester) async {
+      await pumpMap(tester);
+      await chooseNewMarker(tester, 'Путь');
+
+      expect(f.services.editMode.state.target?.type, LandmarkType.track);
+      expect(find.text(DrawingBar.titleOf(LandmarkType.track)), findsOneWidget);
+    });
+
+    testWidgets('«Набор точек» opens the waypoint dialog without coordinates, then drawing with what was entered', (
+      tester,
+    ) async {
+      await pumpMap(tester);
+      await chooseNewMarker(tester, 'Набор точек');
+
+      expect(find.byKey(const Key('set_dialog')), findsOneWidget);
+      expect(find.byKey(const Key('waypoint_dialog_coords')), findsNothing);
+      expect(find.byKey(const Key('waypoint_dialog_group')), findsOneWidget);
+      expect(f.services.editMode.state.target, isNull);
+
+      await tester.enterText(find.byKey(const Key('waypoint_dialog_name_field')), 'Посты');
+      await tester.tap(find.byKey(const Key('waypoint_dialog_more')));
+      await tester.pumpAndSettle();
+      // «Ещё...» набора: иконка, цвет, стиль, комментарий, сайт, ключевые слова, описание.
+      for (final title in ['Иконка', 'Цвет', 'Стиль', 'Комментарий', 'Сайт', 'Ключевые слова', 'Описание']) {
+        expect(find.descendant(of: find.byKey(const Key('more_properties_sheet')), matching: find.text(title)), findsOneWidget);
+      }
+      expect(find.text('Галерея'), findsNothing);
+      await tester.tap(find.text('Сайт'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('waypoint_dialog_website')), 'https://example.org');
+      await tester.tap(find.byKey(const Key('waypoint_dialog_more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ключевые слова'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('waypoint_dialog_keywords')), 'пост, север');
+      await tester.tap(find.byKey(const Key('waypoint_dialog_ok')));
+      await tester.pumpAndSettle();
+
+      final target = f.services.editMode.state.target!;
+      expect(target.type, LandmarkType.set);
+      expect(target.folder, f.paths.importDefault);
+      final m = target.object.userMetadata.entries;
+      expect(m[LandmarkMetadata.nameKey], 'Посты');
+      expect(m[LandmarkMetadata.websiteKey], 'https://example.org');
+      expect(m[LandmarkMetadata.keywordsKey], 'пост, север');
+      expect(find.text(DrawingBar.titleOf(LandmarkType.set)), findsOneWidget);
+    });
 
     testWidgets('«Новая метка» → «Область» starts drawing an area', (tester) async {
       await pumpMap(tester);

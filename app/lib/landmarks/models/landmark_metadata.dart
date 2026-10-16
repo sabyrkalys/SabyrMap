@@ -45,6 +45,12 @@ class LandmarkMetadata {
   /// Вид метки в приложении (тип путевой точки: «Пост», «Опасность»...).
   static const String kindKey = 'type';
   static const String styleKey = 'style';
+
+  /// Сайт метки (адрес строкой).
+  static const String websiteKey = 'website';
+
+  /// Ключевые слова строкой, через запятую.
+  static const String keywordsKey = 'keywords';
   static const String createdAtKey = 'created_at';
   static const String updatedAtKey = 'updated_at';
   static const String lengthKey = 'length_m';

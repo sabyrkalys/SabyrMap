@@ -39,14 +39,48 @@ Future<WaypointData?> showWaypointDialog(
   );
 }
 
+/// Opens «Набор точек»: the waypoint dialog without coordinates (the
+/// points are drawn on the map afterwards), with the set's «Ещё...».
+Future<WaypointData?> showSetDialog(BuildContext context, {IconLibraryScanner? iconScanner}) {
+  return showDialog<WaypointData>(
+    context: context,
+    builder: (_) => WaypointDialog(
+      iconScanner: iconScanner,
+      title: 'Набор точек',
+      titleIcon: Icons.share_location_sharp,
+      showCoordinates: false,
+      properties: setProperties,
+    ),
+  );
+}
+
 /// «Путевая точка»: name, where it goes, its group, then icon (flag), colour
-/// (palette), description (pencil) and «ЕЩЁ...» for the rest.
+/// (palette), description (pencil) and «ЕЩЁ...» for the rest. The same
+/// dialog, titled «Набор точек» and without [showCoordinates], creates a
+/// set ([showSetDialog]).
 class WaypointDialog extends ConsumerStatefulWidget {
-  const WaypointDialog({super.key, this.iconScanner, this.pointLabel = 'Координаты центра экрана', this.fixedPoint});
+  const WaypointDialog({
+    super.key,
+    this.iconScanner,
+    this.pointLabel = 'Координаты центра экрана',
+    this.fixedPoint,
+    this.title = 'Путевая точка',
+    this.titleIcon = Icons.location_on_sharp,
+    this.showCoordinates = true,
+    this.properties = waypointProperties,
+  });
 
   final IconLibraryScanner? iconScanner;
   final String pointLabel;
   final LatLng? fixedPoint;
+  final String title;
+  final IconData titleIcon;
+
+  /// The «Координаты центра экрана» block; a set has no single point.
+  final bool showCoordinates;
+
+  /// The rows of «Ещё...».
+  final List<WaypointProperty> properties;
 
   @override
   ConsumerState<WaypointDialog> createState() => _WaypointDialogState();
@@ -94,6 +128,14 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
   final _commentFocus = FocusNode();
   final _descriptionFocus = FocusNode();
 
+  // «Сайт» and «Ключевые слова» from «Ещё...».
+  bool _websiteVisible = false;
+  bool _keywordsVisible = false;
+  final _website = TextEditingController();
+  final _keywords = TextEditingController();
+  final _websiteFocus = FocusNode();
+  final _keywordsFocus = FocusNode();
+
   @override
   void dispose() {
     _name.dispose();
@@ -104,6 +146,10 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
     _description.dispose();
     _commentFocus.dispose();
     _descriptionFocus.dispose();
+    _website.dispose();
+    _keywords.dispose();
+    _websiteFocus.dispose();
+    _keywordsFocus.dispose();
     super.dispose();
   }
 
@@ -188,11 +234,17 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
   }
 
   Future<void> _onMoreProperties() async {
-    final selected = await showMorePropertiesSheet(context);
+    final selected = await showMorePropertiesSheet(context, properties: widget.properties);
     if (selected == null || !mounted) return;
     switch (selected) {
       case WaypointPropertyType.icon:
         await _pickIcon();
+      case WaypointPropertyType.color:
+        await _pickColor();
+      case WaypointPropertyType.website:
+        _show(() => _websiteVisible = true, _websiteFocus);
+      case WaypointPropertyType.keywords:
+        _show(() => _keywordsVisible = true, _keywordsFocus);
       case WaypointPropertyType.style:
         await _pickType();
       case WaypointPropertyType.description:
@@ -202,9 +254,7 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
       case WaypointPropertyType.image ||
           WaypointPropertyType.gallery ||
           WaypointPropertyType.audio ||
-          WaypointPropertyType.course ||
-          WaypointPropertyType.website ||
-          WaypointPropertyType.keywords:
+          WaypointPropertyType.course:
         // Not stored by the app or the server yet.
         debugPrint('Property selected: $selected');
     }
@@ -500,6 +550,32 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
     );
   }
 
+  /// «Сайт» / «Ключевые слова»: one line under a label, like «Комментарий».
+  Widget _lineField(String label, Key key, TextEditingController controller, FocusNode focus, {String? hint}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 15, color: _textColor)),
+        TextField(
+          key: key,
+          controller: controller,
+          focusNode: focus,
+          maxLines: 1,
+          keyboardType: key == const Key('waypoint_dialog_website') ? TextInputType.url : TextInputType.text,
+          style: const TextStyle(fontSize: 16, color: _textColor),
+          cursorColor: _accent,
+          decoration: InputDecoration(
+            isDense: true,
+            hintText: hint,
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFFBDBDBD))),
+            focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: _accent, width: 1.5)),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// «Описание»: a label over a borderless block of at least five lines,
   /// a thin line under it.
   Widget _descriptionField() {
@@ -546,6 +622,8 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
       // «Описание» is the waypoint's note on the server.
       note: _descriptionVisible ? _description.text.trim() : '',
       comment: _commentVisible ? _comment.text.trim() : null,
+      website: _websiteVisible ? _website.text.trim() : null,
+      keywords: _keywordsVisible ? _keywords.text.trim() : null,
     ),
   );
 
@@ -554,7 +632,7 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
     final width = MediaQuery.sizeOf(context).width;
     const buttonStyle = TextStyle(fontWeight: FontWeight.w600, letterSpacing: 0.5);
     return AlertDialog(
-      key: const Key('waypoint_dialog'),
+      key: Key(widget.showCoordinates ? 'waypoint_dialog' : 'set_dialog'),
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation: 12,
@@ -570,16 +648,16 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Padding(
-              padding: EdgeInsets.only(bottom: 24),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 24),
               child: Row(
                 children: [
-                  Icon(Icons.location_on_sharp, size: 24, color: _iconColor),
-                  SizedBox(width: 12),
+                  Icon(widget.titleIcon, size: 24, color: _iconColor),
+                  const SizedBox(width: 12),
                   Flexible(
                     child: Text(
-                      'Путевая точка',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w500, color: _textColor),
+                      widget.title,
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w500, color: _textColor),
                     ),
                   ),
                 ],
@@ -601,13 +679,26 @@ class _WaypointDialogState extends ConsumerState<WaypointDialog> {
               ),
             ),
             const SizedBox(height: 20),
-            _coordsSection(),
-            const SizedBox(height: 16),
+            if (widget.showCoordinates) ...[_coordsSection(), const SizedBox(height: 16)],
             _groupSection(),
             const SizedBox(height: 24),
             if (_icon case final icon?) ...[_iconRow(icon), const SizedBox(height: 16)],
             if (_colorValue case final color?) ...[_colorRow(Color(color)), const SizedBox(height: 16)],
             if (_commentVisible) ...[_commentField(), const SizedBox(height: 16)],
+            if (_websiteVisible) ...[
+              _lineField('Сайт', const Key('waypoint_dialog_website'), _website, _websiteFocus, hint: 'https://'),
+              const SizedBox(height: 16),
+            ],
+            if (_keywordsVisible) ...[
+              _lineField(
+                'Ключевые слова',
+                const Key('waypoint_dialog_keywords'),
+                _keywords,
+                _keywordsFocus,
+                hint: 'через запятую',
+              ),
+              const SizedBox(height: 16),
+            ],
             if (_descriptionVisible) ...[_descriptionField(), const SizedBox(height: 16)],
             Row(
               children: [

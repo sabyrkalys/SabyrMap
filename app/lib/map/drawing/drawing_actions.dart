@@ -1,4 +1,5 @@
 import 'package:app/landmarks/composite/edit_mode/edit_commands.dart';
+import 'package:app/landmarks/composite/edit_mode/edit_mode_controller.dart';
 import 'package:app/landmarks/drafts/metadata_patch.dart';
 import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
@@ -10,6 +11,9 @@ import '../../icons/icon_library_scanner.dart';
 import '../../waypoints/new_marker/marker_type.dart';
 import '../../waypoints/new_marker/new_marker_sheet.dart';
 import '../../waypoints/waypoint_create_action.dart';
+import '../../waypoints/waypoint_dialog/marker_group.dart';
+import '../../waypoints/waypoint_dialog/waypoint_data.dart';
+import '../../waypoints/waypoint_dialog/waypoint_dialog.dart';
 import '../map_target.dart';
 import 'shape_dialogs.dart';
 
@@ -26,11 +30,27 @@ Future<void> openNewMarker(
 }) async {
   final type = await showNewMarkerSheet(context);
   if (type == null || !context.mounted) return;
+  // Набор точек: сначала его свойства — диалог путевой точки без
+  // координат, потом точки рисуются на карте.
+  if (type.id == MarkerTypeIds.set) {
+    final container = ProviderScope.containerOf(context, listen: false);
+    final data = await showSetDialog(context, iconScanner: iconScanner);
+    if (data == null) return;
+    final services = container.read(landmarkServicesProvider);
+    final folders = container.read(markerGroupFoldersProvider);
+    container.read(crosshairMenuOpenProvider.notifier).close();
+    services.editMode.startNew(
+      LandmarkType.set,
+      folder: folderFor(folders, data.groupId) ?? folders.unsorted,
+      metadata: setMetadata(data, services.index.byType(LandmarkType.set).map((i) => i.name)),
+    );
+    onDrawingStarted?.call();
+    return;
+  }
   final drawn = switch (type.id) {
     MarkerTypeIds.route => LandmarkType.route,
     MarkerTypeIds.path => LandmarkType.track,
     MarkerTypeIds.area => LandmarkType.area,
-    MarkerTypeIds.set => LandmarkType.set,
     _ => null,
   };
   if (drawn != null) {
@@ -63,6 +83,26 @@ void startDrawing(WidgetRef ref, LandmarkType type) {
   ref.read(landmarkServicesProvider).editMode.startNew(type, folder: ref.read(markerGroupFoldersProvider).unsorted);
 }
 
+/// Метаданные набора из диалога «Набор точек»; пустое имя — следующий
+/// «Набор точек N» среди [existingNames].
+LandmarkMetadata setMetadata(WaypointData data, Iterable<String> existingNames) {
+  String? text(String? value) => value == null || value.trim().isEmpty ? null : value.trim();
+  final name = text(data.name) ?? nextDrawingName(LandmarkType.set, existingNames);
+  return LandmarkMetadata(
+    entries: {
+      LandmarkMetadata.nameKey: name,
+      LandmarkMetadata.kindKey: data.type,
+      LandmarkMetadata.colorKey: ?data.colorValue,
+      LandmarkMetadata.userIconKey: ?data.iconId,
+      LandmarkMetadata.iconKey: ?data.markerIconId,
+      LandmarkMetadata.commentKey: ?text(data.comment),
+      LandmarkMetadata.descriptionKey: ?text(data.note),
+      LandmarkMetadata.websiteKey: ?text(data.website),
+      LandmarkMetadata.keywordsKey: ?text(data.keywords),
+    },
+  );
+}
+
 /// Имя по умолчанию для нового объекта: «Маршрут N», «Область N» — на
 /// один больше наибольшего N среди [existingNames].
 String nextDrawingName(LandmarkType type, Iterable<String> existingNames) {
@@ -83,14 +123,18 @@ String nextDrawingName(LandmarkType type, Iterable<String> existingNames) {
   return '$base ${highest + 1}';
 }
 
-/// «Готово»: спрашивает имя и сохраняет нарисованный объект новым файлом.
-/// Возвращает путь файла; null — имя не подтвердили или запись не
-/// удалась (тогда рисование остаётся открытым, о причине — сообщение).
+/// «Готово»: спрашивает имя и сохраняет нарисованный объект новым файлом;
+/// у объекта с именем (набор точек — его дали в диалоге до рисования)
+/// сохраняет сразу. Возвращает путь файла; null — имя не подтвердили или
+/// запись не удалась (тогда рисование остаётся открытым, о причине —
+/// сообщение).
 Future<String?> finishDrawing(BuildContext context, LandmarkServices services) async {
   final editMode = services.editMode;
   final target = editMode.state.target;
   if (target == null || !editMode.canFinish) return null;
   final messenger = ScaffoldMessenger.of(context);
+  final given = target.object.userMetadata.name;
+  if (given != null && given.trim().isNotEmpty) return _save(editMode, messenger, given);
   final name = await showDialog<String>(
     context: context,
     builder: (context) => _NameDialog(
@@ -99,6 +143,10 @@ Future<String?> finishDrawing(BuildContext context, LandmarkServices services) a
   );
   if (name == null) return null;
   editMode.execute(UpdateMetadataCommand(patch: MetadataPatch(set: {LandmarkMetadata.nameKey: name})));
+  return _save(editMode, messenger, name);
+}
+
+Future<String?> _save(EditModeController editMode, ScaffoldMessengerState messenger, String name) async {
   try {
     final path = await editMode.saveAndClose();
     messenger.showSnackBar(SnackBar(content: Text('«$name» сохранено')));

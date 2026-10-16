@@ -331,12 +331,13 @@ class LandmarkLayer {
     return (features: out, paths: paths);
   }
 
-  /// Цвет объекта: свой; у точки — цвет её типа метки; у остального — по
-  /// умолчанию для линий и надписей.
+  /// Цвет объекта: свой; у путевой точки (и точки со стилем) — цвет её
+  /// типа метки; у остального — по умолчанию для линий и надписей.
   static String paintColor(Map<String, dynamic> props) {
     if (props['color'] case final String color) return color;
     return switch (props['role']) {
-      'point' when props['type'] == LandmarkType.waypoint.name =>
+      // Точки набора с заданным стилем — цвета этого стиля, как путевые.
+      'point' when props['type'] == LandmarkType.waypoint.name || props['kind'] != null =>
         waypointTypeColors[props['kind']] ?? waypointTypeColors[defaultWaypointType]!,
       'point' => defaultShapeColor,
       'label' => defaultLabelColor,
