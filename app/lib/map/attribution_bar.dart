@@ -16,37 +16,47 @@ String attributionText(MapSource? base, List<MapSource> visibleOverlays) {
   return parts.join(' · ');
 }
 
-/// Half-transparent round (i) button: the attributions open in a dialog
-/// instead of a bar over the map. Replaces MapLibre's own (i), which lists
-/// only attributions written as HTML links (ours are plain text).
+/// A small half-transparent round (i) in the top right corner: the
+/// attributions open in a dialog instead of a bar over the map. Replaces
+/// MapLibre's own (i), which lists only attributions written as HTML links
+/// (ours are plain text). Drawn [size] across, it takes taps in a larger
+/// invisible square ([hitSize]) so it can still be hit with a finger.
 class AttributionButton extends StatelessWidget {
   const AttributionButton({super.key, required this.text});
 
-  static const double size = 40;
+  /// Visible circle, dp.
+  static const double size = 18;
+
+  /// Tap area around it, dp.
+  static const double hitSize = 32;
 
   final String text;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      // Same see-through look as the bottom nav panel.
-      color: Colors.white.withValues(alpha: 0.5),
-      shape: const CircleBorder(),
-      child: InkWell(
-        key: const Key('attribution_button'),
-        customBorder: const CircleBorder(),
-        onTap: () => showDialog<void>(
+    return InkWell(
+      key: const Key('attribution_button'),
+      customBorder: const CircleBorder(),
+      onTap: () => showDialog<void>(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Источники карт'),
-            content: Text(text.isEmpty ? 'Нет данных об авторах карты' : text.split(' · ').join('\n')),
-            actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Закрыть'))],
-          ),
+        builder: (context) => AlertDialog(
+          title: const Text('Источники карт'),
+          content: Text(text.isEmpty ? 'Нет данных об авторах карты' : text.split(' · ').join('\n')),
+          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Закрыть'))],
         ),
-        child: const SizedBox(
-          width: size,
-          height: size,
-          child: Icon(Icons.info_outline, size: 22, color: Color(0xB316181A)),
+      ),
+      child: SizedBox(
+        width: hitSize,
+        height: hitSize,
+        child: Center(
+          child: Container(
+            key: const Key('attribution_dot'),
+            width: size,
+            height: size,
+            // Same see-through look as the bottom nav panel.
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.5), shape: BoxShape.circle),
+            child: const Icon(Icons.info_outline, size: 14, color: Color(0xB316181A)),
+          ),
         ),
       ),
     );

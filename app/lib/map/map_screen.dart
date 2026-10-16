@@ -784,6 +784,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             // AttributionButton replaces it.
             attributionButtonPosition: AttributionButtonPosition.bottomRight,
             attributionButtonMargins: const Point(-200, -200),
+            compassViewPosition: CompassViewPosition.topRight,
+            compassViewMargins: const Point(4, AttributionButton.hitSize),
           ),
           if (_mapBusy && toggles[MenuToggle.mapsLoadingIndicators]!)
             const Positioned(
@@ -847,13 +849,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           // Required by the map providers. At the right screen edge, level
           // with the bottom nav: under extendBody the bottom padding is the
           // nav panel (60 dp) plus the system bar.
-          // Над шторкой набора точек места для (i) нет — там кнопки карты.
-          if (!SetPanel.isActive(_editMode))
-            Positioned(
-              right: MediaQuery.paddingOf(context).right + 5,
-              bottom: MediaQuery.paddingOf(context).bottom - (60 + AttributionButton.size) / 2,
-              child: AttributionButton(text: attribution),
-            ),
+          // Источники карт — маленькой (i) в верхнем правом углу; компас
+          // MapLibre сдвинут под неё.
+          Positioned(
+            top: MediaQuery.paddingOf(context).top,
+            right: MediaQuery.paddingOf(context).right,
+            child: AttributionButton(text: attribution),
+          ),
           // Ортофотопланы и масштаб; при шторке набора точек — над ней.
           if (!SetPanel.isActive(_editMode))
             Positioned(
