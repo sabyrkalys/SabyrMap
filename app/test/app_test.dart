@@ -1,7 +1,6 @@
 import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_source.dart';
 import 'package:app/main.dart';
-import 'package:app/tracks/tracks_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'compass/fakes.dart';
 import 'landmarks/services/fixture.dart';
-import 'tracks/fakes.dart';
 
 void main() {
   // Карта рисует метки из индекса настоящих сервисов во временной папке.
@@ -21,7 +19,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
           compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
           landmarkServicesProvider.overrideWithValue(fixture.services),
           onScreenRegistryProvider.overrideWithValue(fixture.services.onScreen),

@@ -1,4 +1,3 @@
-import 'dart:async';
 
 import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/compass/compass_screen.dart';
@@ -10,7 +9,6 @@ import 'package:app/menu/menu_panels.dart';
 import 'package:app/menu/menu_toggles.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
-import 'package:app/tracks/tracks_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,7 +16,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../compass/fakes.dart';
 import '../map/state/map_layers_controller_test.dart' show MemoryMapStateStore;
 import '../tracks/fake_location_source.dart';
-import '../tracks/fakes.dart';
 
 class _MemoryStore implements MenuTogglesStore {
   Map<String, bool> saved = {};
@@ -28,19 +25,6 @@ class _MemoryStore implements MenuTogglesStore {
   Future<void> save(Map<String, bool> values) async => saved = {...values};
 }
 
-class _SlowTracksRepository extends FakeTracksRepository {
-  final pending = Completer<Track>();
-
-  @override
-  Future<Track> create({
-    required String name,
-    required List<TrackPoint> points,
-    DateTime? startedAt,
-    DateTime? finishedAt,
-  }) =>
-      pending.future;
-}
-
 var openedAllMarkers = 0;
 
 void main() {
@@ -48,7 +32,6 @@ void main() {
     WidgetTester tester,
     MenuTab tab, {
     FakeLocationSource? locationSource,
-    FakeTracksRepository? tracksRepo,
   }) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.625;
@@ -57,7 +40,6 @@ void main() {
       overrides: [
         allMarkersOpenerProvider.overrideWithValue((_) => openedAllMarkers++),
         menuTogglesStoreProvider.overrideWithValue(_MemoryStore()),
-        tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
         compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
         mapStateStoreProvider.overrideWithValue(MemoryMapStateStore()),
         if (locationSource != null) locationSourceProvider.overrideWithValue(locationSource),
@@ -205,87 +187,6 @@ void main() {
 
     expect(find.text('Трек слишком короткий, чтобы сохранить'), findsOneWidget);
     expect(find.byKey(const Key('track_name_field')), findsNothing);
-  });
-
-  testWidgets('a TrackException on save shows a SnackBar with the error message', (tester) async {
-    final locationSource = FakeLocationSource();
-    await pumpPanel(
-      tester,
-      MenuTab.positioning,
-      locationSource: locationSource,
-      tracksRepo: FakeTracksRepository()..createResult = const TrackException('Could not create track'),
-    );
-
-    // Start recording and emit enough points for a valid track.
-    await tester.tap(find.byKey(const Key('track_record_toggle')));
-    await tester.pumpAndSettle();
-    locationSource.emit(const TrackPoint(lat: 1.0, lng: 2.0));
-    await tester.pump();
-    locationSource.emit(const TrackPoint(lat: 1.1, lng: 2.1));
-    await tester.pump();
-
-    // Stop recording -- this opens the save-name sheet.
-    await tester.tap(find.byKey(const Key('track_record_toggle')));
-    await tester.pumpAndSettle();
-
-    // Submit the save form.
-    await tester.enterText(find.byKey(const Key('track_name_field')), 'My track');
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('track_save_button')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Could not create track'), findsOneWidget);
-  });
-
-  testWidgets('a track save failure is still reported after the panel closes', (tester) async {
-    final locationSource = FakeLocationSource();
-    final repo = _SlowTracksRepository();
-    final container = ProviderContainer(
-      overrides: [
-        menuTogglesStoreProvider.overrideWithValue(_MemoryStore()),
-        tracksRepositoryProvider.overrideWithValue(repo),
-        locationSourceProvider.overrideWithValue(locationSource),
-      ],
-    );
-    addTearDown(container.dispose);
-    var showPanel = true;
-    late StateSetter setHostState;
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: Scaffold(
-            body: StatefulBuilder(
-              builder: (context, setState) {
-                setHostState = setState;
-                return showPanel
-                    ? Align(alignment: Alignment.bottomLeft, child: menuPanelFor(MenuTab.positioning, arrowCenterX: 25))
-                    : const SizedBox.shrink();
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('track_record_toggle')));
-    await tester.pumpAndSettle();
-    locationSource.emit(const TrackPoint(lat: 1.0, lng: 2.0));
-    await tester.pump();
-    locationSource.emit(const TrackPoint(lat: 1.1, lng: 2.1));
-    await tester.pump();
-    await tester.tap(find.byKey(const Key('track_record_toggle')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('track_name_field')), 'My track');
-    await tester.tap(find.byKey(const Key('track_save_button')));
-    await tester.pumpAndSettle();
-
-    setHostState(() => showPanel = false);
-    await tester.pump();
-    repo.pending.completeError(const TrackException('Could not create track'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Could not create track'), findsOneWidget);
   });
 
   testWidgets('КАРТЫ: «Доступные карты» and «Карты на экране» open their screens', (tester) async {

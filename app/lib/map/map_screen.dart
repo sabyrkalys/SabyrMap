@@ -47,8 +47,6 @@ import 'state/map_viewport.dart';
 import '../menu/menu_toggles.dart';
 import '../tracks/track_models.dart';
 import '../tracks/track_recording_controller.dart';
-import '../tracks/tracks_controller.dart';
-import '../tracks/tracks_visibility_controller.dart';
 import '../waypoints/waypoint_actions.dart';
 import '../waypoints/waypoint_create_action.dart';
 
@@ -620,43 +618,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return stale;
     });
 
-    final tracksVisible = ref.read(tracksVisibilityControllerProvider);
-    final tracks = tracksVisible ? ref.read(tracksControllerProvider) : const <Track>[];
-    final currentIds = tracks.map((t) => t.id).toSet();
-    for (final id in _linesByTrackId.keys.toList()) {
-      if (id == _recordingLineKey) continue;
-      if (!currentIds.contains(id)) {
-        await controller.removeLine(_linesByTrackId.remove(id)!);
-        _appliedLineKeys.remove(id);
-      }
-    }
-
-    for (final track in tracks) {
-      // Cheap proxy for "did the geometry change": point count plus the
-      // last point's coordinates. Exact correctness matters less than
-      // avoiding the worst case of re-pushing every unrelated track's full
-      // geometry on every recording-stream tick.
-      final key = _geometryKey(track.points.map((p) => (p.lat, p.lng)).toList());
-      final existing = _linesByTrackId[track.id];
-      if (existing == null) {
-        final options = LineOptions(
-          geometry: [for (final p in track.points) LatLng(p.lat, p.lng)],
-          lineColor: '#1976D2',
-          lineWidth: 3,
-        );
-        _linesByTrackId[track.id] = await controller.addLine(options);
-        _appliedLineKeys[track.id] = key;
-      } else if (_appliedLineKeys[track.id] != key) {
-        final options = LineOptions(
-          geometry: [for (final p in track.points) LatLng(p.lat, p.lng)],
-          lineColor: '#1976D2',
-          lineWidth: 3,
-        );
-        await controller.updateLine(existing, options);
-        _appliedLineKeys[track.id] = key;
-      }
-    }
-
+    // Сохранённые треки — файлы меток, их рисует LandmarkLayer; здесь —
+    // только линия идущей записи.
     final recordingState = ref.read(trackRecordingControllerProvider);
     if (recordingState is TrackRecordingActive && recordingState.points.length >= 2) {
       final key = _geometryKey(recordingState.points.map((p) => (p.lat, p.lng)).toList());
@@ -736,18 +699,9 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final orthophotosOn = ref.watch(mapLayersProvider.select((state) => state.orthophotosOn));
-    ref.listen<List<Track>>(tracksControllerProvider, (previous, next) {
-      _requestSync();
-    });
     ref.listen<TrackRecordingState>(trackRecordingControllerProvider, (previous, next) {
       _requestSync();
     });
-    // The visibility toggle lives on the Метки tab now; a change there
-    // still has to reach this screen's own sync loop.
-    ref.listen<bool>(tracksVisibilityControllerProvider, (previous, next) {
-      _requestSync();
-    });
-
     // Ортофотопланы включают кнопка и глазик в «Картах на экране».
     ref.listen<bool>(mapLayersProvider.select((state) => state.orthophotosOn), (previous, next) {
       if (next && previous == false) unawaited(_updateOrthophotos());

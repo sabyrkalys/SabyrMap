@@ -8,14 +8,12 @@ import 'package:app/map/map_crosshair.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/menu/menu_toggles.dart';
 import 'package:app/theme/app_theme.dart';
-import 'package:app/tracks/tracks_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../landmarks/services/fixture.dart';
-import '../tracks/fakes.dart';
 
 class _NoopTogglesStore implements MenuTogglesStore {
   @override
@@ -135,7 +133,6 @@ void main() {
       addTearDown(tester.view.reset);
       final container = ProviderContainer(
         overrides: [
-          tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
           menuTogglesStoreProvider.overrideWithValue(_NoopTogglesStore()),
           landmarkServicesProvider.overrideWithValue(f.services),
           onScreenRegistryProvider.overrideWithValue(f.services.onScreen),

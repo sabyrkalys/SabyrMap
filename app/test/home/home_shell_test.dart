@@ -4,7 +4,6 @@ import 'package:app/compass/compass_source.dart';
 import 'package:app/home/home_shell.dart';
 import 'package:app/map/map_screen.dart';
 import 'package:app/menu/menu_toggles.dart';
-import 'package:app/tracks/tracks_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -13,7 +12,6 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../compass/fakes.dart';
 import '../landmarks/services/fixture.dart';
-import '../tracks/fakes.dart';
 
 class _MemoryStore implements MenuTogglesStore {
   @override
@@ -32,7 +30,6 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          tracksRepositoryProvider.overrideWithValue(FakeTracksRepository()),
           compassSourceProvider.overrideWithValue(FakeUnavailableCompassSource()),
           menuTogglesStoreProvider.overrideWithValue(_MemoryStore()),
           landmarkServicesProvider.overrideWithValue(fixture.services),

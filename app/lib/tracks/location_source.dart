@@ -44,6 +44,8 @@ class GeolocatorLocationSource implements LocationSource {
         lat: position.latitude,
         lng: position.longitude,
         elevationMeters: position.altitude,
+        time: position.timestamp,
+        accuracyMeters: position.accuracy,
       ),
     );
   }

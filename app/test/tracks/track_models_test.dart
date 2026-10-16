@@ -1,93 +1,27 @@
+import 'package:app/landmarks/models/landmark_location.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('Track.fromJson', () {
-    test('parses geom coordinates as [lng, lat] pairs into TrackPoint(lat, lng)', () {
-      final json = {
-        'id': 't1',
-        'org_id': 'o1',
-        'owner_id': 'u1',
-        'name': 'Morning walk',
-        'geom': {
-          'type': 'LineString',
-          'coordinates': [
-            [7.6, 45.9],
-            [7.7, 46.0],
-          ],
-        },
-        'created_at': '2026-08-22T10:00:00Z',
-      };
+  test('a GPS point becomes a file location with elevation, UTC time and accuracy in file units', () {
+    final location = TrackPoint(
+      lat: 48.5,
+      lng: 37.1,
+      elevationMeters: 212.345,
+      time: DateTime.utc(2026, 10, 16, 8, 30),
+      accuracyMeters: 4.25,
+    ).toLocation();
 
-      final track = Track.fromJson(json);
-
-      expect(track.id, 't1');
-      expect(track.orgId, 'o1');
-      expect(track.ownerId, 'u1');
-      expect(track.name, 'Morning walk');
-      expect(track.points, hasLength(2));
-      expect(track.points[0].lng, 7.6);
-      expect(track.points[0].lat, 45.9);
-      expect(track.points[1].lng, 7.7);
-      expect(track.points[1].lat, 46.0);
-      expect(track.createdAt, DateTime.parse('2026-08-22T10:00:00Z'));
-    });
-
-    test('parses elevation and measurement fields when present', () {
-      final json = {
-        'id': 't1',
-        'org_id': 'o1',
-        'owner_id': 'u1',
-        'name': 'Ridge Loop',
-        'geom': {
-          'type': 'LineString',
-          'coordinates': [
-            [7.6, 45.9, 1200.0],
-            [7.7, 46.0, 1250.5],
-          ],
-        },
-        'created_at': '2026-08-22T10:00:00Z',
-        'length_meters': 4200.5,
-        'duration_seconds': 5400,
-        'elevation_gain_meters': 320.0,
-      };
-
-      final track = Track.fromJson(json);
-
-      expect(track.points[0].elevationMeters, 1200.0);
-      expect(track.points[1].elevationMeters, 1250.5);
-      expect(track.lengthMeters, 4200.5);
-      expect(track.durationSeconds, 5400);
-      expect(track.elevationGainMeters, 320.0);
-    });
-
-    test('defaults measurement fields when absent', () {
-      final json = {
-        'id': 't1',
-        'org_id': 'o1',
-        'owner_id': 'u1',
-        'name': 'Old track',
-        'geom': {
-          'type': 'LineString',
-          'coordinates': [
-            [7.6, 45.9],
-            [7.7, 46.0],
-          ],
-        },
-        'created_at': '2026-08-20T10:00:00Z',
-      };
-
-      final track = Track.fromJson(json);
-
-      expect(track.points[0].elevationMeters, 0.0);
-      expect(track.lengthMeters, 0.0);
-      expect(track.durationSeconds, isNull);
-      expect(track.elevationGainMeters, isNull);
-    });
+    expect((location.latitude, location.longitude), (48.5, 37.1));
+    expect(location.valueOf(LocationValueType.elevation)?.value, 212345);
+    expect(location.valueOf(LocationValueType.utcTime)?.value, DateTime.utc(2026, 10, 16, 8, 30).millisecondsSinceEpoch);
+    expect(location.valueOf(LocationValueType.accuracy)?.value, 425);
   });
 
-  test('TrackException.toString includes the message', () {
-    const exception = TrackException('Could not create track');
-    expect(exception.toString(), 'TrackException: Could not create track');
+  test('unknown time and accuracy are left out', () {
+    final location = const TrackPoint(lat: 1, lng: 2).toLocation();
+    expect(location.valueOf(LocationValueType.utcTime), isNull);
+    expect(location.valueOf(LocationValueType.accuracy), isNull);
+    expect(location.valueOf(LocationValueType.elevation)?.value, 0);
   });
 }

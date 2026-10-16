@@ -5,7 +5,6 @@ import 'package:app/map/map_target.dart';
 import 'package:app/menu/menu_toggles.dart';
 import 'package:app/tracks/track_models.dart';
 import 'package:app/tracks/track_recording_controller.dart';
-import 'package:app/tracks/tracks_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,7 +15,6 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../landmarks/services/fixture.dart';
 import '../tracks/fake_location_source.dart';
-import '../tracks/fakes.dart';
 
 class _NoopTogglesStore implements MenuTogglesStore {
   @override
@@ -35,9 +33,8 @@ class _NoopTogglesStore implements MenuTogglesStore {
 // Метки карты — из индекса настоящих сервисов во временной папке.
 late ServicesFixture _fixture;
 
-_baseOverrides({FakeTracksRepository? tracksRepo}) {
+_baseOverrides() {
   return [
-    tracksRepositoryProvider.overrideWithValue(tracksRepo ?? FakeTracksRepository()),
     menuTogglesStoreProvider.overrideWithValue(_NoopTogglesStore()),
     landmarkServicesProvider.overrideWithValue(_fixture.services),
     onScreenRegistryProvider.overrideWithValue(_fixture.services.onScreen),

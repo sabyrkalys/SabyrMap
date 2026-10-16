@@ -1,10 +1,44 @@
+import 'package:app/landmarks/composite/drafts/track_draft.dart';
+import 'package:app/landmarks/validation/validation_result.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../app/landmark_services_provider.dart';
 import 'track_models.dart';
 import 'track_name_form_sheet.dart';
 import 'track_recording_controller.dart';
-import 'tracks_controller.dart';
+
+/// Записанный трек — файлом `.trk` в несортированные метки: появляется
+/// во «Всех метках» и на карте, как нарисованный. Точки — одним сегментом,
+/// с высотой, временем и точностью GPS.
+Future<String?> saveRecordedTrack(
+  ProviderContainer container,
+  ScaffoldMessengerState messenger, {
+  required String name,
+  required List<TrackPoint> points,
+}) async {
+  final locations = [for (final p in points) p.toLocation()];
+  try {
+    final path = await container
+        .read(landmarkServicesProvider)
+        .compositeCreation
+        .createTrack(
+          TrackDraft(
+            name: name,
+            targetFolder: container.read(markerGroupFoldersProvider).unsorted,
+            initialLocations: locations,
+          ),
+          locations.first,
+        );
+    messenger.showSnackBar(SnackBar(content: Text('Трек «$name» сохранён')));
+    return path;
+  } on ValidationException catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('Трек не сохранён: ${e.errors.join('; ')}')));
+  } on Exception catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('Трек не сохранён: $e')));
+  }
+  return null;
+}
 
 String _defaultTrackName() {
   final now = DateTime.now();
@@ -31,16 +65,7 @@ Future<void> toggleTrackRecording(BuildContext context, WidgetRef ref, TrackReco
     }
     final result = await showTrackNameFormSheet(context, initialName: _defaultTrackName());
     if (result == null) return;
-    try {
-      await container.read(tracksControllerProvider.notifier).saveTrack(
-            name: result.name,
-            points: stopResult.points,
-            startedAt: stopResult.startedAt,
-            finishedAt: stopResult.finishedAt,
-          );
-    } on TrackException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
+    await saveRecordedTrack(container, messenger, name: result.name, points: stopResult.points);
   } else {
     await container.read(trackRecordingControllerProvider.notifier).start();
     final newState = container.read(trackRecordingControllerProvider);
