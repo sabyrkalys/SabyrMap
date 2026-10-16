@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:app/landmarks/composite/edit_mode/edit_mode_controller.dart';
 import 'package:app/landmarks/models/landmark_type.dart';
 import 'package:flutter/material.dart';
@@ -86,11 +84,12 @@ class SetPanel extends StatelessWidget {
   /// «0 точ.», «12 точ.».
   static String countLabel(int n) => '$n точ.';
 
-  /// Высота системной панели внизу, dp — у самого окна: в карте нижний
-  /// отступ MediaQuery занят нижним меню, а не системными кнопками.
+  /// Высота системных кнопок внизу, dp — у самого окна: в карте нижний
+  /// отступ MediaQuery занят нижним меню. Кнопки обычно спрятаны
+  /// ([configureSystemUi]) — тогда отступа нет.
   static double bottomInset(BuildContext context) {
     final view = View.of(context);
-    return max(view.viewPadding.bottom, view.padding.bottom) / view.devicePixelRatio;
+    return view.padding.bottom / view.devicePixelRatio;
   }
 
   @override
