@@ -38,7 +38,7 @@ class LandmarkLayer {
   static const String haloLayerId = 'landmarks-halo';
   static const String dotLayerId = 'landmarks-dot';
 
-  /// Невидимый круг побольше под каждой точкой: по кружку в 6 dp пальцем
+  /// Невидимый круг побольше под каждой точкой: по кружку в 10 dp пальцем
   /// не попасть.
   static const String hitLayerId = 'landmarks-hit';
   static const String iconLayerId = 'landmarks-icon';
@@ -65,7 +65,7 @@ class LandmarkLayer {
   };
 
   /// Диаметр кружка точки вместе с белой обводкой, dp.
-  static const double dotDiameter = 6;
+  static const double dotDiameter = 10;
 
   /// Шрифт надписей: есть на сервере глифов ([LayerManager.glyphsUrl]).
   static const List<String> labelFont = ['Noto Sans Regular'];
@@ -148,16 +148,16 @@ class LandmarkLayer {
     await _controller.addCircleLayer(
       sourceId,
       haloLayerId,
-      const CircleLayerProperties(circleRadius: 6, circleColor: '#FFFFFF', circleOpacity: 0.55, circleBlur: 0.7),
+      const CircleLayerProperties(circleRadius: 9, circleColor: '#FFFFFF', circleOpacity: 0.55, circleBlur: 0.7),
       filter: dot,
       enableInteraction: false,
     );
     await _controller.addCircleLayer(
       sourceId,
       dotLayerId,
-      // Радиус 2.5 и обводка 0.5 — вместе [dotDiameter].
+      // Радиус 4.5 и обводка 0.5 — вместе [dotDiameter].
       const CircleLayerProperties(
-        circleRadius: 2.5,
+        circleRadius: 4.5,
         circleColor: color,
         circleStrokeColor: '#FFFFFF',
         circleStrokeWidth: 0.5,
@@ -226,7 +226,7 @@ class LandmarkLayer {
       draftSourceId,
       draftVertexLayerId,
       const CircleLayerProperties(
-        circleRadius: ['case', ['get', 'last'], 3, 2],
+        circleRadius: ['case', ['get', 'last'], 5, 4],
         circleColor: '#FFFFFF',
         circleStrokeColor: draftColor,
         circleStrokeWidth: 1,

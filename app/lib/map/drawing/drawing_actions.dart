@@ -5,6 +5,7 @@ import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/landmarks/services/landmark_services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:maplibre_gl/maplibre_gl.dart' show LatLng;
 
 import '../../app/landmark_services_provider.dart';
 import '../../icons/icon_library_scanner.dart';
@@ -14,6 +15,7 @@ import '../../waypoints/waypoint_create_action.dart';
 import '../../waypoints/waypoint_dialog/marker_group.dart';
 import '../../waypoints/waypoint_dialog/waypoint_data.dart';
 import '../../waypoints/waypoint_dialog/waypoint_dialog.dart';
+import '../map_focus.dart';
 import '../map_target.dart';
 import 'shape_dialogs.dart';
 
@@ -81,6 +83,36 @@ Future<void> openNewMarker(
 void startDrawing(WidgetRef ref, LandmarkType type) {
   ref.read(crosshairMenuOpenProvider.notifier).close();
   ref.read(landmarkServicesProvider).editMode.startNew(type, folder: ref.read(markerGroupFoldersProvider).unsorted);
+}
+
+/// Поиск в «Управлении метками»: точки рисуемого набора списком;
+/// нажатие показывает точку на карте.
+Future<void> showSetPointsSheet(BuildContext context, WidgetRef ref) async {
+  final object = ref.read(landmarkServicesProvider).editMode.state.target?.object;
+  if (object is! SetObject || object.waypoints.isEmpty) return;
+  final focus = ref.read(mapFocusProvider.notifier);
+  await showModalBottomSheet<void>(
+    context: context,
+    builder: (context) => SafeArea(
+      child: ListView(
+        key: const Key('set_points_sheet'),
+        shrinkWrap: true,
+        children: [
+          for (final (i, w) in object.waypoints.indexed)
+            ListTile(
+              key: Key('set_point_$i'),
+              leading: const Icon(Icons.location_on_sharp),
+              title: Text(w.userMetadata.name ?? 'Точка ${i + 1}'),
+              subtitle: Text('${w.location.latitude.toStringAsFixed(5)}, ${w.location.longitude.toStringAsFixed(5)}'),
+              onTap: () {
+                Navigator.of(context).pop();
+                focus.focus(LatLng(w.location.latitude, w.location.longitude));
+              },
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Метаданные набора из диалога «Набор точек»; пустое имя — следующий

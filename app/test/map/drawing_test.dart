@@ -2,6 +2,7 @@ import 'package:app/app/landmark_services_provider.dart';
 import 'package:app/landmarks/models/landmark_file.dart';
 import 'package:app/map/drawing/drawing_actions.dart';
 import 'package:app/map/drawing/drawing_bar.dart';
+import 'package:app/map/drawing/set_panel.dart';
 import 'package:app/map/drawing/shape_dialogs.dart';
 import 'package:app/waypoints/waypoint_dialog/waypoint_data.dart';
 import 'package:app/map/landmark_layer.dart';
@@ -88,6 +89,26 @@ void main() {
     expect(parseRadius('0'), isNull);
     expect(parseRadius('-3'), isNull);
     expect(parseRadius('abc'), isNull);
+  });
+
+  testWidgets('«Управление метками» fits a narrow phone with the app theme', (tester) async {
+    tester.view.physicalSize = const Size(1216, 2688);
+    tester.view.devicePixelRatio = 3.25;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: SetPanel(pointCount: 12, onAddPoint: () {}, onSearch: () {}, onFinish: () {}),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    expect(find.text('12 точ.'), findsOneWidget);
+    expect(find.text('ПУТЕВАЯ ТОЧКА'), findsOneWidget);
   });
 
   group('draftFeatures', () {
@@ -438,7 +459,58 @@ void main() {
       expect(m[LandmarkMetadata.nameKey], 'Посты');
       expect(m[LandmarkMetadata.websiteKey], 'https://example.org');
       expect(m[LandmarkMetadata.keywordsKey], 'пост, север');
-      expect(find.text(DrawingBar.titleOf(LandmarkType.set)), findsOneWidget);
+      // Точки набора — панелью «Управление метками», не верхней панелью.
+      expect(find.byKey(const Key('set_panel')), findsOneWidget);
+      expect(find.byKey(const Key('drawing_bar')), findsNothing);
+    });
+
+    Future<void> startSet(WidgetTester tester) async {
+      f.services.editMode.startNew(
+        LandmarkType.set,
+        folder: f.paths.importDefault,
+        metadata: const LandmarkMetadata(entries: {LandmarkMetadata.nameKey: 'Посты'}),
+      );
+      await tester.pump();
+    }
+
+    String count(WidgetTester tester) => tester.widget<Text>(find.byKey(const Key('set_panel_count'))).data!;
+
+    testWidgets('«Управление метками»: «+ ПУТЕВАЯ ТОЧКА» adds the point under the crosshair; search lists the points', (
+      tester,
+    ) async {
+      await pumpMap(tester);
+      await startSet(tester);
+      expect(find.text('Управление метками'), findsOneWidget);
+      expect(count(tester), '0 точ.');
+      expect(tester.widget<IconButton>(find.byKey(const Key('set_panel_search'))).onPressed, isNull);
+
+      await tester.tap(find.byKey(const Key('set_panel_add')));
+      await tester.pump();
+      await tester.tap(find.byKey(const Key('set_panel_add')));
+      await tester.pump();
+      expect(count(tester), '2 точ.');
+
+      await tester.tap(find.byKey(const Key('set_panel_search')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('set_point_1')), findsOneWidget);
+      expect(find.text('Точка 2'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('set_point_0')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('set_points_sheet')), findsNothing);
+    });
+
+    testWidgets('the tick with no points just closes; system back closes an empty drawing too', (tester) async {
+      await pumpMap(tester);
+      await startSet(tester);
+      await tester.tap(find.byKey(const Key('set_panel_done')));
+      await tester.pump();
+      expect(f.services.editMode.state.target, isNull);
+      expect(find.byKey(const Key('set_panel')), findsNothing);
+
+      await startSet(tester);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(f.services.editMode.state.target, isNull);
     });
 
     testWidgets('«Новая метка» → «Область» starts drawing an area', (tester) async {

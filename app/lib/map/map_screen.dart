@@ -22,6 +22,7 @@ import 'catalog/catalog_repository.dart';
 import 'crosshair_menu.dart';
 import 'drawing/drawing_actions.dart';
 import 'drawing/drawing_bar.dart';
+import 'drawing/set_panel.dart';
 import 'drawing/shape_dialogs.dart';
 import 'info_panel.dart';
 import 'landmark_layer.dart';
@@ -854,7 +855,33 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               ),
             ),
           ),
-          if (_drawing)
+          // Системное «Назад» во время рисования закрывает его (с точками —
+          // после вопроса), а не уходит с карты. PopScope действует на
+          // весь маршрут, где бы ни стоял.
+          PopScope(
+            canPop: !_drawing,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && _drawing) cancelDrawing(context, ref.read(landmarkServicesProvider));
+            },
+            child: const SizedBox.shrink(),
+          ),
+          // Набор точек — панелью «Управление метками» внизу
+          // над нижним меню (его высота — нижний отступ).
+          if (_drawing && _editMode.state.target!.type == LandmarkType.set)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: MediaQuery.paddingOf(context).bottom,
+              child: SetPanel(
+                pointCount: _editMode.pointCount,
+                onAddPoint: _addDrawingPoint,
+                onSearch: () => showSetPointsSheet(context, ref),
+                onFinish: () => _editMode.pointCount == 0
+                    ? _editMode.close()
+                    : finishDrawing(context, ref.read(landmarkServicesProvider)),
+              ),
+            )
+          else if (_drawing)
             Positioned(
               top: 0,
               left: 12,
@@ -955,12 +982,13 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 child: SizedBox(
                   width: 48,
                   height: 48,
-                  // A white dot 6 dp across, its 1 dp dark border included.
+                  // A white dot 10 dp across (as big as a landmark dot), its
+                  // 1 dp dark border included.
                   child: Center(
                     child: Container(
                       key: const Key('map_crosshair'),
-                      width: 6,
-                      height: 6,
+                      width: 10,
+                      height: 10,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: Colors.white,
