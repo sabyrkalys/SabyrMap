@@ -62,6 +62,12 @@ class HomeNavScope extends InheritedWidget {
   /// (например, от контекста навигатора).
   static HomeNavScope? current;
 
+  /// Шторки сейчас открываются немодально над картой ([showSheet]).
+  static bool sheetsOverMap(BuildContext context) {
+    final scope = maybeOf(context) ?? current;
+    return scope != null && scope.isMapOnTop();
+  }
+
   /// Шторка над картой: немодальная, если карта на экране ([openSheet]):
   /// касание карты закрывает её и тут же двигает карту. Иначе (из «Всех
   /// меток», в тестах без [HomeShell]) — обычная модальная шторка [panel].

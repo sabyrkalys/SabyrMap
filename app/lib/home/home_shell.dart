@@ -31,41 +31,51 @@ class _HomeShellState extends State<HomeShell> {
   // Немодальная шторка над картой (HomeNavScope.showSheet) — в Scaffold:
   // карта под ней принимает касания.
   final _scaffold = GlobalKey<ScaffoldState>();
+  final _sheetHeight = ValueNotifier<double>(0);
+
+  /// Меню слева и кнопки карты справа — над немодальной шторкой.
+  Widget _sheetNav() => ValueListenableBuilder<double>(
+    valueListenable: _sheetHeight,
+    builder: (context, height, child) =>
+        Positioned(left: 0, right: 0, bottom: height + 8, child: child!),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: MediaQuery.removePadding(
+            context: context,
+            removeBottom: true,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: _BottomNav(
+                destinations: _destinations,
+                selectedIndex: null,
+                onSelected: (index) {
+                  _sheet?.close();
+                  _onNavSelected(index);
+                },
+              ),
+            ),
+          ),
+        ),
+        if (MapSideButtons.builder case final buttons?)
+          Padding(padding: const EdgeInsets.only(right: 16), child: Builder(builder: buttons)),
+      ],
+    ),
+  );
   PersistentBottomSheetController? _sheet;
 
   Future<void> _openSheet(WidgetBuilder builder) {
     _sheet?.close();
     final container = ProviderScope.containerOf(context, listen: false);
+    // В шторке — только панель: меню и кнопки карты над ней стоят в Stack
+    // главного экрана (_sheetNav), и пустые места между ними пропускают
+    // касания к карте (Material шторки забирал бы их все).
     final controller = _scaffold.currentState!.showBottomSheet(
-      (sheetContext) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Меню слева, кнопки карты справа — как над шторкой набора точек.
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: MediaQuery.removePadding(
-                  context: sheetContext,
-                  removeBottom: true,
-                  child: _BottomNav(
-                    destinations: _destinations,
-                    selectedIndex: null,
-                    onSelected: (index) {
-                      _sheet?.close();
-                      _onNavSelected(index);
-                    },
-                  ),
-                ),
-              ),
-              if (MapSideButtons.builder case final buttons?)
-                Padding(padding: const EdgeInsets.only(right: 16), child: buttons(sheetContext)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Flexible(child: builder(sheetContext)),
-        ],
+      (sheetContext) => MeasureSize(
+        onSize: (size) => _sheetHeight.value = size.height,
+        // Во всю ширину, как модальные шторки.
+        child: SizedBox(width: double.infinity, child: builder(sheetContext)),
       ),
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -79,6 +89,7 @@ class _HomeShellState extends State<HomeShell> {
     return controller.closed.whenComplete(() {
       if (!identical(_sheet, controller)) return;
       _sheet = null;
+      _sheetHeight.value = 0;
       if (mounted) setState(() {});
       container.read(mapSheetOpenProvider.notifier).set(false);
     });
@@ -87,6 +98,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void dispose() {
     HomeNavScope.current = null;
+    _sheetHeight.dispose();
     super.dispose();
   }
 
@@ -157,6 +169,7 @@ class _HomeShellState extends State<HomeShell> {
                       onPointerDown: _closeSheetOnMapTouch,
                       child: const MapScreen(),
                     ),
+                    if (_sheet != null) _sheetNav(),
                     // Режим сравнения слоёв: панель над нижним меню.
                     Positioned(
                       left: 0,
