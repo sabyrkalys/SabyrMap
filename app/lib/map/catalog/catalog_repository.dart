@@ -117,8 +117,9 @@ class CatalogRepository {
   static const String serverSatelliteSourceId = 'server-satellite';
 
   /// Base map shown when the user has not chosen one yet (or the saved one
-  /// is gone from the catalog).
-  static const String defaultBaseSourceId = serverHybridSourceId;
+  /// is gone from the catalog): plain satellite, with roads/schemes left for
+  /// the user to add themselves as overlays.
+  static const String defaultBaseSourceId = serverSatelliteSourceId;
 
   final MediaFileFolderService _mapsFolder;
   final MediaFileFolderService _orthophotoFolder;
@@ -184,10 +185,7 @@ class CatalogRepository {
       id: serverProviderId,
       name: 'Сервер карт',
       sources: [
-        style(serverHybridSourceId, 'Спутник + дороги', 'hybrid-day'),
-        style('server-hybrid-night', 'Ночь', 'hybrid-night'),
-        style('server-vector-day', 'Только дороги', 'vector-day'),
-        style('server-vector-night', 'Только дороги (ночь)', 'vector-night'),
+        style('server-hybrid-day-nobuildings', 'Гибрид', 'hybrid-day-nobuildings'),
         MapSource(
           id: serverSatelliteSourceId,
           name: 'Спутник',
@@ -396,6 +394,10 @@ class CatalogRepository {
 
   /// Every .mbtiles in mediafile/orthophoto, whatever its name: one
   /// territory each. No folder (tests, no storage) — none.
+  ///
+  /// Nameless: orthophotos aren't picked one by one, [MapState.orthophotosOn]
+  /// shows them all at once (wherever the map happens to be), so the file
+  /// name — often a real place name — never needs to appear in the UI.
   Future<List<MapSource>> _orthophotoSources() async {
     final List<MediaFileEntry> entries;
     try {
@@ -408,7 +410,7 @@ class CatalogRepository {
         if (entry.fileName.toLowerCase().endsWith('.mbtiles'))
           MapSource(
             id: '$orthophotoPrefix${entry.fileName}',
-            name: entry.fileName.substring(0, entry.fileName.length - '.mbtiles'.length),
+            name: '',
             tileUrlTemplate: 'mbtiles://${entry.path}',
             format: TileFormat.raster,
             storageMode: StorageMode.offlineRegion,

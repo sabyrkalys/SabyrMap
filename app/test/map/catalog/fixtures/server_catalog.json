@@ -6,8 +6,8 @@
    "isolated": false,
    "sources": [
     {
-     "id": "server-hybrid-day",
-     "name": "Украина · спутник + дороги",
+     "id": "server-hybrid-day-nobuildings",
+     "name": "Гибрид",
      "format": "vector",
      "storageMode": "onlineCache",
      "attribution": "© OpenMapTiles © OpenStreetMap contributors · Esri, Maxar, Earthstar Geographics, and the GIS Community",
@@ -16,46 +16,7 @@
      "canBeOverlay": false,
      "downloadable": true,
      "version": "v1",
-     "styleUrl": "http://localhost:3000/style/hybrid-day"
-    },
-    {
-     "id": "server-hybrid-night",
-     "name": "Украина · ночь",
-     "format": "vector",
-     "storageMode": "onlineCache",
-     "attribution": "© OpenMapTiles © OpenStreetMap contributors · Esri, Maxar, Earthstar Geographics, and the GIS Community",
-     "minZoom": 0,
-     "maxZoom": 20,
-     "canBeOverlay": false,
-     "downloadable": true,
-     "version": "v1",
-     "styleUrl": "http://localhost:3000/style/hybrid-night"
-    },
-    {
-     "id": "server-vector-day",
-     "name": "Украина · только дороги",
-     "format": "vector",
-     "storageMode": "onlineCache",
-     "attribution": "© OpenMapTiles © OpenStreetMap contributors",
-     "minZoom": 0,
-     "maxZoom": 20,
-     "canBeOverlay": false,
-     "downloadable": true,
-     "version": "v1",
-     "styleUrl": "http://localhost:3000/style/vector-day"
-    },
-    {
-     "id": "server-vector-night",
-     "name": "Украина · только дороги (ночь)",
-     "format": "vector",
-     "storageMode": "onlineCache",
-     "attribution": "© OpenMapTiles © OpenStreetMap contributors",
-     "minZoom": 0,
-     "maxZoom": 20,
-     "canBeOverlay": false,
-     "downloadable": true,
-     "version": "v1",
-     "styleUrl": "http://localhost:3000/style/vector-night"
+     "styleUrl": "http://localhost:3000/style/hybrid-day-nobuildings"
     },
     {
      "id": "server-satellite",

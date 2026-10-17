@@ -19,14 +19,12 @@ from app.services import maps, pmtiles
 # id, name template, style_path, format, min/max zoom, can_be_overlay (every
 # map can also lie over another one; a hybrid goes with its satellite)
 _MAPS = [
-    ("server-hybrid-day", "{region} · спутник + дороги", "style/hybrid-day", "vector", 0, 20, True),
-    ("server-hybrid-day-nobuildings", "{region} · спутник + дороги, без зданий", "style/hybrid-day-nobuildings",
-     "vector", 0, 20, True),
-    ("server-hybrid-night", "{region} · ночь", "style/hybrid-night", "vector", 0, 20, True),
-    ("server-vector-day", "{region} · только дороги", "style/vector-day", "vector", 0, 20, True),
-    ("server-vector-night", "{region} · только дороги (ночь)", "style/vector-night", "vector", 0, 20, True),
+    ("server-hybrid-day-nobuildings", "Гибрид", "style/hybrid-day-nobuildings", "vector", 0, 20, True),
     ("server-satellite", "{region} · спутник", "satellite/{z}/{x}/{y}", "raster", 0, 17, True),
 ]
+# «server-hybrid-day», «server-vector-day», «server-hybrid-night» и
+# «server-vector-night» убраны из списка по просьбе пользователя
+# (2026-10-17); seed() ниже удаляет их и на уже засеянных базах.
 
 # Maps that are only layers over another map, under their own provider (shown
 # in the app as «Яндекс»): Yandex roads z0–17 with OSM street names.
@@ -79,6 +77,15 @@ def seed(db: Session, *, version: str, region: str) -> list[MapCatalogEntry]:
         entry.attribution = _attribution(entry)
         db.add(entry)
         entries.append(entry)
+
+    # Entries this script used to manage but no longer lists (e.g. a map
+    # dropped from _MAPS/_LAYERS/_IMAGERY) — delete rather than leave stale.
+    managed_providers = {"server", LAYERS_PROVIDER, IMAGERY_PROVIDER}
+    kept_ids = {e.id for e in entries}
+    for stale in db.query(MapCatalogEntry).filter(MapCatalogEntry.provider_id.in_(managed_providers)):
+        if stale.id not in kept_ids:
+            db.delete(stale)
+
     db.flush()
     return entries
 

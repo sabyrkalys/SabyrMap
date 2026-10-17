@@ -80,14 +80,9 @@ void main() {
 
     final sources = {for (final s in providers.first.sources) s.id: s};
     expect(sources.keys, [
-      'server-hybrid-day', 'server-hybrid-night', 'server-vector-day', 'server-vector-night', 'server-satellite',
+      'server-hybrid-day-nobuildings', 'server-satellite',
     ]);
     expect(sources.keys, contains(CatalogRepository.defaultBaseSourceId));
-
-    final hybrid = sources[CatalogRepository.serverHybridSourceId]!;
-    expect(hybrid.format, TileFormat.vector);
-    expect(hybrid.styleUrl, 'http://tiles.test/style/hybrid-day');
-    expect(hybrid.downloadable, isTrue);
 
     final sat = sources[CatalogRepository.serverSatelliteSourceId]!;
     expect(sat.format, TileFormat.raster);
@@ -105,9 +100,9 @@ void main() {
 
     expect(providers.map((p) => p.id), ['server', 'osm', 'server-layers']);
     final hybrid = providers.first.sources.first;
-    expect(hybrid.id, 'server-hybrid-day');
-    expect(hybrid.name, 'Украина · спутник + дороги');
-    expect(hybrid.styleUrl, 'http://localhost:3000/style/hybrid-day');
+    expect(hybrid.id, 'server-hybrid-day-nobuildings');
+    expect(hybrid.name, 'Гибрид');
+    expect(hybrid.styleUrl, 'http://localhost:3000/style/hybrid-day-nobuildings');
     expect(hybrid.storageMode, StorageMode.onlineCache);
     expect(hybrid.downloadable, isTrue);
     expect(hybrid.version, 'v1');
@@ -209,10 +204,10 @@ void main() {
     addTearDown(container.dispose);
 
     final first = await container.read(catalogProvider.future);
-    expect(first.first.sources.first.name, 'Спутник + дороги', reason: 'built-in until the server answers');
+    expect(first.first.sources.first.name, 'Гибрид', reason: 'built-in until the server answers');
     await pumpEventQueue();
     expect(requested, [Uri.parse('http://api.test/maps')]);
-    expect(container.read(catalogProvider).value!.first.sources.first.name, 'Украина · спутник + дороги');
+    expect(container.read(catalogProvider).value!.first.sources.first.name, 'Гибрид');
   });
 
   test('without a connection the start-up refresh keeps the built-in catalog', () async {
@@ -228,7 +223,7 @@ void main() {
 
     await container.read(catalogProvider.future);
     await pumpEventQueue();
-    expect(container.read(catalogProvider).value!.first.sources.first.name, 'Спутник + дороги');
+    expect(container.read(catalogProvider).value!.first.sources.first.name, 'Гибрид');
   });
 
   group('offline region folders', () {
@@ -389,7 +384,9 @@ void main() {
     final providers = await repository.load();
     final ortho = providers.singleWhere((p) => p.id == CatalogRepository.orthophotoProviderId);
     expect(ortho.name, 'Ортофотопланы');
-    expect(ortho.sources.map((s) => s.name), ['Авдеевка 2026', 'Доброполье']);
+    // Nameless: orthophoto territories are shown all at once, never picked
+    // by name — and the file name is often a real, sensitive place name.
+    expect(ortho.sources.map((s) => s.name), ['', '']);
     final dobro = ortho.sources.last;
     expect(dobro.id, 'ortho-Доброполье.mbtiles');
     expect(dobro.tileUrlTemplate, 'mbtiles:///storage/orthophoto/Доброполье.mbtiles');

@@ -68,7 +68,7 @@ def _job(db, user_id_email="worker@example.test", **fields):
 
     user = create_personal_organization_and_owner(db, email=user_id_email, password_hash="x")
     job = RegionJob(
-        user_id=user.id, map_id="server-hybrid-day", max_zoom=12, version="v1",
+        user_id=user.id, map_id="server-hybrid-day-nobuildings", max_zoom=12, version="v1",
         bbox=bbox_geometry(BBOX),
         status="queued", progress=0.0, storage_dir=uuid.uuid4().hex, **fields,
     )
@@ -151,7 +151,7 @@ def _real_archives(tiles_v1: Path, tmp_path: Path) -> None:
 @needs_cli
 def test_build_region_cuts_every_archive_and_writes_a_manifest(seeded, map_server):
     _real_archives(map_server / "tiles" / "v1", map_server)
-    entry = seeded.get(MapCatalogEntry, "server-hybrid-day")
+    entry = seeded.get(MapCatalogEntry, "server-hybrid-day-nobuildings")
     out = Path(settings.REGIONS_PATH) / "r1"
 
     files = worker.build_region(entry, BBOX, 5, out, fetch=fake_fetch)
@@ -168,7 +168,7 @@ def test_build_region_cuts_every_archive_and_writes_a_manifest(seeded, map_serve
     assert zooms == [0, 1, 2, 3, 4, 5]
     assert [bytes(d) for (d,) in data] == [b"5/22/11"]
     manifest = json.loads((out / "manifest.json").read_text())
-    assert manifest["map_id"] == "server-hybrid-day"
+    assert manifest["map_id"] == "server-hybrid-day-nobuildings"
     assert [f["name"] for f in manifest["files"]] == names[:-1]
     assert not list(out.glob("*.pmtiles"))
 

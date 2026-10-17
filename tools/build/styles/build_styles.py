@@ -323,28 +323,32 @@ def style(name, theme, hybrid, tiles_base, buildings=True):
 
 
 def roads_style(tiles_base):
-    """Дороги Яндекса отдельным векторным слоем (z0–17, без классов и названий):
-    светлая линия в тёмной обводке, видна и на спутнике, и на схеме; названия
-    улиц — из OSM. Фона нет — приложение кладёт этот стиль слоем поверх любой
-    карты."""
-    def road(id_, color, width, opacity):
-        return {
-            "id": id_, "type": "line", "source": "roads", "source-layer": "roads",
-            "layout": {"line-cap": "round", "line-join": "round"},
-            "paint": {"line-color": color, "line-width": width, "line-opacity": opacity},
-        }
+    """Дороги OSM отдельным прозрачным слоем: та же раскраска, что в
+    hybrid-* (road_layers, классы motorway/primary/secondary/.../path) —
+    жёлтые главные дороги в тёмной обводке, белые улицы, тропы и грунтовки,
+    подписи улиц. Фона и построек нет — приложение кладёт этот стиль поверх
+    любой карты (спутник, векторная схема...).
+
+    Раньше здесь был отдельный источник «roads» (дороги Яндекса), но его
+    геометрия оказалась мусором и слой был на паузе (см. память
+    yandex-roads-layer) — теперь тот же слот использует рабочие данные OSM,
+    без отдельного тайлсета."""
+    p = PALETTES["day"]
+    layers = road_layers(p, True)
+    # Тропы — серым оттенком второстепенных дорог (их же обводка,
+    # road-middle-casing: rgba(0,0,0,0.35)), не ярко-оранжевым hybrid-цветом
+    # из road_layers — в этом отдельном слое тропы не должны выделяться
+    # сильнее самих дорог. Только здесь — hybrid-стили («Гибрид» и т. п.) не
+    # трогаем.
+    for layer in layers:
+        if layer["id"] == "road-path":
+            layer["paint"]["line-color"] = "rgba(0,0,0,0.35)"
     return {
         "version": 8,
         "name": "SabyrMap roads",
         "metadata": {"sabyrmap:overlay": True},
         "glyphs": f"{tiles_base}/font/{{fontstack}}/{{range}}",
         "sources": {
-            "roads": {
-                "type": "vector",
-                "tiles": [f"{tiles_base}/roads/{{z}}/{{x}}/{{y}}"],
-                "minzoom": 0, "maxzoom": 17,
-                "attribution": "© Яндекс",
-            },
             "osm": {
                 "type": "vector",
                 "tiles": [f"{tiles_base}/osm/{{z}}/{{x}}/{{y}}"],
@@ -352,13 +356,9 @@ def roads_style(tiles_base):
                 "attribution": "© OpenMapTiles © OpenStreetMap contributors",
             },
         },
-        "layers": [
-            road("roads-casing", "#3b3326", zoom(8, 0.6, 12, 2.2, 16, 6, 19, 12), zoom(6, 0, 9, 0.6, 12, 0.8)),
-            road("roads", "#f3d27a", zoom(8, 0.4, 12, 1.2, 16, 4, 19, 9), zoom(6, 0, 8, 0.7, 12, 1)),
-            # Названий у дорог Яндекса нет — подписи улиц из OSM (до z14,
-            # дальше растягиваются), белые с тёмным ореолом поверх любой карты.
+        "layers": layers + [
             {
-                "id": "roads-name", "type": "symbol", "source": "osm",
+                "id": "road-name", "type": "symbol", "source": "osm",
                 "source-layer": "transportation_name", "minzoom": 13,
                 "layout": {
                     "symbol-placement": "line", "text-field": NAME, "text-font": FONT,
@@ -391,7 +391,7 @@ def main():
         print(f"{path}  ({len(data['layers'])} слоёв)")
     path = args.out / "roads.json"
     path.write_text(json.dumps(roads_style(base), ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    print(f"{path}  (дороги Яндекса, слой)")
+    print(f"{path}  (дороги OSM, слой)")
 
 
 if __name__ == "__main__":

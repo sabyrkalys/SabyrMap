@@ -15,7 +15,7 @@ def _register(client, email):
 
 
 def _create(client, headers, **overrides):
-    body = {"map_id": "server-hybrid-day", "bbox": BBOX, "max_zoom": 15, **overrides}
+    body = {"map_id": "server-hybrid-day-nobuildings", "bbox": BBOX, "max_zoom": 15, **overrides}
     return client.post("/regions", json=body, headers=headers)
 
 
@@ -40,7 +40,7 @@ def test_regions_need_login(client, seeded):
 def test_estimate_splits_by_archive(client, seeded):
     headers = _register(client, "est@example.test")
 
-    response = client.post("/regions/estimate", json={"map_id": "server-hybrid-day", "bbox": BBOX, "max_zoom": 15},
+    response = client.post("/regions/estimate", json={"map_id": "server-hybrid-day-nobuildings", "bbox": BBOX, "max_zoom": 15},
                            headers=headers)
 
     assert response.status_code == 200
@@ -66,7 +66,7 @@ def test_estimate_of_a_raster_map_has_no_style(client, seeded):
 
 def test_estimate_outside_the_data_counts_only_the_overview(client, seeded):
     headers = _register(client, "est-out@example.test")
-    body = client.post("/regions/estimate", json={"map_id": "server-hybrid-day", "bbox": [10, 50, 10.1, 50.1],
+    body = client.post("/regions/estimate", json={"map_id": "server-hybrid-day-nobuildings", "bbox": [10, 50, 10.1, 50.1],
                                                   "max_zoom": 14}, headers=headers).json()
     assert [p["tileset"] for p in body["parts"]] == ["overview"]
 
@@ -100,7 +100,7 @@ def test_create_rejects_regions_over_the_size_limit(client, seeded, monkeypatch)
     response = _create(client, headers)
 
     assert response.status_code == 413
-    estimate = client.post("/regions/estimate", json={"map_id": "server-hybrid-day", "bbox": BBOX, "max_zoom": 15},
+    estimate = client.post("/regions/estimate", json={"map_id": "server-hybrid-day-nobuildings", "bbox": BBOX, "max_zoom": 15},
                            headers=headers).json()
     assert estimate["allowed"] is False
 

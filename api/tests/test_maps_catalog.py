@@ -21,15 +21,14 @@ def test_catalog_is_public_and_lists_server_maps(client, seeded):
     assert [p["id"] for p in providers] == ["server", "server-layers", "server-imagery"]
     assert providers[0]["name"] == "Сервер карт"
     ids = [s["id"] for s in providers[0]["sources"]]
-    assert ids == ["server-hybrid-day", "server-hybrid-day-nobuildings", "server-hybrid-night", "server-vector-day",
-                   "server-vector-night", "server-satellite"]
+    assert ids == ["server-hybrid-day-nobuildings", "server-satellite"]
 
 
 def test_imagery_is_a_raster_map_of_its_own_group(client, seeded):
     providers = {p["id"]: p for p in client.get("/maps").json()["providers"]}
 
     imagery = providers["server-imagery"]
-    assert imagery["name"] == "Снимки"
+    assert imagery["name"] == "Спутниковые снимки"
     [snapshot] = imagery["sources"]
     assert snapshot["id"] == "server-zolotoj-kolodez"
     assert snapshot["tileUrlTemplate"] == "https://maps.test/tiles/zolotoj-kolodez/{z}/{x}/{y}"
@@ -79,12 +78,13 @@ def test_catalog_matches_the_client_format(client, seeded):
 def test_catalog_builds_absolute_urls_from_the_public_tiles_url(client, seeded):
     sources = {s["id"]: s for s in client.get("/maps").json()["providers"][0]["sources"]}
 
-    assert sources["server-hybrid-day"]["styleUrl"] == "https://maps.test/tiles/style/hybrid-day"
+    assert sources["server-hybrid-day-nobuildings"]["styleUrl"] == (
+        "https://maps.test/tiles/style/hybrid-day-nobuildings")
     assert sources["server-satellite"]["tileUrlTemplate"] == "https://maps.test/tiles/satellite/{z}/{x}/{y}"
     # Every server map can also lie over another one as a layer.
     assert all(s["canBeOverlay"] for s in sources.values())
-    assert sources["server-hybrid-day"]["storageMode"] == "onlineCache"
-    assert sources["server-hybrid-day"]["version"] == "v1"
+    assert sources["server-hybrid-day-nobuildings"]["storageMode"] == "onlineCache"
+    assert sources["server-hybrid-day-nobuildings"]["version"] == "v1"
 
 
 def test_public_tiles_url_defaults_to_public_host(monkeypatch):
@@ -102,7 +102,24 @@ def test_seed_names_maps_after_the_region_and_is_idempotent(seeded):
     seed(seeded, version="v1", region="Казахстан")
 
     entries = seeded.query(MapCatalogEntry).all()
-    assert len(entries) == 8
-    hybrid = seeded.get(MapCatalogEntry, "server-hybrid-day")
-    assert hybrid.name == "Казахстан · спутник + дороги"
+    assert len(entries) == 4
+    hybrid = seeded.get(MapCatalogEntry, "server-hybrid-day-nobuildings")
+    assert hybrid.name == "Гибрид"
     assert hybrid.version == "v1"
+
+
+def test_seed_deletes_entries_it_no_longer_lists(seeded):
+    from app.models.map_catalog import MapCatalogEntry
+    from app.seed_maps import seed
+
+    # A map this script used to manage (e.g. a retired «server-hybrid-day»),
+    # left over from before it was dropped from _MAPS.
+    seeded.add(MapCatalogEntry(
+        id="server-retired", provider_id="server", name="Старая карта", format="vector",
+        style_path="style/retired", min_zoom=0, max_zoom=20, version="v1", can_be_overlay=True,
+    ))
+    seeded.flush()
+
+    seed(seeded, version="v1", region="Казахстан")
+
+    assert seeded.get(MapCatalogEntry, "server-retired") is None
