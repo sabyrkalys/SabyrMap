@@ -50,9 +50,10 @@ class LayerContextMenu extends ConsumerWidget {
     final name = layerName(providers, realId);
     final ids = state.overlays.map((l) => l.sourceId).toList(); // снизу вверх
     final onMap = ids.contains(sourceId);
-    // Перемещаются слои и выбранная карта (общий список сверху вниз);
-    // ортофотопланы и базовая карта стоят на местах.
-    final stack = notifier.stack;
+    // Перемещаются слои, ортофотопланы и выбранная карта — общий список
+    // сверху вниз.
+    final hasOrthophotos = providers.any((p) => p.id == CatalogRepository.orthophotoProviderId);
+    final stack = notifier.stack(hasOrthophotos: hasOrthophotos);
     final stackId = _isBase ? MapStateNotifier.mapKey : sourceId;
     final movable = stack.contains(stackId) && stack.length > 1;
     final isTop = movable && stack.first == stackId;
@@ -76,9 +77,13 @@ class LayerContextMenu extends ConsumerWidget {
     /// Как [openSheet], но на время экрана прячет «Карты на экране».
     Future<void> openOverMap(Future<void> Function(BuildContext context) open) async {
       final under = navigator.context;
+      // Немодальная шторка над картой одна: меню слоя уже заменило «Карты
+      // на экране», закрыть нужно только его. Модальные (не с карты) —
+      // меню поверх панели, закрыть оба.
+      final stacked = !HomeNavScope.sheetsOverMap(context);
       navigator.pop();
       if (!fromPanel) return open(under);
-      navigator.pop();
+      if (stacked) navigator.pop();
       await open(under);
       if (under.mounted) await LayersPanel.show(under);
     }
@@ -122,8 +127,10 @@ class LayerContextMenu extends ConsumerWidget {
           onTap: noMap ? null : () => openSheet((c) => LayerDetailsScreen.show(c, realId, layerMenuId: sourceId)),
         ),
         // Сравнивают слои и карту между собой; одной карте сравнивать не с
-        // чем — пункта нет, пока не добавлен ещё слой.
-        if (movable)
+        // чем — пункта нет, пока не добавлен ещё слой. Ортофотопланы —
+        // группа территорий, а не один слой с адресом в каталоге — его нет
+        // и здесь, хотя переставлять их теперь можно.
+        if (movable && !isOrthophotos)
           SheetMenuItem(
             key: const Key('layer_menu_compare'),
             icon: Icons.compare,

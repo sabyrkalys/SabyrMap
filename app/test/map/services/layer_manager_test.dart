@@ -506,13 +506,30 @@ void main() {
       expect(host.sources, isEmpty);
     });
 
-    test('they go under the base style roads, so the roads stay visible', () async {
+    test('by default they go above every overlay, ignoring the base style roads', () async {
       final m = manager();
       await m.setBaseSource(liberty);
+      // Not a search target any more (orthophotosUnder decides, not the
+      // style's own layers) — present just to prove it's ignored.
       host.styleLayers = ['background', 'satellite', 'road-middle-casing', 'road-major', 'boundary-country'];
+      await m.addOverlay(osm);
       await m.setOrthophotos([dobro, avd]);
-      expect(host.calls, contains('addLayer ortho-Доброполье.mbtiles-layer below road-middle-casing'));
-      expect(host.calls, contains('addLayer ortho-Авдеевка.mbtiles-layer below road-middle-casing'));
+      expect(host.layers, ['osm-standard-layer', 'ortho-Доброполье.mbtiles-layer', 'ortho-Авдеевка.mbtiles-layer']);
+    });
+
+    test('reorderOverlays(underOrthophotos:) moves them between overlays, re-anchoring the native layers', () async {
+      final m = manager();
+      await m.setBaseSource(liberty);
+      await m.addOverlay(osm);
+      await m.addOverlay(ySat);
+      await m.setOrthophotos([dobro]);
+      expect(host.layers, ['osm-standard-layer', 'yandex-sat-layer', 'ortho-Доброполье.mbtiles-layer']);
+
+      await m.reorderOverlays([osm.id, ySat.id], underOrthophotos: 1);
+      expect(host.layers, ['osm-standard-layer', 'ortho-Доброполье.mbtiles-layer', 'yandex-sat-layer']);
+
+      await m.reorderOverlays([osm.id, ySat.id], underOrthophotos: 0);
+      expect(host.layers, ['ortho-Доброполье.mbtiles-layer', 'osm-standard-layer', 'yandex-sat-layer']);
     });
 
     test('a base without roads: under the annotations', () async {
@@ -765,6 +782,112 @@ void main() {
       await m.setBaseSource(liberty);
       expect(host.layers.first, LayerManager.layerIdOf(osm.id));
       expect(host.layers.last, 'server-roads~place-label');
+    });
+  });
+
+  group('MapStyleResolver.previewStyleOf', () {
+    const overlay = MapSource(
+      id: 'server-roads',
+      name: 'Яндекс дороги (слой)',
+      styleUrl: 'https://t/style/roads',
+      format: TileFormat.vector,
+      storageMode: StorageMode.onlineCache,
+      extraParams: {'overlayOnly': 'true'},
+    );
+    const base = MapSource(
+      id: 'server-vector-night',
+      name: 'Только дороги (ночь)',
+      styleUrl: 'https://t/style/vector-night',
+      format: TileFormat.vector,
+      storageMode: StorageMode.onlineCache,
+    );
+    final texts = {
+      'https://t/style/roads': convert.jsonEncode({
+        'version': 8,
+        'sources': {
+          'osm': {'type': 'vector', 'tiles': []},
+        },
+        'layers': [
+          {'id': 'road-major', 'type': 'line', 'source': 'osm'},
+        ],
+      }),
+      'https://t/style/vector-night': convert.jsonEncode({
+        'version': 8,
+        'sources': <String, Object>{},
+        'layers': [
+          {
+            'id': 'background',
+            'type': 'background',
+            'paint': {'background-color': '#1c2126'},
+          },
+          {'id': 'water', 'type': 'fill', 'source': 'osm'},
+        ],
+      }),
+    };
+
+    MapStyleResolver resolver() => MapStyleResolver(
+          catalog: LayerCatalog([
+            const MapProvider(id: 'server-layers', name: 'Слои', sources: [overlay]),
+            const MapProvider(id: 'server', name: 'Сервер', sources: [base]),
+          ]),
+          google: GoogleTilesService(apiKey: '', httpClient: MockClient((_) async => http.Response('', 500))),
+          yandex: YandexTilesService(apiKey: '', httpClient: MockClient((_) async => http.Response('', 500))),
+          fetchText: (url) async => texts[url.toString()]!,
+        );
+
+    test('a plain (non-overlay) map is unaffected — its style URL is returned as is', () async {
+      expect(await resolver().previewStyleOf(base, null), 'https://t/style/vector-night');
+    });
+
+    test('an overlay source gets the base map\'s background layer prepended', () async {
+      final json = await resolver().previewStyleOf(overlay, base);
+      final style = convert.jsonDecode(json) as Map<String, dynamic>;
+      final layers = style['layers'] as List;
+      expect(layers.first, {
+        'id': 'background',
+        'type': 'background',
+        'paint': {'background-color': '#1c2126'},
+      });
+      expect(layers.last, {'id': 'road-major', 'type': 'line', 'source': 'osm'});
+      expect(style['sources'], containsPair('osm', isA<Map>()));
+    });
+
+    test('without a base map, a light fallback background is used', () async {
+      final json = await resolver().previewStyleOf(overlay, null);
+      final style = convert.jsonDecode(json) as Map<String, dynamic>;
+      expect((style['layers'] as List).first, {
+        'id': 'background',
+        'type': 'background',
+        'paint': {'background-color': '#e5e3df'},
+      });
+    });
+
+    test('a base style with no background layer also falls back to the light default', () async {
+      final r = MapStyleResolver(
+        catalog: LayerCatalog([
+          const MapProvider(id: 'server-layers', name: 'Слои', sources: [overlay]),
+        ]),
+        google: GoogleTilesService(apiKey: '', httpClient: MockClient((_) async => http.Response('', 500))),
+        yandex: YandexTilesService(apiKey: '', httpClient: MockClient((_) async => http.Response('', 500))),
+        fetchText: (url) async => texts[url.toString()]!,
+      );
+      const noBackground = MapSource(
+        id: 'no-bg',
+        name: 'Без фона',
+        styleUrl: 'https://t/style/no-bg',
+        format: TileFormat.vector,
+        storageMode: StorageMode.onlineCache,
+      );
+      final json = await r.previewStyleOf(
+        overlay,
+        noBackground,
+      );
+      final style = convert.jsonDecode(json) as Map<String, dynamic>;
+      expect((style['layers'] as List).first, {
+        'id': 'background',
+        'type': 'background',
+        'paint': {'background-color': '#e5e3df'},
+      });
     });
   });
 }

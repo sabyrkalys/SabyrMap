@@ -128,8 +128,9 @@ void main() {
 
   testWidgets('dragging a layer by its ≡ handle reorders the map (top of the list = top of the map)', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
-    expect(find.byIcon(Icons.drag_handle), findsNWidgets(3), reason: 'two layers and the map');
-    // Сверху вниз: OSM, затем Гибрид. Тянем Гибрид за ручку наверх.
+    expect(find.byIcon(Icons.drag_handle), findsNWidgets(4),
+        reason: 'two layers, the orthophotos (the harness catalog always has one) and the map');
+    // Сверху вниз: Ортофотопланы, OSM, затем Гибрид. Тянем Гибрид за ручку наверх.
     final handle = find.byKey(const Key('layer_drag_yandex-hybrid'));
     final gesture = await tester.startGesture(tester.getCenter(handle));
     await gesture.moveBy(const Offset(0, -200), timeStamp: const Duration(milliseconds: 100));
@@ -143,17 +144,20 @@ void main() {
 
   testWidgets('moving a layer down the list puts it right below its new neighbour', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
-    tester.widget<ReorderableListView>(find.byType(ReorderableListView)).onReorderItem!(0, 1);
+    // List index 0 is the orthophotos row (the harness catalog always has
+    // one, above every layer by default); 1 and 2 are OSM and Гибрид.
+    tester.widget<ReorderableListView>(find.byType(ReorderableListView)).onReorderItem!(1, 2);
     await tester.pumpAndSettle();
     expect(h.state.overlays.map((l) => l.sourceId), ['osm-standard', 'yandex-hybrid']);
   });
 
-  testWidgets('orthophotos: one row above the layers; its eye is the map switch', (tester) async {
+  testWidgets('orthophotos: above the layers by default, now draggable too; its eye is the map switch',
+      (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     const key = MapStateNotifier.orthophotosKey;
     expect(find.text('Ортофотопланы'), findsOneWidget);
     expect(tester.getTopLeft(find.text('Ортофотопланы')).dy < tester.getTopLeft(find.text('Яндекс Гибрид')).dy, isTrue);
-    expect(find.byKey(const Key('layer_drag_$key')), findsNothing);
+    expect(find.byKey(const Key('layer_drag_$key')), findsOneWidget);
     final eye = find.byKey(const Key('layer_visible_$key'));
     expect(find.descendant(of: eye, matching: find.byIcon(Icons.visibility_off)), findsOneWidget);
 
@@ -176,7 +180,7 @@ void main() {
     expect(h.state.orthophotoOpacity, 0.6);
   });
 
-  testWidgets('orthophotos: the menu changes only their look', (tester) async {
+  testWidgets('orthophotos: the menu changes their look and moves them, but has no compare', (tester) async {
     await h.pump(tester);
     await tester.tap(find.byKey(const Key('layer_menu_${MapStateNotifier.orthophotosKey}')));
     await tester.pumpAndSettle();
@@ -185,10 +189,13 @@ void main() {
     for (final key in ['layer_menu_remove', 'layer_menu_force_refresh']) {
       expect(enabled(key), isFalse, reason: key);
     }
-    for (final key in ['layer_menu_compare', 'layer_menu_remove_others', 'layer_menu_move_up']) {
+    // Сравнивать нечего: ортофотопланы — группа территорий, а не один слой
+    // с адресом в каталоге.
+    for (final key in ['layer_menu_compare', 'layer_menu_remove_others']) {
       expect(find.byKey(Key(key)), findsNothing, reason: key);
     }
-    for (final key in ['layer_menu_details', 'layer_menu_opacity', 'layer_menu_color', 'layer_menu_invert']) {
+    for (final key
+        in ['layer_menu_details', 'layer_menu_opacity', 'layer_menu_color', 'layer_menu_invert', 'layer_menu_move_up']) {
       expect(enabled(key), isTrue, reason: key);
     }
     await tester.tap(find.byKey(const Key('layer_menu_invert')));

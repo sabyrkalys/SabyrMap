@@ -191,7 +191,7 @@ class LayerManager {
   })  : _fetchText = fetchText ?? _httpText,
         _host = host,
         _catalog = catalog,
-        _styles = MapStyleResolver(catalog: catalog, google: google, yandex: yandex);
+        _styles = MapStyleResolver(catalog: catalog, google: google, yandex: yandex, fetchText: fetchText);
 
   static const int zStep = 10;
   static const int tileSize = 256;
@@ -281,7 +281,8 @@ class LayerManager {
 
   /// Orthophotos shown over the map: each file is one territory, so they
   /// don't cover each other and aren't counted against [maxRasterOverlays].
-  /// They sit above the overlays, under the base style's roads.
+  /// Their position among the overlays is [_orthophotosUnder], the same
+  /// kind of marker [_overlaysUnderMap] is for the chosen map.
   final List<MapSource> _orthophotos = [];
   Future<void> _tail = Future.value();
 
@@ -312,10 +313,51 @@ class LayerManager {
     return null;
   }
 
-  /// Ceiling for the overlay at stack position [position] (bottom = 0);
-  /// the stored count, not [overlaysUnderMap]: the list may still be filling.
-  String? _ceilingAt(int position) =>
-      position < _overlaysUnderMap ? (_mapFloor ?? _overlayCeiling) : _overlayCeiling;
+  /// How many overlays (the lowest ones) lie under the orthophotos; null —
+  /// not set yet (nothing was ever dragged), meaning their old, fixed spot:
+  /// above every overlay.
+  int? _orthophotosUnder;
+
+  int get orthophotosUnder => (_orthophotosUnder ?? _overlays.length).clamp(0, _overlays.length);
+
+  /// [orthophotosUnder], but null when never customized — for [MapState] to
+  /// store, so a later overlay count change still reads as "above every
+  /// overlay" instead of locking in today's count.
+  int? get orthophotosUnderStored => _orthophotosUnder;
+
+  /// For the first orthophotos put on the map: how many overlays will be
+  /// under them. Null keeps the default (above every overlay).
+  void setOrthophotosUnder(int? count) => _orthophotosUnder = count == null ? null : (count < 0 ? 0 : count);
+
+  /// Bottom layer of the lowest orthophoto; null without any shown.
+  String? get _orthophotoFloor => _orthophotos.isEmpty ? null : layerIdOf(_orthophotos.first.id);
+
+  /// Ceiling for the overlay at stack position [position] (bottom = 0): under
+  /// the chosen map or the orthophotos, whichever of the two markers is
+  /// nearer [position] — a tie favours the map (orthophotos end up just
+  /// above it) — or [_host.annotationsBottomLayerId] when [position] is
+  /// above both (or there is no map/no orthophotos). Reads the stored
+  /// counts, not the clamped getters: the overlay list may still be filling.
+  String? _ceilingAt(int position) {
+    // The stored [_orthophotosUnder], not [orthophotosUnder]: it may exceed
+    // the list's length while the list is still filling (same reason
+    // [_overlaysUnderMap] is read raw below). Null — no custom spot yet —
+    // reads as "above every position", their old, fixed place.
+    final orthoAt = _orthophotosUnder;
+    final hasOrthophotos = _orthophotos.isNotEmpty;
+    final belowMap = position < _overlaysUnderMap;
+    final belowOrthophotos = hasOrthophotos && (orthoAt == null || position < orthoAt);
+    if (belowMap && belowOrthophotos) {
+      // Whichever marker is nearer wins; a tie (or orthoAt still unset,
+      // i.e. infinitely high) favours the map.
+      return (orthoAt == null || _overlaysUnderMap <= orthoAt)
+          ? (_mapFloor ?? _host.annotationsBottomLayerId)
+          : (_orthophotoFloor ?? _host.annotationsBottomLayerId);
+    }
+    if (belowMap) return _mapFloor ?? _host.annotationsBottomLayerId;
+    if (belowOrthophotos) return _orthophotoFloor ?? _host.annotationsBottomLayerId;
+    return _host.annotationsBottomLayerId;
+  }
 
   /// For the first layers put on the map: how many overlays will be under it.
   void setOverlaysUnderMap(int count) => _overlaysUnderMap = count < 0 ? 0 : count;
@@ -495,11 +537,6 @@ class LayerManager {
   /// Orthophotos on the map now.
   List<MapSource> getOrthophotos() => List.unmodifiable(_orthophotos);
 
-  /// Where overlays go: under the lowest orthophoto, or under the
-  /// annotations when there are none.
-  String? get _overlayCeiling =>
-      _orthophotos.isEmpty ? _host.annotationsBottomLayerId : layerIdOf(_orthophotos.first.id);
-
   /// Shows exactly [sources] as orthophotos (an empty list removes them).
   /// Only the difference is applied: ones already shown stay as they are
   /// (no flicker while the map moves), ones no longer wanted are removed,
@@ -541,8 +578,9 @@ class LayerManager {
           minZoom: source.minZoom,
           maxZoom: source.maxZoom,
         );
-        // Each one right under the roads: above the overlays and the
-        // orthophotos added before it.
+        // Each one at the same, shared ceiling: above the orthophotos
+        // added before it (in this call or earlier), under whatever
+        // [_orthophotoCeiling] found above [orthophotosUnder].
         await _host.addRasterLayer(
           source.id,
           layerIdOf(source.id),
@@ -558,16 +596,13 @@ class LayerManager {
     return LayerChangeResult(problems);
   }
 
-  /// Where orthophotos go: under the lowest road layer of our styles
-  /// (road_layers in tools/build/styles/build_styles.py), so roads, borders
-  /// and labels stay on top of the photo; under the annotations for a base
-  /// without such roads.
+  /// Where orthophotos go: at [orthophotosUnder] among the overlays — right
+  /// under the lowest one still above that spot, or under the annotations
+  /// when none are (the same marker mechanism [_ceilingAt] gives overlays
+  /// relative to the chosen map).
   Future<String?> _orthophotoCeiling() async {
-    try {
-      for (final id in await _host.layerIds()) {
-        if (id.startsWith('road-')) return id;
-      }
-    } catch (_) {}
+    final at = orthophotosUnder;
+    if (at < _overlays.length) return _bottomLayerOf(_overlays[at].sourceId);
     return _host.annotationsBottomLayerId;
   }
 
@@ -646,6 +681,7 @@ class LayerManager {
         _colors.remove(sourceId);
         _vectors.remove(sourceId);
         if (index < _overlaysUnderMap) _overlaysUnderMap--;
+        if (_orthophotosUnder != null && index < _orthophotosUnder!) _orthophotosUnder = _orthophotosUnder! - 1;
       });
 
   Future<void> setOpacity(String sourceId, double opacity) => _serial(() async {
@@ -681,7 +717,9 @@ class LayerManager {
   /// [orderedIds] bottom → top; must name exactly the current overlays.
   /// [underMap]: how many of them (from the bottom) lie under the chosen map;
   /// unchanged when not given.
-  Future<void> reorderOverlays(List<String> orderedIds, {int? underMap}) => _serial(() async {
+  /// [underOrthophotos]: how many overlays (from the bottom) lie under the
+  /// orthophotos; unchanged when not given.
+  Future<void> reorderOverlays(List<String> orderedIds, {int? underMap, int? underOrthophotos}) => _serial(() async {
         final current = {for (final l in _overlays) l.sourceId: l};
         if (orderedIds.length != current.length || !orderedIds.every(current.containsKey)) {
           throw ArgumentError.value(orderedIds, 'orderedIds', 'must list exactly the current overlays');
@@ -691,14 +729,39 @@ class LayerManager {
         }
         _overlays.clear();
         if (underMap != null) _overlaysUnderMap = underMap.clamp(0, orderedIds.length);
+        if (underOrthophotos != null) _orthophotosUnder = underOrthophotos.clamp(0, orderedIds.length);
         for (var i = 0; i < orderedIds.length; i++) {
           final layer = current[orderedIds[i]]!.copyWith(zIndex: (i + 1) * zStep);
-          // Added bottom → top, each right under its ceiling (the map or the
-          // annotations), so each new one sits above the previous.
+          // Added bottom → top, each right under its ceiling (the map, the
+          // orthophotos or the annotations), so each new one sits above the
+          // previous.
           await _addLayersOf(layer, _ceilingAt(i));
           _overlays.add(layer);
         }
+        // The orthophotos' own native layers don't move with the overlay
+        // rebuild above; re-anchor them only when their spot changed.
+        if (underOrthophotos != null) await _repositionOrthophotos();
       });
+
+  /// Re-inserts the current orthophotos' native layers (not their sources,
+  /// already on the map) at the ceiling [orthophotosUnder] now resolves to —
+  /// used after a reorder moves them relative to the overlays.
+  Future<void> _repositionOrthophotos() async {
+    if (_orthophotos.isEmpty) return;
+    final ceiling = await _orthophotoCeiling();
+    for (final source in _orthophotos) {
+      try {
+        await _host.removeLayer(layerIdOf(source.id));
+        await _host.addRasterLayer(
+          source.id,
+          layerIdOf(source.id),
+          opacity: _orthophotoOpacity,
+          color: RasterColor.of(_orthophotoColor),
+          belowLayerId: ceiling,
+        );
+      } catch (_) {}
+    }
+  }
 
   int _indexOf(String sourceId) {
     final index = _overlays.indexWhere((l) => l.sourceId == sourceId);
@@ -799,13 +862,22 @@ class MapStyleResolver {
     required LayerCatalog catalog,
     required GoogleTilesService google,
     required YandexTilesService yandex,
+    Future<String> Function(Uri url)? fetchText,
   })  : _catalog = catalog,
         _google = google,
-        _yandex = yandex;
+        _yandex = yandex,
+        _fetchText = fetchText ?? _httpText;
 
   final LayerCatalog _catalog;
   final GoogleTilesService _google;
   final YandexTilesService _yandex;
+  final Future<String> Function(Uri url) _fetchText;
+
+  static Future<String> _httpText(Uri url) async {
+    final response = await http.get(url);
+    if (response.statusCode != 200) throw LayerException('Стиль не загрузился (${response.statusCode})');
+    return utf8.decode(response.bodyBytes);
+  }
 
   Future<String> styleOf(MapSource source) async {
     if (source.format == TileFormat.vector) {
@@ -814,6 +886,42 @@ class MapStyleResolver {
       return url;
     }
     return jsonEncode(_rasterStyle(source, await tileUrl(source)));
+  }
+
+  /// [styleOf], but for a preview snapshot (map_previews.dart): an
+  /// overlay-only source (e.g. «Яндекс дороги (слой)») has no background of
+  /// its own — on screen that's the point, it sits on another map — but
+  /// drawn alone for a preview, MapLibre fills the gap with black (its
+  /// snapshot has no alpha). [base] (the current base map, if any) supplies
+  /// a background layer so the preview reads like it does over a real map.
+  Future<String> previewStyleOf(MapSource source, MapSource? base) async {
+    if (!source.isOverlayOnly) return styleOf(source);
+    final overlay = await _fetchStyle(source);
+    Map<String, dynamic> background = const {
+      'id': 'background',
+      'type': 'background',
+      'paint': {'background-color': '#e5e3df'},
+    };
+    if (base != null) {
+      try {
+        final baseStyle = await _fetchStyle(base);
+        background = (baseStyle['layers'] as List).cast<Map<String, dynamic>>().firstWhere(
+              (l) => l['type'] == 'background',
+            );
+      } catch (_) {
+        // base's style couldn't be fetched/parsed — keep the fallback above.
+      }
+    }
+    overlay['layers'] = [background, ...overlay['layers'] as List];
+    return jsonEncode(overlay);
+  }
+
+  /// [source]'s style as JSON: [styleOf] already inline, or fetched if it's
+  /// a URL (every vector style).
+  Future<Map<String, dynamic>> _fetchStyle(MapSource source) async {
+    final style = await styleOf(source);
+    final text = style.trimLeft().startsWith('{') ? style : await _fetchText(Uri.parse(style));
+    return jsonDecode(text) as Map<String, dynamic>;
   }
 
   /// The raster tile URL, with the key/session and access check for Google

@@ -93,7 +93,7 @@ void main() {
   });
 
   testWidgets('a map alone: «Сравнить...», «Переместить» and «Убрать остальные» are hidden', (tester) async {
-    await h.pump(tester);
+    await h.pump(tester, withOrthophotos: false);
     await openMenu(tester, 'base');
     for (final key in ['layer_menu_compare', 'layer_menu_move_up', 'layer_menu_remove_others']) {
       expect(find.byKey(Key(key)), findsNothing, reason: key);
@@ -115,7 +115,7 @@ void main() {
   });
 
   testWidgets('without a map: remembered on the next start; a layer alone has nothing to compare with', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer], base: LayerManager.noMapId));
+    await h.pump(tester, saved: stateWith(const [hybridLayer], base: LayerManager.noMapId), withOrthophotos: false);
     expect(h.state.baseSourceId, LayerManager.noMapId);
     expect(h.host.style, contains('"background"'));
     expect(find.byKey(const Key('layer_base_row')), findsNothing);
@@ -133,7 +133,7 @@ void main() {
   });
 
   testWidgets('the top layer can be moved down, the others up; a single layer cannot move', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]));
+    await h.pump(tester, saved: stateWith(const [hybridLayer, osmLayer]), withOrthophotos: false);
     await openMenu(tester, 'osm-standard');
     expect(find.text('Переместить вниз'), findsOneWidget);
     expect(find.text('Переместить вверх'), findsNothing);
@@ -147,13 +147,13 @@ void main() {
   });
 
   testWidgets('a single layer can go under the map and back; the map moves too', (tester) async {
-    await h.pump(tester, saved: stateWith(const [hybridLayer]));
+    await h.pump(tester, saved: stateWith(const [hybridLayer]), withOrthophotos: false);
     await openMenu(tester, 'yandex-hybrid');
     expect(find.text('Переместить вниз'), findsOneWidget);
     await tester.tap(find.byKey(const Key('layer_menu_move_up')));
     await tester.pumpAndSettle();
     expect(h.state.overlaysUnderMap, 1);
-    expect(h.container.read(mapLayersProvider.notifier).stack, [MapStateNotifier.mapKey, 'yandex-hybrid']);
+    expect(h.container.read(mapLayersProvider.notifier).stack(), [MapStateNotifier.mapKey, 'yandex-hybrid']);
 
     await tester.tap(find.byKey(const Key('layer_menu_cancel')));
     await tester.pumpAndSettle();
@@ -165,10 +165,10 @@ void main() {
     expect(h.store.saved!.overlaysUnderMap, 0);
   });
 
-  testWidgets('the orthophotos and the base map do not move', (tester) async {
+  testWidgets('the orthophotos can now move; the world map never does', (tester) async {
     await h.pump(tester, saved: stateWith(const [hybridLayer]));
     await openMenu(tester, MapStateNotifier.orthophotosKey);
-    expect(find.byKey(const Key('layer_menu_move_up')), findsNothing);
+    expect(find.byKey(const Key('layer_menu_move_up')), findsOneWidget);
     await tester.tap(find.byKey(const Key('layer_menu_cancel')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('layer_menu_world')));

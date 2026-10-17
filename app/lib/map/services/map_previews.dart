@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../catalog/catalog_repository.dart';
 import '../models/map_models.dart';
+import '../state/map_layers_controller.dart';
 import '../state/map_viewport.dart';
 import 'google_tiles_service.dart';
 import 'layer_manager.dart';
@@ -137,12 +138,16 @@ final mapPreviewProvider = FutureProvider.autoDispose.family<File?, MapSource>((
       (bounds.southwest.longitude + bounds.northeast.longitude) / 2,
     );
     final providers = await ref.watch(catalogProvider.future);
+    final catalog = LayerCatalog(providers);
     final styles = MapStyleResolver(
-      catalog: LayerCatalog(providers),
+      catalog: catalog,
       google: ref.read(googleTilesServiceProvider),
       yandex: ref.read(yandexTilesServiceProvider),
     );
-    return await previews.draw(source, await styles.styleOf(source), center);
+    final baseId = ref.read(mapLayersProvider).baseSourceId;
+    final base = baseId == null ? null : catalog.source(baseId);
+    final style = await styles.previewStyleOf(source, base);
+    return await previews.draw(source, style, center);
   } on LayerException {
     return null;
   } on FileSystemException {

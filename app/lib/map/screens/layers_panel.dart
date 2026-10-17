@@ -89,8 +89,9 @@ class LayersPanel extends ConsumerWidget {
       for (final p in providers)
         if (p.id == CatalogRepository.orthophotoProviderId) ...p.sources,
     ];
-    // Слои и карта сверху вниз; карта может стоять между слоями.
-    final stack = notifier.stack;
+    // Слои, ортофотопланы и карта сверху вниз; карта и ортофотопланы могут
+    // стоять между слоями (и друг другом).
+    final stack = notifier.stack(hasOrthophotos: orthophotos.isNotEmpty);
     final overlaysById = {for (final l in state.overlays) l.sourceId: l};
 
     return ConstrainedBox(
@@ -115,28 +116,10 @@ class LayersPanel extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Все ортофотопланы — одна строка над слоями (на карте они
-                        // выше слоёв); глазик — та же кнопка, что на карте.
-                        if (orthophotos.isNotEmpty)
-                          OnScreenLayerRow(
-                            key: const ValueKey(MapStateNotifier.orthophotosKey),
-                            layer: ActiveLayer(
-                              sourceId: MapStateNotifier.orthophotosKey,
-                              type: MapLayerType.overlay,
-                              opacity: state.orthophotoOpacity,
-                              visible: state.orthophotosOn,
-                              zIndex: 0,
-                            ),
-                            name: 'Ортофотопланы',
-                            source: orthophotos.first,
-                            onVisible: (v) => runLayerChange(context, () => notifier.setOrthophotosOn(v)),
-                            onOpacity: () => _openOpacity(context, MapStateNotifier.orthophotosKey),
-                            onMenu: () =>
-                                LayerContextMenu.show(context, MapStateNotifier.orthophotosKey, fromPanel: true),
-                          ),
                         // Порядок — ручкой ≡ (долгий тап по строке открывает меню).
-                        // Слои и выбранная карта — один перетаскиваемый список (сверху
-                        // вниз); «Ортофотопланы» и «Базовая карта» стоят на местах.
+                        // Слои, ортофотопланы и выбранная карта — один
+                        // перетаскиваемый список (сверху вниз); «Базовая
+                        // карта» (мировая подложка) стоит на своём месте, ниже.
                         ReorderableListView(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -165,6 +148,27 @@ class LayersPanel extends ConsumerWidget {
                                   ).push(MaterialPageRoute<void>(builder: (_) => const AvailableMapsScreen())),
                                   onMenu: () =>
                                       LayerContextMenu.show(context, LayerContextMenu.baseId, fromPanel: true),
+                                )
+                              else if (id == MapStateNotifier.orthophotosKey)
+                                OnScreenLayerRow(
+                                  key: const ValueKey(MapStateNotifier.orthophotosKey),
+                                  index: i,
+                                  layer: ActiveLayer(
+                                    sourceId: MapStateNotifier.orthophotosKey,
+                                    type: MapLayerType.overlay,
+                                    opacity: state.orthophotoOpacity,
+                                    visible: state.orthophotosOn,
+                                    zIndex: 0,
+                                  ),
+                                  name: 'Ортофотопланы',
+                                  source: orthophotos.first,
+                                  onVisible: (v) => runLayerChange(context, () => notifier.setOrthophotosOn(v)),
+                                  onOpacity: () => _openOpacity(context, MapStateNotifier.orthophotosKey),
+                                  onMenu: () => LayerContextMenu.show(
+                                    context,
+                                    MapStateNotifier.orthophotosKey,
+                                    fromPanel: true,
+                                  ),
                                 )
                               else if (overlaysById[id] case final layer?)
                                 OnScreenLayerRow(

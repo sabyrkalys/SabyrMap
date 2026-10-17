@@ -78,7 +78,7 @@ class OnScreenLayerRow extends StatelessWidget {
   });
 
   /// Место в [ReorderableListView] — для ручки перетаскивания; null —
-  /// строку не перетащить (ортофотопланы).
+  /// строку не перетащить (вне перетаскиваемого списка).
   final int? index;
   final ActiveLayer layer;
   final String name;

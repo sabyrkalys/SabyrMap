@@ -80,6 +80,10 @@ class MapSource {
   /// The server's map data version (e.g. "v1"); a new one means new tiles.
   final String? version;
 
+  /// A transparent layer meant to sit on another map (e.g. «Яндекс дороги
+  /// (слой)»), never shown on its own.
+  bool get isOverlayOnly => extraParams?['overlayOnly'] == 'true';
+
   factory MapSource.fromJson(Map<String, dynamic> json) => MapSource(
         id: json['id'] as String,
         name: json['name'] as String,
@@ -249,6 +253,7 @@ class MapPreset {
     this.worldOpacity = 1.0,
     this.orthophotosOn = false,
     this.orthophotoOpacity = 1.0,
+    this.orthophotosUnder,
   });
 
   final String id;
@@ -267,6 +272,9 @@ class MapPreset {
   final bool orthophotosOn;
   final double orthophotoOpacity;
 
+  /// See [MapState.orthophotosUnder].
+  final int? orthophotosUnder;
+
   MapPreset copyWith({String? name}) => MapPreset(
         id: id,
         name: name ?? this.name,
@@ -279,6 +287,7 @@ class MapPreset {
         worldOpacity: worldOpacity,
         orthophotosOn: orthophotosOn,
         orthophotoOpacity: orthophotoOpacity,
+        orthophotosUnder: orthophotosUnder,
       );
 
   factory MapPreset.fromJson(Map<String, dynamic> json) => MapPreset(
@@ -298,6 +307,7 @@ class MapPreset {
         worldOpacity: (json['worldOpacity'] as num?)?.toDouble() ?? 1.0,
         orthophotosOn: json['orthophotosOn'] as bool? ?? false,
         orthophotoOpacity: (json['orthophotoOpacity'] as num?)?.toDouble() ?? 1.0,
+        orthophotosUnder: (json['orthophotosUnder'] as num?)?.toInt(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -312,6 +322,7 @@ class MapPreset {
         if (worldOpacity != 1.0) 'worldOpacity': worldOpacity,
         if (orthophotosOn) 'orthophotosOn': true,
         if (orthophotoOpacity != 1.0) 'orthophotoOpacity': orthophotoOpacity,
+        if (orthophotosUnder != null) 'orthophotosUnder': orthophotosUnder,
       };
 
   @override
@@ -327,7 +338,8 @@ class MapPreset {
       other.mapVisible == mapVisible &&
       other.worldOpacity == worldOpacity &&
       other.orthophotosOn == orthophotosOn &&
-      other.orthophotoOpacity == orthophotoOpacity;
+      other.orthophotoOpacity == orthophotoOpacity &&
+      other.orthophotosUnder == orthophotosUnder;
 
   @override
   int get hashCode => Object.hash(id, name, baseSourceId, Object.hashAll(overlays));
@@ -346,6 +358,7 @@ class MapState {
     this.mapVisible = true,
     this.mapOpacity = 1.0,
     this.overlaysUnderMap = 0,
+    this.orthophotosUnder,
   });
 
   const MapState.initial()
@@ -358,7 +371,8 @@ class MapState {
         worldOpacity = 1.0,
         mapVisible = true,
         mapOpacity = 1.0,
-        overlaysUnderMap = 0;
+        overlaysUnderMap = 0,
+        orthophotosUnder = null;
 
   final String? baseSourceId;
   final List<ActiveLayer> overlays;
@@ -384,6 +398,10 @@ class MapState {
   /// How many overlays (the lowest ones) lie under the chosen map.
   final int overlaysUnderMap;
 
+  /// How many overlays (the lowest ones) lie under the orthophotos; null —
+  /// never dragged, their old, fixed spot: above every overlay.
+  final int? orthophotosUnder;
+
   MapState copyWith({
     String? baseSourceId,
     List<ActiveLayer>? overlays,
@@ -395,6 +413,8 @@ class MapState {
     bool? mapVisible,
     double? mapOpacity,
     int? overlaysUnderMap,
+    int? orthophotosUnder,
+    bool orthophotosUnderGiven = false,
   }) =>
       MapState(
         baseSourceId: baseSourceId ?? this.baseSourceId,
@@ -407,6 +427,7 @@ class MapState {
         mapVisible: mapVisible ?? this.mapVisible,
         mapOpacity: mapOpacity ?? this.mapOpacity,
         overlaysUnderMap: overlaysUnderMap ?? this.overlaysUnderMap,
+        orthophotosUnder: orthophotosUnderGiven ? orthophotosUnder : this.orthophotosUnder,
       );
 
   factory MapState.fromJson(Map<String, dynamic> json) => MapState(
@@ -424,6 +445,7 @@ class MapState {
         mapVisible: json['mapVisible'] as bool? ?? true,
         mapOpacity: (json['mapOpacity'] as num?)?.toDouble() ?? 1.0,
         overlaysUnderMap: (json['overlaysUnderMap'] as num?)?.toInt() ?? 0,
+        orthophotosUnder: (json['orthophotosUnder'] as num?)?.toInt(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -437,6 +459,7 @@ class MapState {
         if (!mapVisible) 'mapVisible': false,
         if (mapOpacity != 1.0) 'mapOpacity': mapOpacity,
         if (overlaysUnderMap != 0) 'overlaysUnderMap': overlaysUnderMap,
+        if (orthophotosUnder != null) 'orthophotosUnder': orthophotosUnder,
       };
 
   @override
@@ -451,7 +474,8 @@ class MapState {
       other.worldOpacity == worldOpacity &&
       other.mapVisible == mapVisible &&
       other.mapOpacity == mapOpacity &&
-      other.overlaysUnderMap == overlaysUnderMap;
+      other.overlaysUnderMap == overlaysUnderMap &&
+      other.orthophotosUnder == orthophotosUnder;
 
   @override
   int get hashCode =>
@@ -466,5 +490,6 @@ class MapState {
         mapVisible,
         mapOpacity,
         overlaysUnderMap,
+        orthophotosUnder,
       );
 }

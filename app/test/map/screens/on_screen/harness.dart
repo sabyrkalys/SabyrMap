@@ -78,12 +78,24 @@ const dobro = MapSource(
   canBeOverlay: true,
 );
 
+/// [providers] without orthophotos — for tests that want the base map or an
+/// overlay truly alone in the stack, unaffected by the harness's always-on
+/// «Ортофотопланы» provider ([LayersHarness.pump]'s `withOrthophotos: false`).
+final providersWithoutOrthophotos = [
+  for (final p in providers)
+    if (p.id != CatalogRepository.orthophotoProviderId) p,
+];
+
 class FixedCatalog extends CatalogNotifier {
-  @override
-  Future<List<MapProvider>> build() async => providers;
+  FixedCatalog([this._providers = const []]);
+
+  final List<MapProvider> _providers;
 
   @override
-  Future<void> reload() async => state = AsyncData(providers);
+  Future<List<MapProvider>> build() async => _providers;
+
+  @override
+  Future<void> reload() async => state = AsyncData(_providers);
 }
 
 
@@ -107,15 +119,19 @@ class LayersHarness {
     Widget? child,
     bool open = true,
     List<Override> overrides = const [],
+    // False isolates the base map and overlays from the harness's always-on
+    // orthophoto provider — for tests about a layer or the map truly alone.
+    bool withOrthophotos = true,
   }) async {
     tester.view.physicalSize = const Size(1080, 3000);
     tester.view.devicePixelRatio = 2.625;
     addTearDown(tester.view.reset);
     host = FakeHost();
     store = MemoryMapStateStore(saved);
+    final catalog = withOrthophotos ? providers : providersWithoutOrthophotos;
     container = ProviderContainer(
       overrides: [
-        catalogProvider.overrideWith(FixedCatalog.new),
+        catalogProvider.overrideWith(() => FixedCatalog(catalog)),
         mapStateStoreProvider.overrideWithValue(store),
         offlineServiceProvider.overrideWithValue(OfflineService(backend: FakeOfflineBackend())),
         ...overrides,
@@ -125,7 +141,7 @@ class LayersHarness {
     await container.read(mapLayersProvider.notifier).attach(
           LayerManager(
             host: host,
-            catalog: LayerCatalog(providers),
+            catalog: LayerCatalog(catalog),
             google: GoogleTilesService(
               apiKey: 'G',
               httpClient: MockClient((r) async => r.url.path.endsWith('createSession')

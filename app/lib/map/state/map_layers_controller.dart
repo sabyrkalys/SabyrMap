@@ -103,6 +103,8 @@ class MapStateNotifier extends Notifier<MapState> {
   void _syncOverlays() => _publish(state.copyWith(
         overlays: _requireManager().getActiveLayers(),
         overlaysUnderMap: _requireManager().overlaysUnderMap,
+        orthophotosUnder: _requireManager().orthophotosUnderStored,
+        orthophotosUnderGiven: true,
       ));
 
   /// Called by the map screen when the map (and a new [manager]) exists.
@@ -117,6 +119,7 @@ class MapStateNotifier extends Notifier<MapState> {
     // копирование из APK не задерживает показ карты.
     unawaited(_attachWorld(manager));
     manager.setOverlaysUnderMap(state.overlaysUnderMap);
+    manager.setOrthophotosUnder(state.orthophotosUnder);
     await manager.setMapVisible(state.mapVisible);
     try {
       MapSource base;
@@ -295,21 +298,43 @@ class MapStateNotifier extends Notifier<MapState> {
     _syncOverlays();
   }
 
-  /// The whole movable stack top → bottom: overlay ids and [mapKey] for the
-  /// chosen map, which may sit between them.
-  List<String> get stack {
+  /// The whole movable stack top → bottom: overlay ids, [mapKey] for the
+  /// chosen map, and — when [hasOrthophotos] (there are files to show) —
+  /// [orthophotosKey], any of which may sit between the overlays. A tie
+  /// (same spot) puts orthophotos just above the map.
+  List<String> stack({bool hasOrthophotos = false}) {
     final bottomUp = state.overlays.map((l) => l.sourceId).toList();
-    final under = state.overlaysUnderMap.clamp(0, bottomUp.length);
+    final mapAt = state.overlaysUnderMap.clamp(0, bottomUp.length);
     final hasMap = (state.baseSourceId ?? CatalogRepository.defaultBaseSourceId) != LayerManager.noMapId;
-    return [...bottomUp.take(under), if (hasMap) mapKey, ...bottomUp.skip(under)].reversed.toList();
+    final orthoAt = hasOrthophotos ? (state.orthophotosUnder ?? bottomUp.length).clamp(0, bottomUp.length) : null;
+    final result = <String>[];
+    for (var i = 0; i <= bottomUp.length; i++) {
+      if (hasMap && mapAt == i) result.add(mapKey);
+      if (orthoAt == i) result.add(orthophotosKey);
+      if (i < bottomUp.length) result.add(bottomUp[i]);
+    }
+    return result.reversed.toList();
   }
 
-  /// Applies a new [stack] order (top → bottom, see [stack]).
+  /// Applies a new [stack] order (top → bottom, see [stack]). Omit
+  /// [orthophotosKey] (pass a [topToBottom] built with `hasOrthophotos:
+  /// false`) to leave their spot unchanged.
   Future<void> reorderStack(List<String> topToBottom) async {
     final bottomUp = topToBottom.reversed.toList();
-    final mapAt = bottomUp.indexOf(mapKey);
-    final overlays = [for (final id in bottomUp) if (id != mapKey) id];
-    await _requireManager().reorderOverlays(overlays, underMap: mapAt < 0 ? 0 : mapAt);
+    final overlays = <String>[];
+    int? mapUnder;
+    int? orthoUnder;
+    for (final id in bottomUp) {
+      switch (id) {
+        case mapKey:
+          mapUnder = overlays.length;
+        case orthophotosKey:
+          orthoUnder = overlays.length;
+        default:
+          overlays.add(id);
+      }
+    }
+    await _requireManager().reorderOverlays(overlays, underMap: mapUnder ?? 0, underOrthophotos: orthoUnder);
     _syncOverlays();
   }
 

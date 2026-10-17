@@ -35,8 +35,6 @@ import 'map_crosshair.dart';
 import 'map_overlays.dart';
 import 'map_scale.dart';
 import '../icons/icon_renderer.dart';
-import '../app_icons.dart';
-import '../widgets/app_icon.dart';
 import 'map_focus.dart';
 import 'orthophoto/orthophoto_extent.dart';
 import 'map_target.dart';
@@ -213,9 +211,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     _editMode = ref.read(landmarkServicesProvider).editMode..addListener(_onEditModeChanged);
     _mapBearing = ref.read(mapBearingProvider.notifier);
     // Кнопки карты над шторками (HomeNavScope.showSheet).
-    MapSideButtons.builder = (_) => Consumer(
-      builder: (context, ref, _) => _mapButtons(ref.watch(mapLayersProvider.select((state) => state.orthophotosOn))),
-    );
+    MapSideButtons.builder = (_) => _mapButtons();
     _loadSavedCamera();
     _loadMyLocation();
   }
@@ -337,23 +333,6 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result.problems.join('\n'))));
     }
     await _updateOrthophotos();
-  }
-
-  /// Кнопка ортофотопланов: включить или выключить.
-  Future<void> _toggleOrthophotos() async {
-    final notifier = ref.read(mapLayersProvider.notifier);
-    final on = !ref.read(mapLayersProvider).orthophotosOn;
-    final files = await notifier.setOrthophotosOn(on);
-    if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    if (on && files == 0) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Ортофотопланов нет: положите файлы .mbtiles в папку mediafile/orthophoto')),
-      );
-      return;
-    }
-    // Включённые ортофотопланы ставит на карту ref.listen в build.
   }
 
   /// Ортофотопланы вокруг экрана (видимая область и соседние участки) — на
@@ -879,40 +858,22 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
   }
 
-  /// Кнопки справа внизу: ортофотопланы и масштаб.
-  Widget _mapButtons(bool orthophotosOn) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Ортофотопланы: одно нажатие включает или выключает; во
-        // включённом виде кнопка залита цветом.
-        MapRoundButton(
-          key: const Key('orthophoto_button'),
-          active: orthophotosOn,
-          tooltip: orthophotosOn ? 'Ортофотопланы включены' : 'Ортофотопланы выключены',
-          onTap: _toggleOrthophotos,
-          child: Semantics(
-            toggled: orthophotosOn,
-            label: 'Ортофотопланы',
-            child: AppIcon(AppIcons.drone, size: 26, color: MapRoundButton.iconColorFor(orthophotosOn)),
-          ),
-        ),
-        const SizedBox(height: 12),
-        MapZoomButtons(
-          onZoomIn: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
-          onZoomOut: () => _controller?.animateCamera(CameraUpdate.zoomOut()),
-        ),
-      ],
+  /// Кнопки справа внизу: масштаб. Ортофотопланы включаются и
+  /// переставляются в «Картах на экране» (своей кнопки над картой больше
+  /// нет — она дублировала глазик там же).
+  Widget _mapButtons() {
+    return MapZoomButtons(
+      onZoomIn: () => _controller?.animateCamera(CameraUpdate.zoomIn()),
+      onZoomOut: () => _controller?.animateCamera(CameraUpdate.zoomOut()),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final orthophotosOn = ref.watch(mapLayersProvider.select((state) => state.orthophotosOn));
     ref.listen<TrackRecordingState>(trackRecordingControllerProvider, (previous, next) {
       _requestSync();
     });
-    // Ортофотопланы включают кнопка и глазик в «Картах на экране».
+    // Ортофотопланы включает глазик в «Картах на экране».
     ref.listen<bool>(mapLayersProvider.select((state) => state.orthophotosOn), (previous, next) {
       if (next && previous == false) unawaited(_updateOrthophotos());
     });
@@ -1064,7 +1025,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             Positioned(
               right: 16,
               bottom: 16,
-              child: SafeArea(top: false, left: false, child: _mapButtons(orthophotosOn)),
+              child: SafeArea(top: false, left: false, child: _mapButtons()),
             ),
           // Системное «Назад» во время рисования закрывает его (с точками —
           // после вопроса), а не уходит с карты. PopScope действует на
@@ -1097,7 +1058,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     alignment: Alignment.centerRight,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 16, bottom: 12),
-                      child: _mapButtons(orthophotosOn),
+                      child: _mapButtons(),
                     ),
                   ),
                   MeasureSize(

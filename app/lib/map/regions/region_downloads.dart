@@ -121,8 +121,9 @@ class RegionDownloadsNotifier extends Notifier<List<RegionDownload>> {
 
   Future<MapSource?> _overviewSource() async {
     for (final provider in await ref.read(catalogProvider.future)) {
+      if (provider.id != CatalogRepository.serverProviderId) continue;
       for (final s in provider.sources) {
-        if (s.id == CatalogRepository.serverHybridSourceId && s.downloadable) return s;
+        if (s.format == TileFormat.vector && s.downloadable) return s;
       }
     }
     return null;
